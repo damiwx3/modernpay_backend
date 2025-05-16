@@ -5,7 +5,11 @@ module.exports = (sequelize, DataTypes) => {
     balance: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0.00 },
     currency: { type: DataTypes.STRING, defaultValue: 'NGN' },
     accountNumber: { type: DataTypes.STRING, unique: true },
-    bankName: { type: DataTypes.STRING, defaultValue: 'ModernPay Bank' }
+    bankName: { type: DataTypes.STRING, defaultValue: 'ModernPay Bank' },
+    isBlocked: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    }
   });
   return Wallet;
 };
