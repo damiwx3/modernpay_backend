@@ -1,4 +1,3 @@
-// routes/contribution.routes.js
 const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/contribution.controller');
@@ -93,57 +92,58 @@ router.post('/groups/:groupId/join', auth, controller.joinGroup);
  */
 router.get('/groups/:groupId/members', auth, controller.getMembers);
 
+/**
+ * @swagger
+ * /api/contributions/scheduler/trigger:
+ *   post:
+ *     summary: Trigger contribution scheduler manually
+ *     tags: [Contributions]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Scheduler ran successfully
+ */
+router.post('/scheduler/trigger', auth, controller.runScheduler);
+
+/**
+ * @swagger
+ * /api/contributions/groups/{groupId}/payout:
+ *   post:
+ *     summary: Trigger payout for a group
+ *     tags: [Contributions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Payout processed
+ */
+router.post('/groups/:groupId/payout', auth, controller.processPayout);
+
+/**
+ * @swagger
+ * /api/contributions/groups/{groupId}/summary:
+ *   get:
+ *     summary: Get group summary and history
+ *     tags: [Contributions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Group summary returned
+ */
+router.get('/groups/:groupId/summary', auth, controller.getGroupSummary);
+
 module.exports = router;
-
-
-// controllers/contribution.controller.js
-const db = require('../models');
-
-exports.createGroup = async (req, res) => {
-  try {
-    const { name, amountPerMember } = req.body;
-    const group = await db.ContributionGroup.create({ name, amountPerMember });
-    res.status(201).json({ message: 'Group created', group });
-  } catch (err) {
-    res.status(500).json({ message: 'Create group failed', error: err.message });
-  }
-};
-
-exports.getGroups = async (req, res) => {
-  try {
-    const groups = await db.ContributionGroup.findAll();
-    res.status(200).json({ groups });
-  } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch groups', error: err.message });
-  }
-};
-
-exports.joinGroup = async (req, res) => {
-  try {
-    const groupId = req.params.groupId;
-    const existing = await db.ContributionMember.findOne({
-      where: { userId: req.user.id, groupId }
-    });
-    if (existing) return res.status(400).json({ message: 'Already joined' });
-
-    const member = await db.ContributionMember.create({
-      userId: req.user.id,
-      groupId
-    });
-    res.status(200).json({ message: 'Joined group', member });
-  } catch (err) {
-    res.status(500).json({ message: 'Join failed', error: err.message });
-  }
-};
-
-exports.getMembers = async (req, res) => {
-  try {
-    const members = await db.ContributionMember.findAll({
-      where: { groupId: req.params.groupId },
-      include: [{ model: db.User, attributes: ['fullName', 'email'] }]
-    });
-    res.status(200).json({ members });
-  } catch (err) {
-    res.status(500).json({ message: 'Fetch members failed', error: err.message });
-  }
-};
