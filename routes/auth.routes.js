@@ -125,4 +125,7 @@ router.post('/verify-otp', authController.verifyOtp);
  */
 router.post('/resend-otp', authController.resendOtp);
 
+console.log("✅ Auth routes loaded");
+
+
 module.exports = router;
