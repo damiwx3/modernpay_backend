@@ -1,6 +1,4 @@
-// app.js
 require('dotenv').config();
-
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -13,8 +11,8 @@ const app = express();
 
 // === Rate Limiting (Security) ===
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per window
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: 'Too many requests from this IP, please try again later.',
 });
 app.use(limiter);
@@ -26,32 +24,22 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // === Swagger Documentation ===
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-app.use('/api/admin-auth', require('./routes/admin_auth.routes'));
-app.use('/api/admin-dashboard', require('./routes/admin_dashboard.routes'));
-app.use('/api/admin-kyc', require('./routes/admin_kyc.routes'));
-app.use('/api/notify', require('./routes/notify.routes'));
-app.use('/api/system', require('./routes/system.routes'));
-app.use('/api/webhooks', require('./routes/webhook.routes'));
 
-
-
-
-
-// === Modular Routes ===
-const routes = require('./routes'); // loads routes/index.js
+// === Modular Routes (Only this is needed)
+const routes = require('./routes'); // auto loads all subroutes inside index.js
 app.use('/api', routes);
 
-// === Root Route ===
+// === Root Route
 app.get('/', (req, res) => {
   res.send('🌍 ModernPay Backend API is running.');
 });
 
-// === 404 Handler ===
+// === 404 Handler
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-// === Global Error Handler ===
+// === Global Error Handler
 app.use(errorHandler);
 
 module.exports = app;
