@@ -3,6 +3,7 @@ const router = express.Router();
 const adminController = require('../controllers/admin.controller');
 const adminAuth = require('../middleware/admin_auth.middleware');
 
+
 /**
  * @swagger
  * tags:
@@ -69,5 +70,33 @@ router.post('/kyc/approve', adminAuth, adminController.approveKyc);
  *         description: Stats summary
  */
 router.get('/summary', adminAuth, adminController.getAdminSummary);
+
+/**
+ * @swagger
+ * /api/admin/wallet/block:
+ *   post:
+ *     summary: Block a user's wallet
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *             properties:
+ *               userId:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Wallet blocked
+ *       404:
+ *         description: Wallet not found
+ */
+router.post('/wallet/block', adminAuth, adminController.blockWallet);
+
 
 module.exports = router;
