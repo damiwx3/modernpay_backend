@@ -23,6 +23,7 @@ app.get('/', (req, res) => res.send('🌍 API Running'));
 
 // Catch 404
 app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
+app.use('/api/webhooks', require('./routes/webhook.routes'));
 
 // Error Handler
 app.use(errorHandler);
