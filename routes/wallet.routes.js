@@ -93,4 +93,46 @@ router.post('/fund', auth, walletController.fundWallet);
  */
 router.post('/transfer', auth, walletController.transferFunds);
 
+/**
+ * @swagger
+ * /api/wallets/transfer-bank:
+ *   post:
+ *     summary: Transfer to Nigerian bank account (external)
+ *     tags: [Wallets]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - bankCode
+ *               - accountNumber
+ *               - amount
+ *             properties:
+ *               bankCode:
+ *                 type: string
+ *                 example: "058"
+ *               accountNumber:
+ *                 type: string
+ *                 example: "0123456789"
+ *               amount:
+ *                 type: number
+ *                 example: 1000
+ *               narration:
+ *                 type: string
+ *                 example: "Withdrawal to bank"
+ *     responses:
+ *       200:
+ *         description: Transfer successful
+ *       400:
+ *         description: Invalid input or balance error
+ *       500:
+ *         description: Flutterwave transfer failed
+ */
+router.post('/transfer-bank', auth, walletController.transferToBank);
+
+
 module.exports = router;
