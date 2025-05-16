@@ -12,6 +12,20 @@ const authMiddleware = require('../middleware/auth.middleware');
 
 /**
  * @swagger
+ * /api/users:
+ *   get:
+ *     summary: Confirm that user routes are working
+ *     tags: [Users]
+ *     responses:
+ *       200:
+ *         description: Returns a success message
+ */
+router.get('/', (req, res) => {
+  res.json({ message: 'User routes are live!' });
+});
+
+/**
+ * @swagger
  * /api/users/profile:
  *   get:
  *     summary: Get the authenticated user's profile
@@ -24,10 +38,45 @@ const authMiddleware = require('../middleware/auth.middleware');
  *       401:
  *         description: Unauthorized
  */
-
-
 router.get('/profile', authMiddleware, userController.getProfile);
+
+/**
+ * @swagger
+ * /api/users/profile:
+ *   put:
+ *     summary: Update the authenticated user's profile
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Profile updated
+ *       401:
+ *         description: Unauthorized
+ */
 router.put('/profile', authMiddleware, userController.updateProfile);
+
+/**
+ * @swagger
+ * /api/users/{id}:
+ *   get:
+ *     summary: Get a user by ID
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: Returns user info
+ *       404:
+ *         description: User not found
+ */
 router.get('/:id', authMiddleware, userController.getUserById);
 
 module.exports = router;
