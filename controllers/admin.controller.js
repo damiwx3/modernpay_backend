@@ -84,6 +84,23 @@ exports.approveKyc = async (req, res) => {
   }
 };
 
+// Block a user's wallet
+exports.blockWallet = async (req, res) => {
+  const { userId } = req.body;
+
+  try {
+    const wallet = await db.Wallet.findOne({ where: { userId } });
+    if (!wallet) return res.status(404).json({ message: 'Wallet not found' });
+
+    wallet.isBlocked = true;
+    await wallet.save();
+
+    res.status(200).json({ message: 'Wallet blocked' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to block wallet', error: err.message });
+  }
+};
+
 // ✅ Admin Dashboard Summary
 exports.getAdminSummary = async (req, res) => {
   try {
