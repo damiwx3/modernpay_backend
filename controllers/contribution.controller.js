@@ -1,7 +1,70 @@
 const db = require('../models');
 const { Op } = require('sequelize');
 
-// 🔁 Manual trigger for cron job
+// Create a new contribution group
+exports.createGroup = async (req, res) => {
+  try {
+    const { name, amountPerMember } = req.body;
+    const group = await db.ContributionGroup.create({ name, amountPerMember });
+    res.status(201).json({ message: 'Group created', group });
+  } catch (err) {
+    res.status(500).json({ message: 'Create group failed', error: err.message });
+  }
+};
+
+// Join a contribution group
+exports.joinGroup = async (req, res) => {
+  try {
+    const groupId = req.params.groupId;
+    const existing = await db.ContributionMember.findOne({
+      where: { userId: req.user.id, groupId }
+    });
+    if (existing) return res.status(400).json({ message: 'Already joined' });
+
+    const member = await db.ContributionMember.create({
+      userId: req.user.id,
+      groupId
+    });
+    res.status(200).json({ message: 'Joined group', member });
+  } catch (err) {
+    res.status(500).json({ message: 'Join failed', error: err.message });
+  }
+};
+
+// Make a contribution (stub)
+exports.makeContribution = async (req, res) => {
+  res.status(200).json({ message: 'makeContribution not implemented' });
+};
+
+// Leave a group (stub)
+exports.leaveGroup = async (req, res) => {
+  res.status(200).json({ message: 'leaveGroup not implemented' });
+};
+
+// Get all groups (stub)
+exports.getGroups = async (req, res) => {
+  try {
+    const groups = await db.ContributionGroup.findAll();
+    res.status(200).json({ groups });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch groups', error: err.message });
+  }
+};
+
+// Get members of a group (stub)
+exports.getMembers = async (req, res) => {
+  try {
+    const members = await db.ContributionMember.findAll({
+      where: { groupId: req.params.groupId },
+      include: [{ model: db.User, attributes: ['fullName', 'email'] }]
+    });
+    res.status(200).json({ members });
+  } catch (err) {
+    res.status(500).json({ message: 'Fetch members failed', error: err.message });
+  }
+};
+
+// Run scheduler
 exports.runScheduler = async (req, res) => {
   try {
     const scheduler = require('../jobs/contributionScheduler');
@@ -12,7 +75,7 @@ exports.runScheduler = async (req, res) => {
   }
 };
 
-// 💸 Payout logic (e.g., to next person in group)
+// Process payout for a group
 exports.processPayout = async (req, res) => {
   const groupId = req.params.groupId;
 
@@ -49,7 +112,7 @@ exports.processPayout = async (req, res) => {
   }
 };
 
-// 📊 Summary of a group
+// Get group summary
 exports.getGroupSummary = async (req, res) => {
   const groupId = req.params.groupId;
 
