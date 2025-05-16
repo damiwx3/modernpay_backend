@@ -13,6 +13,9 @@ router.use('/referrals', require('./referral.routes'));
 router.use('/bills', require('./bill.routes'));
 router.use('/savings', require('./savings.routes'));
 router.use('/transactions', require('./transaction.routes'));
+router.use('/notify', require('./notify.routes'));
+router.use('/system', require('./system.routes'));
+router.use('/webhooks', require('./webhook.routes'));
 
 
 // router.use('/contributions', require('./contribution.routes')); // if needed
