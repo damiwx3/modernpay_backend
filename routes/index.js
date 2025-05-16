@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
+
 router.use('/auth', require('./auth.routes'));
 router.use('/users', require('./user.routes'));
 router.use('/wallets', require('./wallet.routes'));
@@ -16,6 +17,9 @@ router.use('/transactions', require('./transaction.routes'));
 router.use('/notify', require('./notify.routes'));
 router.use('/system', require('./system.routes'));
 router.use('/webhooks', require('./webhook.routes'));
+router.use('/contributions', require('./contribution.routes'));
+
+
 
 
 // router.use('/contributions', require('./contribution.routes')); // if needed
