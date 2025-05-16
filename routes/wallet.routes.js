@@ -80,6 +80,9 @@ router.post('/fund', auth, walletController.fundWallet);
  *               amount:
  *                 type: number
  *                 example: 1000
+ *               narration:
+ *                  type: string
+ *               example: "Payment for ModernPay"
  *     responses:
  *       200:
  *         description: Transfer successful
