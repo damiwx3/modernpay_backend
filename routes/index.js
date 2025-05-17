@@ -19,6 +19,7 @@ router.use('/system', require('./system.routes'));
 router.use('/webhooks', require('./webhook.routes'));
 router.use('/contributions', require('./contribution.routes'));
 router.use('/virtual-cards', require('./virtual_card.routes'));
+router.use('/campaigns', require('./campaign.routes'));
 
 
 
