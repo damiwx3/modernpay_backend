@@ -1,36 +1,41 @@
 const db = require('../models');
-const crypto = require('crypto');
 
-exports.handleFlutterwaveWebhook = async (req, res) => {
-  // Verify Flutterwave Signature
-  const hash = crypto.createHmac('sha256', process.env.FLW_SECRET_HASH)
-    .update(JSON.stringify(req.body))
-    .digest('hex');
+exports.flutterwaveWebhook = async (req, res) => {
+  const secretHash = process.env.FLW_SECRET_HASH;
+  const signature = req.headers['verif-hash'];
 
-  if (hash !== req.headers['verif-hash']) {
-    return res.status(401).send('Invalid signature');
+  if (!signature || signature !== secretHash) {
+    return res.status(401).json({ message: 'Invalid or missing webhook signature' });
   }
 
-  const event = req.body.event;
-  const payload = req.body.data;
+  const payload = req.body;
 
   try {
-    if (event === 'transfer.completed') {
-      const { reference, status, amount, destination } = payload;
+    if (payload.event === 'transfer.completed') {
+      const data = payload.data;
+      const { status, reference, amount } = data;
 
-      const transaction = await db.Transaction.findOne({ where: { description: { [db.Sequelize.Op.like]: `%${reference}%` } } });
+      const txn = await db.Transaction.findOne({ where: { description: reference } });
 
-      if (transaction) {
-        transaction.status = status === 'SUCCESSFUL' ? 'success' : 'failed';
-        await transaction.save();
+      if (!txn) return res.status(404).json({ message: 'Transaction not found' });
 
-        console.log(`✅ Transfer status updated: ${reference} → ${transaction.status}`);
+      if (status === 'SUCCESSFUL') {
+        await txn.update({ status: 'success' });
+        console.log(`✅ Payout successful: ${reference}`);
+      } else if (status === 'FAILED') {
+        const wallet = await db.Wallet.findOne({ where: { userId: txn.userId } });
+        if (wallet) {
+          wallet.balance += parseFloat(amount);
+          await wallet.save();
+        }
+        await txn.update({ status: 'failed' });
+        console.log(`❌ Payout failed and refunded: ${reference}`);
       }
     }
 
     res.status(200).send('Webhook received');
   } catch (err) {
-    console.error('❌ Webhook error:', err.message);
-    res.status(500).send('Error processing webhook');
+    console.error('Webhook error:', err.message);
+    res.status(500).json({ message: 'Internal webhook error' });
   }
 };
