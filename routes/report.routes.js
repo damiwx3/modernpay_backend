@@ -7,12 +7,12 @@ const auth = require('../middleware/auth.middleware');
  * @swagger
  * tags:
  *   name: Reports
- *   description: Statement downloads and transaction exports
+ *   description: Export statements and reports
  */
 
 /**
  * @swagger
- * /api/reports/statement:
+ * /api/reports/monthly-statement:
  *   get:
  *     summary: Download PDF monthly statement
  *     tags: [Reports]
@@ -20,22 +20,22 @@ const auth = require('../middleware/auth.middleware');
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: PDF downloaded
+ *         description: PDF file of current month's statement
  */
-router.get('/statement', auth, controller.downloadPdf);
+router.get('/monthly-statement', auth, controller.generateMonthlyStatement);
 
 /**
  * @swagger
- * /api/reports/transactions/csv:
+ * /api/reports/export-csv:
  *   get:
- *     summary: Export transactions as CSV
+ *     summary: Export transactions to CSV
  *     tags: [Reports]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: CSV exported
+ *         description: CSV file with all transactions
  */
-router.get('/transactions/csv', auth, controller.downloadCsv);
+router.get('/export-csv', auth, controller.exportCSV);
 
 module.exports = router;
