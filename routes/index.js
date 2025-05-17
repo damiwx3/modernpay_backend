@@ -23,6 +23,7 @@ router.use('/campaigns', require('./campaign.routes'));
 router.use('/tickets', require('./ticket.routes'));
 router.use('/disputes', require('./dispute.routes'));
 router.use('/reports', require('./report.routes'));
+router.use('/audit', require('./audit.routes'));
 
 
 
