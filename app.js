@@ -7,13 +7,14 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const routes = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
-
+const maintenanceCheck = require('./middleware/maintenance.middleware');
 const checkMaintenance = require('./middleware/checkMaintenance.middleware'); // <-- Add this line
 
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+app.use(maintenanceCheck);
 app.use(checkMaintenance); // <-- Add this line before loading routes
 
 // Swagger
