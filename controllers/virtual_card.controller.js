@@ -72,3 +72,15 @@ exports.getCardTransactions = async (req, res) => {
     res.status(500).json({ message: 'Could not fetch transactions', error: err.message });
   }
 };
+
+exports.topUpCard = async (req, res) => {
+  res.status(200).json({ message: 'Top up not implemented' });
+};
+
+exports.setSpendingLimit = async (req, res) => {
+  res.status(200).json({ message: 'Set spending limit not implemented' });
+};
+
+exports.deleteCard = async (req, res) => {
+  res.status(200).json({ message: 'Delete card not implemented' });
+};
