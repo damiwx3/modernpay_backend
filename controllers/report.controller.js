@@ -1,55 +1,63 @@
 const db = require('../models');
-const { Parser } = require('json2csv');
 const PDFDocument = require('pdfkit');
+const moment = require('moment');
+const { Parser } = require('json2csv');
 
-// Download CSV transactions
-exports.downloadCsv = async (req, res) => {
-  try {
-    const transactions = await db.Transaction.findAll({
-      where: { userId: req.user.id },
-      order: [['createdAt', 'DESC']]
-    });
-
-    const jsonData = transactions.map(t => t.toJSON());
-    const parser = new Parser();
-    const csv = parser.parse(jsonData);
-
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename=transactions.csv');
-    res.status(200).send(csv);
-  } catch (err) {
-    res.status(500).json({ message: 'Failed to export CSV', error: err.message });
-  }
-};
-
-// Download PDF statement
-exports.downloadPdf = async (req, res) => {
+// PDF monthly statement
+exports.generateMonthlyStatement = async (req, res) => {
   try {
     const user = req.user;
     const transactions = await db.Transaction.findAll({
-      where: { userId: user.id },
-      order: [['createdAt', 'DESC']]
+      where: {
+        userId: user.id,
+        createdAt: {
+          [db.Sequelize.Op.gte]: moment().startOf('month').toDate(),
+          [db.Sequelize.Op.lte]: moment().endOf('month').toDate(),
+        },
+      },
+      order: [['createdAt', 'DESC']],
     });
 
     const doc = new PDFDocument();
+    res.setHeader('Content-Disposition', 'attachment; filename="monthly_statement.pdf"');
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=statement.pdf');
     doc.pipe(res);
 
-    doc.fontSize(18).text(`Account Statement - ${user.fullName}`, { align: 'center' });
+    doc.fontSize(16).text(`Monthly Statement - ${moment().format('MMMM YYYY')}`, { align: 'center' });
     doc.moveDown();
 
     transactions.forEach(txn => {
-      doc.fontSize(12).text(`Date: ${txn.createdAt}`);
-      doc.text(`Type: ${txn.type}`);
-      doc.text(`Amount: ₦${txn.amount}`);
-      doc.text(`Description: ${txn.description}`);
-      doc.text(`Status: ${txn.status}`);
-      doc.moveDown();
+      doc.fontSize(12).text(`• ${txn.type.toUpperCase()} ₦${txn.amount} - ${txn.description} (${moment(txn.createdAt).format('DD MMM')})`);
     });
 
     doc.end();
   } catch (err) {
-    res.status(500).json({ message: 'Failed to generate PDF', error: err.message });
+    res.status(500).json({ message: 'Failed to generate statement', error: err.message });
+  }
+};
+
+// Export transactions as CSV
+exports.exportCSV = async (req, res) => {
+  try {
+    const transactions = await db.Transaction.findAll({
+      where: { userId: req.user.id },
+      order: [['createdAt', 'DESC']],
+    });
+
+    const plain = transactions.map(txn => ({
+      type: txn.type,
+      amount: txn.amount,
+      description: txn.description,
+      date: moment(txn.createdAt).format('YYYY-MM-DD HH:mm:ss')
+    }));
+
+    const parser = new Parser();
+    const csv = parser.parse(plain);
+
+    res.setHeader('Content-Disposition', 'attachment; filename="transactions.csv"');
+    res.set('Content-Type', 'text/csv');
+    res.send(csv);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to export CSV', error: err.message });
   }
 };
