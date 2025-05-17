@@ -1,8 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const webhookController = require('../controllers/webhook.controller');
+const controller = require('../controllers/webhook.controller');
 
-// Public webhook - no auth middleware
-router.post('/flutterwave', webhookController.handleFlutterwaveWebhook);
+/**
+ * @swagger
+ * /api/webhooks/flutterwave:
+ *   post:
+ *     summary: Flutterwave webhook handler
+ *     tags: [Webhooks]
+ *     responses:
+ *       200:
+ *         description: Webhook received
+ */
+router.post('/flutterwave', controller.flutterwaveWebhook);
 
 module.exports = router;
