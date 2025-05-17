@@ -25,6 +25,7 @@ app.get('/', (req, res) => res.send('🌍 API Running'));
 app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
 app.use('/api/webhooks', require('./routes/webhook.routes'));
 app.use('/api/bank', require('./routes/bank.routes'));
+app.use('/api/virtual-cards', require('./routes/virtual_card.routes'));
 
 
 // Error Handler
