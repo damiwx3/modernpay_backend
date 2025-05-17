@@ -22,6 +22,7 @@ router.use('/virtual-cards', require('./virtual_card.routes'));
 router.use('/campaigns', require('./campaign.routes'));
 router.use('/tickets', require('./ticket.routes'));
 router.use('/disputes', require('./dispute.routes'));
+router.use('/reports', require('./report.routes'));
 
 
 
