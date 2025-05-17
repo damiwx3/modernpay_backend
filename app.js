@@ -9,12 +9,14 @@ const routes = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
 const maintenanceCheck = require('./middleware/maintenance.middleware');
 const checkMaintenance = require('./middleware/checkMaintenance.middleware'); // <-- Add this line
+const maintenance = require('./middleware/maintenance.middleware');
 
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 app.use(maintenanceCheck);
+app.use(maintenance);
 app.use(checkMaintenance); // <-- Add this line before loading routes
 
 // Swagger
