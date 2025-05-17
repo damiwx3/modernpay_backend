@@ -1,11 +1,13 @@
 const express = require('express');
 const router = express.Router();
+const controller = require('../controllers/system.controller');
+const adminAuth = require('../middleware/admin_auth.middleware');
 
 /**
  * @swagger
  * tags:
  *   name: System
- *   description: Server & system status
+ *   description: System settings and admin toggles
  */
 
 /**
@@ -60,5 +62,36 @@ router.get('/status', (req, res) => {
     version: '1.0.0'
   });
 });
+
+/**
+ * @swagger
+ * /api/system/maintenance:
+ *   post:
+ *     summary: Toggle maintenance mode (on/off)
+ *     tags: [System]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - mode
+ *             properties:
+ *               mode:
+ *                 type: string
+ *                 enum: [on, off]
+ *                 example: off
+ *     responses:
+ *       200:
+ *         description: Maintenance mode updated
+ *       400:
+ *         description: Invalid mode
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/maintenance', adminAuth, controller.setMaintenanceMode);
 
 module.exports = router;
