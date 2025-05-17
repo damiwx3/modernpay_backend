@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const generateOTP = require('../utils/generateOTP');
 
+// Register
 exports.register = async (req, res) => {
   try {
     const { fullName, email, password } = req.body;
@@ -23,6 +24,14 @@ exports.register = async (req, res) => {
       expiresAt: new Date(Date.now() + 10 * 60 * 1000)
     });
 
+    await db.AuditLog.create({
+      userId: user.id,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      action: 'register',
+      status: 'success'
+    });
+
     res.status(201).json({ message: 'User registered. Verify with OTP.', otp }); // In production, send OTP via SMS/email
   } catch (err) {
     console.error('Register error:', err.message);
@@ -30,17 +39,44 @@ exports.register = async (req, res) => {
   }
 };
 
+// Login
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     const user = await db.User.findOne({ where: { email } });
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user) {
+      await db.AuditLog.create({
+        userId: null,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+        action: 'login',
+        status: 'failed'
+      });
+      return res.status(404).json({ message: 'User not found' });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
+    if (!isMatch) {
+      await db.AuditLog.create({
+        userId: user.id,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+        action: 'login',
+        status: 'failed'
+      });
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
 
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '2d' });
+
+    await db.AuditLog.create({
+      userId: user.id,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      action: 'login',
+      status: 'success'
+    });
 
     res.status(200).json({ message: 'Login successful', token, user });
   } catch (err) {
@@ -49,6 +85,7 @@ exports.login = async (req, res) => {
   }
 };
 
+// Verify OTP
 exports.verifyOtp = async (req, res) => {
   try {
     const { email, code } = req.body;
@@ -73,6 +110,14 @@ exports.verifyOtp = async (req, res) => {
     user.kycStatus = 'pending';
     await user.save();
 
+    await db.AuditLog.create({
+      userId: user.id,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      action: 'verify_otp',
+      status: 'success'
+    });
+
     res.status(200).json({ message: 'OTP verified successfully' });
   } catch (err) {
     console.error('OTP verification error:', err.message);
@@ -80,6 +125,7 @@ exports.verifyOtp = async (req, res) => {
   }
 };
 
+// Resend OTP
 exports.resendOtp = async (req, res) => {
   try {
     const { email } = req.body;
@@ -93,6 +139,14 @@ exports.resendOtp = async (req, res) => {
       code: otp,
       type: 'registration',
       expiresAt: new Date(Date.now() + 10 * 60 * 1000)
+    });
+
+    await db.AuditLog.create({
+      userId: user.id,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      action: 'resend_otp',
+      status: 'success'
     });
 
     res.status(200).json({ message: 'OTP resent successfully', otp }); // Replace with SMS/email logic
