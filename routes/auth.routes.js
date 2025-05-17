@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/auth.controller');
+const securityLogger = require('../middleware/securityLogger');
 
 /**
  * @swagger
@@ -68,8 +69,8 @@ router.post('/register', authController.register);
  *       404:
  *         description: User not found
  */
-router.post('/login', authController.login);
-
+router.post('/login', securityLogger, authController.login);
+//router.post('/logout', securityLogger, authController.logout); // optional
 /**
  * @swagger
  * /api/auth/verify-otp:
