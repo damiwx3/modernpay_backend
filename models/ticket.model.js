@@ -5,7 +5,8 @@ module.exports = (sequelize, DataTypes) => {
     subject: { type: DataTypes.STRING, allowNull: false },
     message: { type: DataTypes.TEXT, allowNull: false },
     status: { type: DataTypes.STRING, defaultValue: 'open' },
-    priority: { type: DataTypes.STRING, defaultValue: 'normal' }
+    priority: { type: DataTypes.STRING, defaultValue: 'normal' },
+    adminResponse: { type: DataTypes.TEXT, allowNull: true }, 
   });
   return Ticket;
 };
