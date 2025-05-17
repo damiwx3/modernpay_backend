@@ -31,6 +31,7 @@ app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
 app.use('/api/webhooks', require('./routes/webhook.routes'));
 app.use('/api/bank', require('./routes/bank.routes'));
 app.use('/api/virtual-cards', require('./routes/virtual_card.routes'));
+app.use('/api/system', require('./routes/system.routes'));
 
 // Error Handler
 app.use(errorHandler);
