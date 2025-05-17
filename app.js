@@ -8,9 +8,13 @@ const bodyParser = require('body-parser');
 const routes = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
 
+const checkMaintenance = require('./middleware/checkMaintenance.middleware'); // <-- Add this line
+
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+app.use(checkMaintenance); // <-- Add this line before loading routes
 
 // Swagger
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
@@ -26,7 +30,6 @@ app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
 app.use('/api/webhooks', require('./routes/webhook.routes'));
 app.use('/api/bank', require('./routes/bank.routes'));
 app.use('/api/virtual-cards', require('./routes/virtual_card.routes'));
-
 
 // Error Handler
 app.use(errorHandler);
