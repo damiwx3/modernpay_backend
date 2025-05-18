@@ -185,3 +185,78 @@ exports.resendOtp = async (req, res) => {
     res.status(500).json({ message: 'Failed to resend OTP' });
   }
 };
+
+// Forgot Password - Send OTP
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const user = await db.User.findOne({ where: { email } });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const otp = generateOTP();
+    await db.OTPCode.create({
+      userId: user.id,
+      code: otp,
+      type: 'password_reset',
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000)
+    });
+
+    // Send OTP
+    await sendEmail(
+      user.email,
+      'Reset Your ModernPay Password',
+      `Hi ${user.fullName},\n\nYour password reset OTP is: ${otp}\nIt expires in 10 minutes.`
+    );
+
+    if (user.phone) {
+      await sendSms(user.phone, `ModernPay reset OTP: ${otp}`);
+    }
+
+    res.status(200).json({ message: 'OTP sent to email and phone' });
+  } catch (err) {
+    console.error('Forgot Password error:', err.message);
+    res.status(500).json({ message: 'Could not send OTP' });
+  }
+};
+
+// Reset Password
+exports.resetPassword = async (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body;
+
+    const user = await db.User.findOne({ where: { email } });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const otp = await db.OTPCode.findOne({
+      where: {
+        userId: user.id,
+        code,
+        type: 'password_reset',
+        used: false,
+        expiresAt: { [db.Sequelize.Op.gt]: new Date() }
+      }
+    });
+
+    if (!otp) return res.status(400).json({ message: 'Invalid or expired OTP' });
+
+    otp.used = true;
+    await otp.save();
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    await db.AuditLog.create({
+      userId: user.id,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      action: 'reset_password',
+      status: 'success'
+    });
+
+    res.status(200).json({ message: 'Password reset successful' });
+  } catch (err) {
+    console.error('Reset Password error:', err.message);
+    res.status(500).json({ message: 'Failed to reset password' });
+  }
+};
