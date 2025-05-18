@@ -3,26 +3,25 @@ const PDFDocument = require('pdfkit');
 const { Parser } = require('json2csv');
 const moment = require('moment');
 
-// ✅ Get all transactions for logged-in user
+// In transaction.controller.js
 exports.getUserTransactions = async (req, res) => {
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 20;
-  const offset = (page - 1) * limit;
-
   try {
-    const result = await db.Transaction.findAndCountAll({
-      where: { userId: req.user.id },
-      order: [['createdAt', 'DESC']],
-      limit,
-      offset,
+    const { month, year } = req.query;
+    const where = { userId: req.user.id };
+
+    if (month && year) {
+      const start = new Date(`${year}-${month}-01`);
+      const end = new Date(start);
+      end.setMonth(start.getMonth() + 1);
+      where.createdAt = { [db.Sequelize.Op.between]: [start, end] };
+    }
+
+    const transactions = await db.Transaction.findAll({
+      where,
+      order: [['createdAt', 'DESC']]
     });
 
-    res.status(200).json({
-      total: result.count,
-      page,
-      totalPages: Math.ceil(result.count / limit),
-      transactions: result.rows,
-    });
+    res.status(200).json({ transactions });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch transactions', error: err.message });
   }
