@@ -6,7 +6,7 @@ exports.createCard = async (req, res) => {
     const existing = await db.VirtualCard.findOne({ where: { userId: req.user.id } });
     if (existing) return res.status(400).json({ message: 'You already have a virtual card' });
 
-    const cardNumber = generateCardNumber();
+    const cardNumber = generateCardNumber().join('');
     const cvv = Math.floor(100 + Math.random() * 900).toString();
     const expiryDate = '12/29';
 
