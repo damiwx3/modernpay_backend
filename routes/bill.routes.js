@@ -1,20 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const billController = require('../controllers/bill.controller');
+const controller = require('../controllers/bill.controller');
 const auth = require('../middleware/auth.middleware');
-
-/**
- * @swagger
- * tags:
- *   name: Bills
- *   description: Bill payment operations (airtime, data, electricity, etc.)
- */
 
 /**
  * @swagger
  * /api/bills/pay:
  *   post:
- *     summary: Pay a utility or airtime bill
+ *     summary: Pay for a bill (airtime, data, etc.)
  *     tags: [Bills]
  *     security:
  *       - bearerAuth: []
@@ -24,24 +17,30 @@ const auth = require('../middleware/auth.middleware');
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [serviceType, amount]
  *             properties:
- *               service:
+ *               serviceType:
  *                 type: string
  *               amount:
  *                 type: number
- *               phoneNumber:
- *                 type: string
+ *     responses:
+ *       201:
+ *         description: Bill paid successfully
+ */
+router.post('/pay', auth, controller.payBill);
+
+/**
+ * @swagger
+ * /api/bills/history:
+ *   get:
+ *     summary: Get user bill payment history
+ *     tags: [Bills]
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Bill payment successful
- *       400:
- *         description: Invalid request
+ *         description: Returns user's bill payment records
  */
-
-
-router.post('/airtime', auth, billController.buyAirtime);
-router.post('/data', auth, billController.buyData);
-router.post('/electricity', auth, billController.payElectricityBill);
-router.get('/history', auth, billController.getBillPaymentHistory);
+router.get('/history', auth, controller.getHistory);
 
 module.exports = router;
