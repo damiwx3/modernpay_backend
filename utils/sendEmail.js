@@ -1,10 +1,12 @@
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail', // or use 'outlook', 'yahoo', or custom SMTP
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false, // TLS
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS, // App Password for Gmail if 2FA enabled
+    pass: process.env.EMAIL_PASS, // App password
   },
 });
 
@@ -21,6 +23,7 @@ const sendEmail = async (to, subject, text) => {
     console.log(`📧 Email sent to ${to} (${info.messageId})`);
   } catch (err) {
     console.error(`❌ Email to ${to} failed:`, err.message);
+    console.error('❌ Full error stack:', err);
   }
 };
 
