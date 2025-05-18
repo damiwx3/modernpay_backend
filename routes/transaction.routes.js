@@ -1,64 +1,56 @@
 const express = require('express');
 const router = express.Router();
-const controller = require('../controllers/transaction.controller');
+const transactionController = require('../controllers/transaction.controller');
 const auth = require('../middleware/auth.middleware');
 
 /**
  * @swagger
- * tags:
- *   name: Transactions
- *   description: Transaction-related operations
- */
-
-/**
- * @swagger
- * /api/transactions/my:
+ * /api/wallets/transactions:
  *   get:
- *     summary: Get my transaction history
- *     tags: [Transactions]
+ *     summary: Fetch user transaction history
+ *     tags: [Wallet]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - name: page
+ *         in: query
+ *         schema: { type: integer }
+ *       - name: limit
+ *         in: query
+ *         schema: { type: integer }
  *     responses:
  *       200:
- *         description: List of user's transactions
- *       401:
- *         description: Unauthorized
+ *         description: Returns user's transaction history
  */
-router.get('/my', auth, controller.getMyTransactions);
+router.get('/transactions', auth, transactionController.getUserTransactions);
 
 /**
  * @swagger
- * /api/transactions/create:
+ * /api/wallets/transactions:
  *   post:
- *     summary: Manually create a transaction log
- *     tags: [Transactions]
+ *     summary: Create a manual transaction (for test/admin)
+ *     tags: [Wallet]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
- *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - amount
- *               - type
+ *             required: [amount, type]
  *             properties:
  *               amount:
  *                 type: number
  *               type:
  *                 type: string
- *                 enum: [credit, debit]
  *               description:
+ *                 type: string
+ *               status:
  *                 type: string
  *     responses:
  *       201:
  *         description: Transaction created
- *       400:
- *         description: Invalid input
- *       401:
- *         description: Unauthorized
  */
-router.post('/create', auth, controller.createTransaction);
+router.post('/transactions', auth, transactionController.createTransaction);
 
 module.exports = router;
