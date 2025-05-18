@@ -26,14 +26,12 @@ exports.register = async (req, res) => {
       expiresAt: new Date(Date.now() + 10 * 60 * 1000)
     });
 
-    // Send OTP via Email
     await sendEmail(
       email,
       'Your ModernPay OTP Code',
       `Hi ${fullName},\n\nYour OTP is: ${otp}\nIt will expire in 10 minutes.\n\n- ModernPay`
     );
 
-    // Send OTP via SMS
     if (phone) {
       await sendSms(
         phone,
@@ -113,15 +111,32 @@ exports.verifyOtp = async (req, res) => {
     const otp = await db.OTPCode.findOne({
       where: {
         userId: user.id,
-        code,
+        type: 'registration',
         used: false,
         expiresAt: { [db.Sequelize.Op.gt]: new Date() }
-      }
+      },
+      order: [['createdAt', 'DESC']]
     });
 
     if (!otp) return res.status(400).json({ message: 'Invalid or expired OTP' });
 
+    if (otp.blockedUntil && otp.blockedUntil > new Date()) {
+      const wait = Math.ceil((otp.blockedUntil - new Date()) / 60000);
+      return res.status(429).json({ message: `Too many failed attempts. Try again in ${wait} minutes.` });
+    }
+
+    if (otp.code !== code) {
+      otp.attempts = (otp.attempts || 0) + 1;
+      if (otp.attempts >= 3) {
+        otp.blockedUntil = new Date(Date.now() + 5 * 60 * 1000);
+      }
+      await otp.save();
+      return res.status(400).json({ message: 'Incorrect OTP' });
+    }
+
     otp.used = true;
+    otp.attempts = 0;
+    otp.blockedUntil = null;
     await otp.save();
 
     user.kycStatus = 'pending';
@@ -202,7 +217,6 @@ exports.forgotPassword = async (req, res) => {
       expiresAt: new Date(Date.now() + 10 * 60 * 1000)
     });
 
-    // Send OTP
     await sendEmail(
       user.email,
       'Reset Your ModernPay Password',
@@ -231,16 +245,39 @@ exports.resetPassword = async (req, res) => {
     const otp = await db.OTPCode.findOne({
       where: {
         userId: user.id,
-        code,
         type: 'password_reset',
         used: false,
         expiresAt: { [db.Sequelize.Op.gt]: new Date() }
-      }
+      },
+      order: [['createdAt', 'DESC']]
     });
 
     if (!otp) return res.status(400).json({ message: 'Invalid or expired OTP' });
 
+    if (otp.blockedUntil && otp.blockedUntil > new Date()) {
+      const wait = Math.ceil((otp.blockedUntil - new Date()) / 60000);
+      return res.status(429).json({ message: `Too many failed attempts. Try again in ${wait} minutes.` });
+    }
+
+    if (otp.code !== code) {
+      otp.attempts = (otp.attempts || 0) + 1;
+      if (otp.attempts >= 3) {
+        otp.blockedUntil = new Date(Date.now() + 5 * 60 * 1000);
+      }
+      await otp.save();
+      return res.status(400).json({ message: 'Incorrect OTP' });
+    }
+
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{6,}$/;
+    if (!passwordRegex.test(newPassword)) {
+      return res.status(400).json({
+        message: 'Password must be at least 6 characters and include lowercase, uppercase, number, and special character.'
+      });
+    }
+
     otp.used = true;
+    otp.attempts = 0;
+    otp.blockedUntil = null;
     await otp.save();
 
     user.password = await bcrypt.hash(newPassword, 10);
