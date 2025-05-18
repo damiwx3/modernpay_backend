@@ -4,10 +4,32 @@ const { Op } = require('sequelize');
 // Create a new contribution group
 exports.createGroup = async (req, res) => {
   try {
-    const { name, amountPerMember } = req.body;
-    const group = await db.ContributionGroup.create({ name, amountPerMember });
-    res.status(201).json({ message: 'Group created', group });
+    const { name, amountPerMember, frequency, payoutSchedule, description, maxMembers } = req.body;
+
+    if (!name || !amountPerMember) {
+      return res.status(400).json({ message: 'Name and amountPerMember are required' });
+    }
+
+    let imageUrl = null;
+    if (req.file) {
+      imageUrl = req.file.path; // Or use Cloudinary URL if you're uploading there
+    }
+
+    const group = await db.ContributionGroup.create({
+      name,
+      description: description || null,
+      amountPerMember: parseFloat(amountPerMember),
+      frequency,
+      payoutSchedule,
+      imageUrl,
+      createdBy: req.user.id,
+      maxMembers: maxMembers ? parseInt(maxMembers) : 10,
+      status: 'active'
+    });
+
+    res.status(201).json({ message: 'Group created successfully', group });
   } catch (err) {
+    console.error('Create group error:', err);
     res.status(500).json({ message: 'Create group failed', error: err.message });
   }
 };
