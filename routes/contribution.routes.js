@@ -2,6 +2,19 @@ const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/contribution.controller');
 const auth = require('../middleware/auth.middleware');
+const multer = require('multer');
+
+// Setup Multer for image upload
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/groups');
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = `${Date.now()}-${file.originalname}`;
+    cb(null, uniqueName);
+  }
+});
+const upload = multer({ storage });
 
 /**
  * @swagger
@@ -21,7 +34,7 @@ const auth = require('../middleware/auth.middleware');
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             required:
@@ -32,11 +45,23 @@ const auth = require('../middleware/auth.middleware');
  *                 type: string
  *               amountPerMember:
  *                 type: number
+ *               frequency:
+ *                 type: string
+ *                 enum: [Daily, Weekly, Monthly]
+ *               payoutSchedule:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               maxMembers:
+ *                 type: integer
+ *               image:
+ *                 type: string
+ *                 format: binary
  *     responses:
  *       201:
  *         description: Group created
  */
-router.post('/groups', auth, controller.createGroup);
+router.post('/groups', auth, upload.single('image'), controller.createGroup);
 
 /**
  * @swagger
