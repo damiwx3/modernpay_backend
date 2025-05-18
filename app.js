@@ -35,6 +35,7 @@ app.use('/api/bank', require('./routes/bank.routes'));
 app.use('/api/virtual-cards', require('./routes/virtual_card.routes'));
 app.use('/api/system', require('./routes/system.routes'));
 app.use('/api/wallets', require('./routes/wallet.routes')); // <-- Added line
+app.use('/api/transactions', require('./routes/transaction.routes'));
 
 // Error Handler
 app.use(errorHandler);
