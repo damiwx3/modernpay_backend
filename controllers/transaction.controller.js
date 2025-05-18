@@ -1,22 +1,34 @@
 const db = require('../models');
 
-// ...existing code...
+// ✅ Get all transactions for logged-in user
+exports.getUserTransactions = async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 20;
+  const offset = (page - 1) * limit;
 
-exports.getMyTransactions = async (req, res) => {
   try {
-    const transactions = await db.Transaction.findAll({
+    const result = await db.Transaction.findAndCountAll({
       where: { userId: req.user.id },
-      order: [['createdAt', 'DESC']]
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset,
     });
-    res.status(200).json({ transactions });
+
+    res.status(200).json({
+      total: result.count,
+      page,
+      totalPages: Math.ceil(result.count / limit),
+      transactions: result.rows,
+    });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch transactions', error: err.message });
   }
 };
 
+// ✅ Create a manual transaction (for admin/testing/demo)
 exports.createTransaction = async (req, res) => {
   try {
-    const { amount, type, description } = req.body;
+    const { amount, type, description, status } = req.body;
 
     if (!amount || !type || isNaN(amount)) {
       return res.status(400).json({ message: 'Amount (numeric) and type are required.' });
@@ -27,7 +39,7 @@ exports.createTransaction = async (req, res) => {
       amount: parseFloat(amount),
       type: type.toLowerCase(), // debit or credit
       description: description || 'Manual transaction',
-      status: 'pending', // Optional: default to pending unless used immediately
+      status: status || 'pending', // Optional: pending, success, failed
     });
 
     res.status(201).json({ message: 'Transaction created successfully', txn });
