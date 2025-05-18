@@ -1,6 +1,7 @@
 const db = require('../models');
 const axios = require('axios');
 const generateAccountNumber = require('../utils/generateAccountNumber');
+const { v4: uuidv4 } = require('uuid');
 
 // 📘 Get wallet balance and account number
 exports.getBalance = async (req, res) => {
@@ -18,7 +19,8 @@ exports.getBalance = async (req, res) => {
 exports.fundWallet = async (req, res) => {
   const { amount } = req.body;
 
-  if (isNaN(amount) || amount <= 0) {
+  const value = parseFloat(amount);
+  if (isNaN(value) || value <= 0) {
     return res.status(400).json({ message: 'Invalid amount' });
   }
 
@@ -34,18 +36,19 @@ exports.fundWallet = async (req, res) => {
       });
     }
 
-    wallet.balance += parseFloat(amount);
+    wallet.balance += value;
     await wallet.save();
 
     await db.Transaction.create({
       userId: req.user.id,
       type: 'credit',
-      amount,
+      amount: value,
+      reference: uuidv4(),
       description: 'Manual Wallet Top-up',
       status: 'success'
     });
 
-    res.status(200).json({ message: 'Wallet funded', newBalance: wallet.balance });
+    res.status(200).json({ message: 'Wallet funded successfully', newBalance: wallet.balance });
   } catch (err) {
     res.status(500).json({ message: 'Funding failed', error: err.message });
   }
@@ -54,8 +57,9 @@ exports.fundWallet = async (req, res) => {
 // 🔁 Transfer to another user via account number
 exports.transferFunds = async (req, res) => {
   const { recipientAccountNumber, amount } = req.body;
+  const value = parseFloat(amount);
 
-  if (!recipientAccountNumber || isNaN(amount) || amount <= 0) {
+  if (!recipientAccountNumber || isNaN(value) || value <= 0) {
     return res.status(400).json({ message: 'Invalid transfer input' });
   }
 
@@ -64,25 +68,22 @@ exports.transferFunds = async (req, res) => {
     const recipientWallet = await db.Wallet.findOne({ where: { accountNumber: recipientAccountNumber } });
 
     if (!recipientWallet) return res.status(404).json({ message: 'Recipient not found' });
-
-    if (!senderWallet || senderWallet.balance < amount) {
+    if (recipientWallet.userId === req.user.id) return res.status(400).json({ message: 'Cannot transfer to yourself' });
+    if (!senderWallet || senderWallet.balance < value) {
       return res.status(400).json({ message: 'Insufficient balance' });
     }
 
-    if (recipientWallet.userId === req.user.id) {
-      return res.status(400).json({ message: 'Cannot transfer to yourself.' });
-    }
-
-    senderWallet.balance -= parseFloat(amount);
-    recipientWallet.balance += parseFloat(amount);
-
+    senderWallet.balance -= value;
+    recipientWallet.balance += value;
     await senderWallet.save();
     await recipientWallet.save();
 
+    // Create debit & credit transaction logs
     await db.Transaction.create({
       userId: req.user.id,
       type: 'debit',
-      amount,
+      amount: value,
+      reference: uuidv4(),
       description: `Transfer to ${recipientAccountNumber}`,
       status: 'success'
     });
@@ -90,12 +91,13 @@ exports.transferFunds = async (req, res) => {
     await db.Transaction.create({
       userId: recipientWallet.userId,
       type: 'credit',
-      amount,
+      amount: value,
+      reference: uuidv4(),
       description: `Received from ${senderWallet.accountNumber}`,
       status: 'success'
     });
 
-    res.status(200).json({ message: 'Transfer successful' });
+    res.status(200).json({ message: 'Transfer successful', senderBalance: senderWallet.balance });
   } catch (err) {
     res.status(500).json({ message: 'Transfer failed', error: err.message });
   }
@@ -105,29 +107,30 @@ exports.transferFunds = async (req, res) => {
 exports.transferToBank = async (req, res) => {
   const { bankCode, accountNumber, amount, narration } = req.body;
   const userId = req.user.id;
+  const value = parseFloat(amount);
 
-  if (!bankCode || !accountNumber || !amount || amount <= 0) {
+  if (!bankCode || !accountNumber || !value || value <= 0) {
     return res.status(400).json({ message: 'Invalid transfer data' });
   }
 
   try {
     const wallet = await db.Wallet.findOne({ where: { userId } });
 
-    if (!wallet || wallet.balance < amount) {
+    if (!wallet || wallet.balance < value) {
       return res.status(400).json({ message: 'Insufficient wallet balance' });
     }
 
     // Deduct balance upfront
-    wallet.balance -= parseFloat(amount);
+    wallet.balance -= value;
     await wallet.save();
 
     const payload = {
       account_bank: bankCode,
       account_number: accountNumber,
-      amount: parseFloat(amount),
+      amount: value,
       narration: narration || 'ModernPay bank payout',
       currency: 'NGN',
-      callback_url: 'https://webhook.site/test-callback',
+      callback_url: 'https://webhook.site/test-callback', // Update with your webhook
       debit_currency: 'NGN'
     };
 
@@ -148,18 +151,19 @@ exports.transferToBank = async (req, res) => {
       await db.Transaction.create({
         userId,
         type: 'debit',
-        amount,
+        amount: value,
+        reference: result.data?.reference || uuidv4(),
         description: `Bank transfer to ${accountNumber}`,
         status: 'success'
       });
 
       return res.status(200).json({ message: 'Transfer successful', data: result.data });
     } else {
-      // Refund wallet if failed
-      wallet.balance += parseFloat(amount);
+      // Refund wallet if Flutterwave failed
+      wallet.balance += value;
       await wallet.save();
 
-      return res.status(500).json({ message: 'Transfer failed', error: result.message });
+      return res.status(500).json({ message: 'Flutterwave transfer failed', error: result.message });
     }
 
   } catch (err) {
