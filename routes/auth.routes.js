@@ -26,13 +26,20 @@ const securityLogger = require('../middleware/securityLogger');
  *               - fullName
  *               - email
  *               - password
+ *               - phone
  *             properties:
  *               fullName:
  *                 type: string
+ *                 example: John Doe
  *               email:
  *                 type: string
+ *                 example: john@example.com
  *               password:
  *                 type: string
+ *                 example: MySecurePassword123
+ *               phone:
+ *                 type: string
+ *                 example: "+2348123456789"
  *     responses:
  *       201:
  *         description: User registered successfully
@@ -59,8 +66,10 @@ router.post('/register', authController.register);
  *             properties:
  *               email:
  *                 type: string
+ *                 example: john@example.com
  *               password:
  *                 type: string
+ *                 example: MySecurePassword123
  *     responses:
  *       200:
  *         description: Login successful
@@ -70,7 +79,7 @@ router.post('/register', authController.register);
  *         description: User not found
  */
 router.post('/login', securityLogger, authController.login);
-//router.post('/logout', securityLogger, authController.logout); // optional
+
 /**
  * @swagger
  * /api/auth/verify-otp:
@@ -89,8 +98,10 @@ router.post('/login', securityLogger, authController.login);
  *             properties:
  *               email:
  *                 type: string
+ *                 example: john@example.com
  *               code:
  *                 type: string
+ *                 example: "593021"
  *     responses:
  *       200:
  *         description: OTP verified
@@ -118,6 +129,7 @@ router.post('/verify-otp', authController.verifyOtp);
  *             properties:
  *               email:
  *                 type: string
+ *                 example: john@example.com
  *     responses:
  *       200:
  *         description: OTP resent
@@ -127,6 +139,5 @@ router.post('/verify-otp', authController.verifyOtp);
 router.post('/resend-otp', authController.resendOtp);
 
 console.log("✅ Auth routes loaded");
-
 
 module.exports = router;
