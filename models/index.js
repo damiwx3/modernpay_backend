@@ -55,6 +55,7 @@ fs.readdirSync(__dirname)
 
 // ✅ Explicitly register AdminUser model
 db.AdminUser = require('./admin_user.model')(sequelize, DataTypes);
+db.BillPayment = require('./bill_payment.model.js')(sequelize, Sequelize.DataTypes);
 
 db.NotificationLog = require('./notification_log.model')(sequelize, DataTypes);
 db.NotificationLog.belongsTo(db.User, { foreignKey: 'userId' });
