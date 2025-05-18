@@ -2,11 +2,13 @@ const db = require('../models');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const generateOTP = require('../utils/generateOTP');
+const sendEmail = require('../utils/sendEmail');
+const sendSms = require('../utils/sendSms');
 
 // Register
 exports.register = async (req, res) => {
   try {
-    const { fullName, email, password } = req.body;
+    const { fullName, email, password, phone } = req.body;
 
     const existing = await db.User.findOne({ where: { email } });
     if (existing) {
@@ -14,7 +16,7 @@ exports.register = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await db.User.create({ fullName, email, password: hashedPassword });
+    const user = await db.User.create({ fullName, email, phone, password: hashedPassword });
 
     const otp = generateOTP();
     await db.OTPCode.create({
@@ -24,6 +26,21 @@ exports.register = async (req, res) => {
       expiresAt: new Date(Date.now() + 10 * 60 * 1000)
     });
 
+    // Send OTP via Email
+    await sendEmail(
+      email,
+      'Your ModernPay OTP Code',
+      `Hi ${fullName},\n\nYour OTP is: ${otp}\nIt will expire in 10 minutes.\n\n- ModernPay`
+    );
+
+    // Send OTP via SMS
+    if (phone) {
+      await sendSms(
+        phone,
+        `Hi ${fullName}, your ModernPay OTP is ${otp}. It expires in 10 minutes.`
+      );
+    }
+
     await db.AuditLog.create({
       userId: user.id,
       ipAddress: req.ip,
@@ -32,7 +49,7 @@ exports.register = async (req, res) => {
       status: 'success'
     });
 
-    res.status(201).json({ message: 'User registered. Verify with OTP.', otp }); // In production, send OTP via SMS/email
+    res.status(201).json({ message: 'User registered. OTP sent via Email and SMS.' });
   } catch (err) {
     console.error('Register error:', err.message);
     res.status(500).json({ message: 'Registration failed' });
@@ -141,6 +158,19 @@ exports.resendOtp = async (req, res) => {
       expiresAt: new Date(Date.now() + 10 * 60 * 1000)
     });
 
+    await sendEmail(
+      user.email,
+      'Your New OTP Code',
+      `Hi ${user.fullName},\n\nYour new OTP is: ${otp}\nIt expires in 10 minutes.`
+    );
+
+    if (user.phone) {
+      await sendSms(
+        user.phone,
+        `Your new ModernPay OTP is: ${otp}. Expires in 10 minutes.`
+      );
+    }
+
     await db.AuditLog.create({
       userId: user.id,
       ipAddress: req.ip,
@@ -149,7 +179,7 @@ exports.resendOtp = async (req, res) => {
       status: 'success'
     });
 
-    res.status(200).json({ message: 'OTP resent successfully', otp }); // Replace with SMS/email logic
+    res.status(200).json({ message: 'OTP resent via Email and SMS.' });
   } catch (err) {
     console.error('Resend OTP error:', err.message);
     res.status(500).json({ message: 'Failed to resend OTP' });
