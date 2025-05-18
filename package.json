@@ -1,14 +1,14 @@
 {
   "name": "final-bank",
   "version": "1.0.0",
-  "description": "// README.md placeholder",
+  "description": "ModernPay Final Bank Project",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["banking", "express", "sequelize", "modernpay"],
+  "author": "Your Name",
   "license": "ISC",
   "dependencies": {
     "@sendgrid/mail": "^8.1.5",
