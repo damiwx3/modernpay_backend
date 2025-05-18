@@ -9,7 +9,9 @@ module.exports = (sequelize, DataTypes) => {
     isBlocked: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
-    }
+    },
+    dailyLimit: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0 },
+    monthlyLimit: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0 }
   });
   return Wallet;
 };
