@@ -52,5 +52,6 @@ router.get('/transactions', auth, transactionController.getUserTransactions);
  *         description: Transaction created
  */
 router.post('/transactions', auth, transactionController.createTransaction);
+router.get('/export', auth, transactionController.exportTransactions);
 
 module.exports = router;
