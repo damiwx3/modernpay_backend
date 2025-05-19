@@ -1,3 +1,4 @@
+// routes/bill.routes.js
 const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/bill.controller');
@@ -23,6 +24,34 @@ const auth = require('../middleware/auth.middleware');
  *         description: List of categories
  */
 router.get('/categories', auth, controller.getCategories);
+
+/**
+ * @swagger
+ * /api/bills/validate:
+ *   post:
+ *     summary: Validate a customer before bill payment (e.g., meter or smartcard)
+ *     tags: [Bills]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [serviceType, customer]
+ *             properties:
+ *               serviceType:
+ *                 type: string
+ *               customer:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Validation successful
+ *       400:
+ *         description: Invalid data
+ */
+router.post('/validate', auth, controller.validateCustomer);
 
 /**
  * @swagger
