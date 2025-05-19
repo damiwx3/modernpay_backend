@@ -16,6 +16,42 @@ exports.getCategories = async (req, res) => {
   }
 };
 
+// Validate customer (smartcard, phone, meter, etc.)
+exports.validateCustomer = async (req, res) => {
+  const { serviceType, customer } = req.body;
+
+  if (!serviceType || !customer) {
+    return res.status(400).json({ message: 'Service type and customer number are required' });
+  }
+
+  try {
+    const response = await axios.post(
+      'https://api.flutterwave.com/v3/bill-items/validate',
+      {
+        item_code: serviceType,
+        code: customer,
+        customer: customer
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.FLW_SECRET_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    const result = response.data;
+
+    if (result.status === 'success') {
+      return res.status(200).json({ message: result.message, data: result.data });
+    } else {
+      return res.status(400).json({ message: result.message || 'Validation failed' });
+    }
+  } catch (err) {
+    return res.status(500).json({ message: 'Validation error', error: err.message });
+  }
+};
+
 // Pay a bill (Airtime, Data, Electricity, TV, etc.)
 exports.payBill = async (req, res) => {
   const { serviceType, amount, customer } = req.body;
