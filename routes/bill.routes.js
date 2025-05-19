@@ -98,4 +98,25 @@ router.post('/pay', auth, controller.payBill);
  */
 router.get('/history', auth, controller.getHistory);
 
+/**
+ * @swagger
+ * /api/bills/bundles/{billerCode}:
+ *   get:
+ *     summary: Get available bundles for a biller (e.g., data or TV)
+ *     tags: [Bills]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: billerCode
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Biller code (e.g., MTN Data)
+ *     responses:
+ *       200:
+ *         description: Returns list of available bundles
+ */
+router.get('/bundles/:billerCode', auth, controller.getBundles);
+
 module.exports = router;
