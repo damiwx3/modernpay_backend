@@ -116,3 +116,22 @@ exports.getHistory = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch history', error: err.message });
   }
 };
+
+// 5. Get bundles (for data, TV, etc.)
+exports.getBundles = async (req, res) => {
+  const billerCode = req.params.billerCode;
+
+  if (!billerCode) {
+    return res.status(400).json({ message: 'Biller code is required' });
+  }
+
+  try {
+    const response = await axios.get(`${FLW_BASE}/bill-items?biller_code=${billerCode}`, {
+      headers: HEADERS,
+    });
+
+    res.status(200).json({ bundles: response.data.data });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to load bundles', error: err.message });
+  }
+};
