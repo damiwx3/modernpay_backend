@@ -11,23 +11,6 @@ const auth = require('../middleware/auth.middleware');
  *     tags: [Bills]
  *     security:
  *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [serviceType, amount, phone]
- *             properties:
- *               serviceType:
- *                 type: string
- *               amount:
- *                 type: number
- *               phone:
- *                 type: string
- *     responses:
- *       201:
- *         description: Bill paid successfully
  */
 router.post('/pay', auth, controller.payBill);
 
@@ -39,28 +22,16 @@ router.post('/pay', auth, controller.payBill);
  *     tags: [Bills]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: serviceType
- *         schema:
- *           type: string
- *         required: false
- *       - in: query
- *         name: startDate
- *         schema:
- *           type: string
- *           format: date
- *         required: false
- *       - in: query
- *         name: endDate
- *         schema:
- *           type: string
- *           format: date
- *         required: false
- *     responses:
- *       200:
- *         description: Returns filtered bill payment history
  */
 router.get('/history', auth, controller.getHistory);
+
+/**
+ * @swagger
+ * /api/bills/categories:
+ *   get:
+ *     summary: List all bill categories
+ *     tags: [Bills]
+ */
+router.get('/categories', controller.getCategories);
 
 module.exports = router;
