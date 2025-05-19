@@ -5,12 +5,53 @@ const auth = require('../middleware/auth.middleware');
 
 /**
  * @swagger
- * /api/bills/pay:
- *   post:
- *     summary: Pay for a bill (airtime, data, etc.)
+ * tags:
+ *   name: Bills
+ *   description: Bill payment endpoints
+ */
+
+/**
+ * @swagger
+ * /api/bills/categories:
+ *   get:
+ *     summary: List available bill categories (Airtime, Data, etc.)
  *     tags: [Bills]
  *     security:
  *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of categories
+ */
+router.get('/categories', auth, controller.getCategories);
+
+/**
+ * @swagger
+ * /api/bills/pay:
+ *   post:
+ *     summary: Pay for a bill via Flutterwave
+ *     tags: [Bills]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [serviceType, amount, customer]
+ *             properties:
+ *               serviceType:
+ *                 type: string
+ *                 example: AIRTIME
+ *               amount:
+ *                 type: number
+ *                 example: 100
+ *               customer:
+ *                 type: string
+ *                 example: "08012345678"  # Or meter/smartcard depending on service
+ *     responses:
+ *       201:
+ *         description: Bill paid successfully
  */
 router.post('/pay', auth, controller.payBill);
 
@@ -22,16 +63,10 @@ router.post('/pay', auth, controller.payBill);
  *     tags: [Bills]
  *     security:
  *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of user's past bill payments
  */
 router.get('/history', auth, controller.getHistory);
-
-/**
- * @swagger
- * /api/bills/categories:
- *   get:
- *     summary: List all bill categories
- *     tags: [Bills]
- */
-router.get('/categories', controller.getCategories);
 
 module.exports = router;
