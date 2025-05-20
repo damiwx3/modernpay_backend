@@ -1,15 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const kycController = require('../controllers/kyc.controller');
-const auth = require('../middleware/auth.middleware');
-const upload = require('../middleware/upload.middleware');
-
-/**
- * @swagger
- * tags:
- *   name: KYC
- *   description: Know Your Customer identity verification
- */
+const auth = require('../middleware/auth');
+const upload = require('../middleware/upload'); // Multer middleware for file uploads
 
 /**
  * @swagger
@@ -26,20 +19,28 @@ const upload = require('../middleware/upload.middleware');
  *           schema:
  *             type: object
  *             properties:
- *               documentType:
+ *               type:
  *                 type: string
- *               documentFile:
+ *               document:
  *                 type: string
  *                 format: binary
  *     responses:
- *       200:
- *         description: KYC uploaded successfully
+ *       201:
+ *         description: KYC document uploaded successfully
  *       400:
  *         description: Invalid or missing data
  */
 
-
+// Tier 3: Upload KYC Document (ID card, etc.)
 router.post('/upload', auth, upload.single('document'), kycController.uploadKycDocument);
+
+// Tier 2: Verify BVN
+router.post('/verify-bvn', auth, kycController.verifyBvn);
+
+// Tier 4: Address or Selfie Verification
+router.post('/verify-address-or-selfie', auth, kycController.verifyAddressOrSelfie);
+
+// Get KYC Status and documents
 router.get('/status', auth, kycController.getKycStatus);
 
 module.exports = router;
