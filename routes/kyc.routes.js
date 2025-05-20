@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const kycController = require('../controllers/kyc.controller');
 const auth = require('../middleware/auth.middleware');
-const upload = require('../middleware/upload'); // Multer middleware for file uploads
+const upload = require('../middleware/upload.middleware'); // Multer middleware for file uploads
 
 /**
  * @swagger
