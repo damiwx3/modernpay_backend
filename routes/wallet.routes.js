@@ -107,5 +107,19 @@ router.post('/transfer', auth, walletController.transferFunds);
  *         description: Bank transfer successful
  */
 router.post('/transfer-to-bank', auth, walletController.transferToBank);
+/**
+ * @swagger
+ * /api/wallets/create-account:
+ *   post:
+ *     summary: Create a virtual account using Flutterwave
+ *     tags: [Wallet]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201:
+ *         description: Virtual account created successfully
+ */
+router.post('/create-account', auth, walletController.createVirtualAccount);
+
 
 module.exports = router;
