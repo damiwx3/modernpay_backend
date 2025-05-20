@@ -14,6 +14,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.ENUM('unverified', 'pending', 'approved', 'rejected'),
       defaultValue: 'unverified'
     },
+    kycLevel: { type: DataTypes.INTEGER, defaultValue: 1 }, // For tiered KYC
+    bvn: { type: DataTypes.STRING },                        // For BVN storage
+    address: { type: DataTypes.STRING },                    // For address (Tier 4)
+    selfieUrl: { type: DataTypes.STRING },                  // For selfie (Tier 4)
     isActive: { type: DataTypes.BOOLEAN, defaultValue: true }
   });
   return User;
