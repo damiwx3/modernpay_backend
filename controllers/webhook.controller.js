@@ -3,20 +3,44 @@ const db = require('../models');
 exports.flutterwaveWebhook = async (req, res) => {
   const secretHash = process.env.FLW_SECRET_HASH;
   const signature = req.headers['verif-hash'];
+  const payload = req.body;
 
   if (!signature || signature !== secretHash) {
     return res.status(401).json({ message: 'Invalid or missing webhook signature' });
   }
 
-  const payload = req.body;
-
   try {
-    if (payload.event === 'transfer.completed') {
+    // 1️⃣ Handle incoming virtual account payments
+    if (payload.event === 'charge.completed' && payload.data.payment_type === 'bank_transfer') {
+      const data = payload.data;
+      const accountNumber = data.account_number;
+      const amount = parseFloat(data.amount);
+      const reference = data.tx_ref || data.flw_ref;
+
+      const wallet = await db.Wallet.findOne({ where: { accountNumber } });
+      if (!wallet) return res.status(404).json({ message: 'Wallet not found' });
+
+      wallet.balance += amount;
+      await wallet.save();
+
+      await db.Transaction.create({
+        userId: wallet.userId,
+        type: 'credit',
+        amount,
+        reference,
+        description: 'Virtual account funding',
+        status: 'success',
+      });
+
+      console.log(`✅ Wallet credited via VA: ${accountNumber} - ₦${amount}`);
+    }
+
+    // 2️⃣ Handle outgoing bank transfer confirmations
+    else if (payload.event === 'transfer.completed') {
       const data = payload.data;
       const { status, reference, amount } = data;
 
-      const txn = await db.Transaction.findOne({ where: { description: reference } });
-
+      const txn = await db.Transaction.findOne({ where: { reference } });
       if (!txn) return res.status(404).json({ message: 'Transaction not found' });
 
       if (status === 'SUCCESSFUL') {
