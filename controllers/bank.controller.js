@@ -27,10 +27,10 @@ exports.verifyAccountNumber = async (req, res) => {
     const response = await axios.post(
       'https://api.flutterwave.com/v3/accounts/resolve',
       {
-        params: {
-          account_number, // <-- use underscore
-          account_bank    // <-- use underscore
-        },
+        account_number,
+        account_bank
+      },
+      {
         headers: {
           Authorization: `Bearer ${process.env.FLW_SECRET_KEY}`
         }
