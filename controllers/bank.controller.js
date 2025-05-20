@@ -1,3 +1,4 @@
+const axios = require('axios');
 const { Bank } = require('../models');
 
 // GET /api/bank/list
@@ -16,11 +17,31 @@ exports.getBankList = async (req, res) => {
 
 // POST /api/bank/verify
 exports.verifyAccountNumber = async (req, res) => {
-  // You should integrate with a real bank verification API here.
   const { accountNumber, bankCode } = req.body;
   if (!accountNumber || !bankCode) {
     return res.status(400).json({ error: 'accountNumber and bankCode are required' });
   }
-  // Example: always succeed for demo
-  res.status(200).json({ accountName: 'Demo User' });
+
+  try {
+    const response = await axios.get(
+      'https://api.flutterwave.com/v3/accounts/resolve',
+      {
+        params: {
+          account_number: accountNumber,
+          account_bank: bankCode
+        },
+        headers: {
+          Authorization: `Bearer YOUR_FLUTTERWAVE_SECRET_KEY`
+        }
+      }
+    );
+
+    if (response.data.status === 'success') {
+      return res.status(200).json({ accountName: response.data.data.account_name });
+    } else {
+      return res.status(400).json({ error: 'Verification failed' });
+    }
+  } catch (err) {
+    return res.status(500).json({ error: 'Verification error', details: err.message });
+  }
 };
