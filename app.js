@@ -28,8 +28,6 @@ app.use('/api', routes);
 // Default
 app.get('/', (req, res) => res.send('🌍 API Running'));
 
-// Catch 404
-app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
 app.use('/api/webhooks', require('./routes/webhook.routes'));
 app.use('/api/virtual-cards', require('./routes/virtual_card.routes'));
 app.use('/api/system', require('./routes/system.routes'));
@@ -38,6 +36,9 @@ app.use('/api/transactions', require('./routes/transaction.routes'));
 app.use('/api/bills', require('./routes/bill.routes'));
 const bankRoutes = require('./routes/bank.routes');
 app.use('/api/bank', bankRoutes);
+
+// Catch 404
+app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
 
 // Error Handler
 app.use(errorHandler);
