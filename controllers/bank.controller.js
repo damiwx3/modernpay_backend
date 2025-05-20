@@ -24,7 +24,7 @@ exports.verifyAccountNumber = async (req, res) => {
   }
 
   try {
-    const response = await axios.get(
+    const response = await axios.post(
       'https://api.flutterwave.com/v3/accounts/resolve',
       {
         params: {
