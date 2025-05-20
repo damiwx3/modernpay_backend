@@ -17,6 +17,7 @@ exports.getBankList = async (req, res) => {
 
 // POST /api/bank/verify
 exports.verifyAccountNumber = async (req, res) => {
+  // Use the correct parameter names for Flutterwave
   const { accountNumber, bankCode } = req.body;
   if (!accountNumber || !bankCode) {
     return res.status(400).json({ error: 'accountNumber and bankCode are required' });
@@ -27,11 +28,11 @@ exports.verifyAccountNumber = async (req, res) => {
       'https://api.flutterwave.com/v3/accounts/resolve',
       {
         params: {
-          account_number: accountNumber,
-          account_bank: bankCode
+          account_number: accountNumber, // <-- use underscore
+          account_bank: bankCode         // <-- use underscore
         },
         headers: {
-          Authorization: `Bearer YOUR_FLUTTERWAVE_SECRET_KEY`
+          Authorization: `Bearer YOUR_FLUTTERWAVE_SECRET_KEY` // <-- replace with your real key
         }
       }
     );
@@ -42,6 +43,8 @@ exports.verifyAccountNumber = async (req, res) => {
       return res.status(400).json({ error: 'Verification failed' });
     }
   } catch (err) {
+    // Optionally log the error for debugging
+    console.error('Flutterwave verification error:', err.response?.data || err.message);
     return res.status(500).json({ error: 'Verification error', details: err.message });
   }
 };
