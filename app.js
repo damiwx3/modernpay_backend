@@ -36,7 +36,7 @@ app.use('/api/system', require('./routes/system.routes'));
 app.use('/api/wallets', require('./routes/wallet.routes')); // <-- Added line
 app.use('/api/transactions', require('./routes/transaction.routes'));
 app.use('/api/bills', require('./routes/bill.routes'));
-const bankRoutes = require('./routes/bank.route');
+const bankRoutes = require('./routes/bank.routes');
 app.use('/api/bank', bankRoutes);
 
 // Error Handler
