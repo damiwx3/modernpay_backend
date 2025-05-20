@@ -10,6 +10,7 @@ const errorHandler = require('./middleware/errorHandler');
 const maintenanceCheck = require('./middleware/maintenance.middleware');
 const checkMaintenance = require('./middleware/checkMaintenance.middleware'); // <-- Add this line
 const maintenance = require('./middleware/maintenance.middleware');
+const bankRoutes = require('./routes/bank.routes');
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -28,13 +29,14 @@ app.use('/api', routes);
 // Default
 app.get('/', (req, res) => res.send('🌍 API Running'));
 
+
 app.use('/api/webhooks', require('./routes/webhook.routes'));
+//app.use('/api/bank', require('./routes/bank.routes'));
 app.use('/api/virtual-cards', require('./routes/virtual_card.routes'));
 app.use('/api/system', require('./routes/system.routes'));
 app.use('/api/wallets', require('./routes/wallet.routes')); // <-- Added line
 app.use('/api/transactions', require('./routes/transaction.routes'));
 app.use('/api/bills', require('./routes/bill.routes'));
-const bankRoutes = require('./routes/bank.routes');
 app.use('/api/bank', bankRoutes);
 
 // Catch 404
