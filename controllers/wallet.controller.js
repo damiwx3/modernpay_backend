@@ -131,7 +131,7 @@ exports.transferToBank = async (req, res) => {
       amount: value,
       narration: narration || 'ModernPay bank payout',
       currency: 'NGN',
-      callback_url: 'https://yourdomain.com/api/webhooks/flutterwave',
+      callback_url: 'https://modernpay-backend.onrender.com/api/webhooks/flutterwave',
       debit_currency: 'NGN',
     };
 
