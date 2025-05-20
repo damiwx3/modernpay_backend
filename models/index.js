@@ -59,6 +59,7 @@ db.BillPayment = require('./bill_payment.model.js')(sequelize, Sequelize.DataTyp
 
 db.NotificationLog = require('./notification_log.model')(sequelize, DataTypes);
 db.NotificationLog.belongsTo(db.User, { foreignKey: 'userId' });
+db.WebhookLog = require('./webhook_log.model')(sequelize, DataTypes);
 
 
 // ==========================
@@ -122,7 +123,13 @@ db.Referral.belongsTo(db.User, { as: 'Referred', foreignKey: 'referredId' });
 db.TransactionDispute.belongsTo(db.Transaction, { foreignKey: 'transactionId' });
 db.TransactionDispute.belongsTo(db.User, { foreignKey: 'userId' });
 
+db.WebhookLog.belongsTo(db.User, { foreignKey: 'userId' });
+db.User.hasMany(db.WebhookLog, { foreignKey: 'userId' });
+
+
 db.AuditLog.belongsTo(db.User, { foreignKey: 'userId' });
+
+
 
 // ==========================
 
@@ -132,6 +139,7 @@ Object.keys(db).forEach((modelName) => {
     db[modelName].associate(db);
   }
 });
+
 
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;
