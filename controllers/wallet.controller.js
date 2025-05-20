@@ -1,25 +1,29 @@
 const db = require('../models');
 const axios = require('axios');
-const generateAccountNumber = require('../utils/generateAccountNumber');
 const { v4: uuidv4 } = require('uuid');
+const generateAccountNumber = require('../utils/generateAccountNumber');
 
-// 📘 Get wallet balance and account number
+// 📘 Get Wallet Balance & Account Info
 exports.getBalance = async (req, res) => {
   try {
     const wallet = await db.Wallet.findOne({ where: { userId: req.user.id } });
     if (!wallet) return res.status(404).json({ message: 'Wallet not found' });
 
-    res.status(200).json({ balance: wallet.balance, accountNumber: wallet.accountNumber });
+    res.status(200).json({
+      balance: wallet.balance,
+      accountNumber: wallet.accountNumber,
+      bankName: wallet.bankName,
+    });
   } catch (err) {
     res.status(500).json({ message: 'Failed to retrieve balance', error: err.message });
   }
 };
 
-// 💰 Fund wallet manually (no gateway)
+// 💰 Manual Wallet Funding
 exports.fundWallet = async (req, res) => {
   const { amount } = req.body;
-
   const value = parseFloat(amount);
+
   if (isNaN(value) || value <= 0) {
     return res.status(400).json({ message: 'Invalid amount' });
   }
@@ -32,7 +36,7 @@ exports.fundWallet = async (req, res) => {
       wallet = await db.Wallet.create({
         userId: req.user.id,
         balance: 0,
-        accountNumber
+        accountNumber,
       });
     }
 
@@ -45,7 +49,7 @@ exports.fundWallet = async (req, res) => {
       amount: value,
       reference: uuidv4(),
       description: 'Manual Wallet Top-up',
-      status: 'success'
+      status: 'success',
     });
 
     res.status(200).json({ message: 'Wallet funded successfully', newBalance: wallet.balance });
@@ -78,24 +82,24 @@ exports.transferFunds = async (req, res) => {
     await senderWallet.save();
     await recipientWallet.save();
 
-    // Create debit & credit transaction logs
-    await db.Transaction.create({
-      userId: req.user.id,
-      type: 'debit',
-      amount: value,
-      reference: uuidv4(),
-      description: `Transfer to ${recipientAccountNumber}`,
-      status: 'success'
-    });
-
-    await db.Transaction.create({
-      userId: recipientWallet.userId,
-      type: 'credit',
-      amount: value,
-      reference: uuidv4(),
-      description: `Received from ${senderWallet.accountNumber}`,
-      status: 'success'
-    });
+    await db.Transaction.bulkCreate([
+      {
+        userId: req.user.id,
+        type: 'debit',
+        amount: value,
+        reference: uuidv4(),
+        description: `Transfer to ${recipientAccountNumber}`,
+        status: 'success',
+      },
+      {
+        userId: recipientWallet.userId,
+        type: 'credit',
+        amount: value,
+        reference: uuidv4(),
+        description: `Received from ${senderWallet.accountNumber}`,
+        status: 'success',
+      },
+    ]);
 
     res.status(200).json({ message: 'Transfer successful', senderBalance: senderWallet.balance });
   } catch (err) {
@@ -106,21 +110,18 @@ exports.transferFunds = async (req, res) => {
 // 🏦 External bank transfer using Flutterwave
 exports.transferToBank = async (req, res) => {
   const { bankCode, accountNumber, amount, narration } = req.body;
-  const userId = req.user.id;
   const value = parseFloat(amount);
 
-  if (!bankCode || !accountNumber || !value || value <= 0) {
+  if (!bankCode || !accountNumber || isNaN(value) || value <= 0) {
     return res.status(400).json({ message: 'Invalid transfer data' });
   }
 
   try {
-    const wallet = await db.Wallet.findOne({ where: { userId } });
-
+    const wallet = await db.Wallet.findOne({ where: { userId: req.user.id } });
     if (!wallet || wallet.balance < value) {
       return res.status(400).json({ message: 'Insufficient wallet balance' });
     }
 
-    // Deduct balance upfront
     wallet.balance -= value;
     await wallet.save();
 
@@ -130,11 +131,11 @@ exports.transferToBank = async (req, res) => {
       amount: value,
       narration: narration || 'ModernPay bank payout',
       currency: 'NGN',
-      callback_url: 'https://webhook.site/test-callback', // Update with your webhook
-      debit_currency: 'NGN'
+      callback_url: 'https://yourdomain.com/api/webhooks/flutterwave',
+      debit_currency: 'NGN',
     };
 
-    const flutterwaveRes = await axios.post(
+    const flutterRes = await axios.post(
       'https://api.flutterwave.com/v3/transfers',
       payload,
       {
@@ -145,21 +146,20 @@ exports.transferToBank = async (req, res) => {
       }
     );
 
-    const result = flutterwaveRes.data;
+    const result = flutterRes.data;
 
     if (result.status === 'success') {
       await db.Transaction.create({
-        userId,
+        userId: req.user.id,
         type: 'debit',
         amount: value,
-        reference: result.data?.reference || uuidv4(),
+        reference: result.data.reference || uuidv4(),
         description: `Bank transfer to ${accountNumber}`,
-        status: 'success'
+        status: 'success',
       });
 
       return res.status(200).json({ message: 'Transfer successful', data: result.data });
     } else {
-      // Refund wallet if Flutterwave failed
       wallet.balance += value;
       await wallet.save();
 
@@ -168,5 +168,48 @@ exports.transferToBank = async (req, res) => {
 
   } catch (err) {
     return res.status(500).json({ message: 'Bank transfer error', error: err.message });
+  }
+};
+
+// 🧾 Create Virtual Account using Flutterwave
+exports.createVirtualAccount = async (req, res) => {
+  const user = await db.User.findByPk(req.user.id);
+  if (!user) return res.status(404).json({ message: 'User not found' });
+
+  try {
+    const response = await axios.post(
+      'https://api.flutterwave.com/v3/virtual-account-numbers',
+      {
+        email: user.email,
+        is_permanent: true,
+        tx_ref: `VA-${Date.now()}`,
+        narration: user.fullName || 'ModernPay Virtual Account',
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.FLW_SECRET_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const account = response.data.data;
+
+    await db.Wallet.update(
+      {
+        accountNumber: account.account_number,
+        bankName: account.bank_name,
+      },
+      { where: { userId: req.user.id } }
+    );
+
+    return res.status(201).json({
+      message: 'Virtual account created',
+      accountNumber: account.account_number,
+      bank: account.bank_name,
+    });
+  } catch (err) {
+    console.error('Flutterwave VA error:', err.response?.data || err.message);
+    return res.status(500).json({ message: 'Failed to create virtual account', error: err.message });
   }
 };
