@@ -1,57 +1,26 @@
-const axios = require('axios');
+const { Bank } = require('../models');
 
-// ✅ Get list of Nigerian banks from Flutterwave
+// GET /api/bank/list
 exports.getBankList = async (req, res) => {
   try {
-    const response = await axios.get('https://api.flutterwave.com/v3/banks/NG', {
-      headers: {
-        Authorization: `Bearer ${process.env.FLW_SECRET_KEY}`,
-      }
+    const banks = await Bank.findAll({
+      where: { active: true },
+      attributes: ['name', 'code'],
+      order: [['name', 'ASC']]
     });
-
-    const banks = response.data.data;
-    res.status(200).json({ message: 'Banks fetched successfully', banks });
+    res.status(200).json(banks);
   } catch (err) {
-    res.status(500).json({
-      message: 'Failed to fetch bank list',
-      error: err.response?.data?.message || err.message
-    });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
-// ✅ Resolve bank account number using Flutterwave
+// POST /api/bank/verify
 exports.verifyAccountNumber = async (req, res) => {
-  const { account_number, bank_code } = req.body;
-
-  if (!account_number || !bank_code) {
-    return res.status(400).json({ message: 'account_number and bank_code are required' });
+  // You should integrate with a real bank verification API here.
+  const { accountNumber, bankCode } = req.body;
+  if (!accountNumber || !bankCode) {
+    return res.status(400).json({ error: 'accountNumber and bankCode are required' });
   }
-
-  try {
-    const response = await axios.get(`https://api.flutterwave.com/v3/accounts/resolve`, {
-      headers: {
-        Authorization: `Bearer ${process.env.FLW_SECRET_KEY}`,
-      },
-      params: {
-        account_number,
-        account_bank: bank_code,
-      }
-    });
-
-    const result = response.data;
-
-    if (result.status === 'success') {
-      return res.status(200).json({
-        message: 'Account verified successfully',
-        data: result.data
-      });
-    } else {
-      return res.status(400).json({ message: 'Verification failed', error: result.message });
-    }
-  } catch (err) {
-    return res.status(500).json({
-      message: 'Flutterwave verification error',
-      error: err.response?.data?.message || err.message,
-    });
-  }
+  // Example: always succeed for demo
+  res.status(200).json({ accountName: 'Demo User' });
 };
