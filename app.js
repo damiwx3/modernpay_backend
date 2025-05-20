@@ -10,7 +10,7 @@ const errorHandler = require('./middleware/errorHandler');
 const maintenanceCheck = require('./middleware/maintenance.middleware');
 const checkMaintenance = require('./middleware/checkMaintenance.middleware'); // <-- Add this line
 const maintenance = require('./middleware/maintenance.middleware');
-const bankRoutes = require('./routes/bank.route');
+const bankRoutes = require('./routes/bank.routes');
 
 app.use(cors());
 app.use(bodyParser.json());
