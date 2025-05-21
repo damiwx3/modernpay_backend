@@ -12,20 +12,6 @@ const authMiddleware = require('../middleware/auth.middleware');
 
 /**
  * @swagger
- * /api/users:
- *   get:
- *     summary: Confirm that user routes are working
- *     tags: [Users]
- *     responses:
- *       200:
- *         description: Returns a success message
- */
-router.get('/', (req, res) => {
-  res.json({ message: 'User routes are live!' });
-});
-
-/**
- * @swagger
  * /api/users/profile:
  *   get:
  *     summary: Get the authenticated user's profile
