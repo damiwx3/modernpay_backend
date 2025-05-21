@@ -14,7 +14,9 @@ const bankRoutes = require('./routes/bank.routes');
 const kycRoutes = require('./routes/kyc.routes');
 const userRoutes = require('./routes/user.routes');
 const savingsRoutes = require('./routes/savings.routes');
+const ticketRoutes = require('./routes/ticket.routes');
 
+app.use('/api/tickets', ticketRoutes);
 app.use('/api/savings', savingsRoutes);
 app.use(cors());
 app.use(bodyParser.json());
