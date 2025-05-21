@@ -59,7 +59,7 @@ exports.respondToTicket = async (req, res) => {
     const ticket = await db.Ticket.findByPk(id);
     if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
-    ticket.message += '\n\n[ADMIN RESPONSE]: ${response}';
+    ticket.message += `\n\n[ADMIN RESPONSE]: ${response}`;
     if (status) ticket.status = status;
 
     await ticket.save();
