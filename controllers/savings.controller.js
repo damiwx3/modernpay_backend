@@ -1,5 +1,6 @@
 const db = require('../models');
 
+// Create a new savings goal
 exports.createGoal = async (req, res) => {
   try {
     const { title, targetAmount, deadline } = req.body;
@@ -18,6 +19,7 @@ exports.createGoal = async (req, res) => {
   }
 };
 
+// Get all savings goals for the user
 exports.getUserGoals = async (req, res) => {
   try {
     const goals = await db.SavingsGoal.findAll({
@@ -31,6 +33,71 @@ exports.getUserGoals = async (req, res) => {
   }
 };
 
+// Get a single savings goal by ID
+exports.getGoalById = async (req, res) => {
+  try {
+    const goal = await db.SavingsGoal.findOne({
+      where: { id: req.params.id, userId: req.user.id }
+    });
+    if (!goal) return res.status(404).json({ message: 'Goal not found' });
+    res.status(200).json({ goal });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to retrieve goal' });
+  }
+};
+
+// Update a savings goal
+exports.updateGoal = async (req, res) => {
+  try {
+    const { title, targetAmount, deadline } = req.body;
+    const goal = await db.SavingsGoal.findOne({
+      where: { id: req.params.id, userId: req.user.id }
+    });
+    if (!goal) return res.status(404).json({ message: 'Goal not found' });
+
+    if (title) goal.title = title;
+    if (targetAmount) goal.targetAmount = targetAmount;
+    if (deadline) goal.deadline = deadline;
+
+    await goal.save();
+    res.status(200).json({ message: 'Goal updated', goal });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to update goal' });
+  }
+};
+
+// Delete a savings goal
+exports.deleteGoal = async (req, res) => {
+  try {
+    const goal = await db.SavingsGoal.findOne({
+      where: { id: req.params.id, userId: req.user.id }
+    });
+    if (!goal) return res.status(404).json({ message: 'Goal not found' });
+
+    await goal.destroy();
+    res.status(200).json({ message: 'Goal deleted' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to delete goal' });
+  }
+};
+
+// Mark a goal as completed
+exports.completeGoal = async (req, res) => {
+  try {
+    const goal = await db.SavingsGoal.findOne({
+      where: { id: req.params.id, userId: req.user.id }
+    });
+    if (!goal) return res.status(404).json({ message: 'Goal not found' });
+
+    goal.completed = true;
+    await goal.save();
+    res.status(200).json({ message: 'Goal marked as completed', goal });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to complete goal' });
+  }
+};
+
+// Deposit money from wallet to savings goal
 exports.depositToGoal = async (req, res) => {
   try {
     const { goalId, amount } = req.body;
@@ -58,6 +125,7 @@ exports.depositToGoal = async (req, res) => {
   }
 };
 
+// Withdraw money from savings goal to wallet
 exports.withdrawFromGoal = async (req, res) => {
   try {
     const { goalId, amount } = req.body;
