@@ -5,7 +5,10 @@ module.exports = (sequelize, DataTypes) => {
     serviceType: { type: DataTypes.STRING, allowNull: false },
     amount: { type: DataTypes.DECIMAL(12, 2), allowNull: false },
     reference: { type: DataTypes.STRING, unique: true },
-    status: { type: DataTypes.STRING, defaultValue: 'pending' }
+    status: { type: DataTypes.STRING, defaultValue: 'pending' },
+    customer: { type: DataTypes.STRING }, // e.g. phone, meter, smartcard, etc.
+    responseData: { type: DataTypes.JSON }, // store Flutterwave response or extra info
+    paidAt: { type: DataTypes.DATE } // when payment was completed
   });
 
   BillPayment.associate = (models) => {
