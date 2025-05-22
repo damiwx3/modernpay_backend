@@ -16,6 +16,7 @@ const userRoutes = require('./routes/user.routes');
 const savingsRoutes = require('./routes/savings.routes');
 const ticketRoutes = require('./routes/ticket.routes');
 const walletRoutes = require('./routes/wallet.routes');
+const contributionCycleRoutes = require('./routes/contributionCycle.routes');
 
 // Middleware
 app.use(cors());
@@ -33,6 +34,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/bank', bankRoutes);
 app.use('/api/kyc', kycRoutes);
 app.use('/api/wallets', walletRoutes);
+app.use('/api/contribution-cycles', contributionCycleRoutes);
 
 // Other modular routes
 app.use('/api/webhooks', require('./routes/webhook.routes'));
