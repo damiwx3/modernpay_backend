@@ -37,7 +37,8 @@ exports.claimCashback = async (req, res) => {
       status: 'success',
     });
 
-    res.status(200).json({ message: '${cashbackAmount} cashback awarded.' });
+    // FIX: Use template literal for the message
+    res.status(200).json({ message: `${cashbackAmount} cashback awarded.` });
   } catch (err) {
     res.status(500).json({ message: 'Failed to reward cashback', error: err.message });
   }
