@@ -130,6 +130,9 @@ db.KYCDocument = require('./kyc_document.model.js')(sequelize, Sequelize.DataTyp
 db.AuditLog.belongsTo(db.User, { foreignKey: 'userId' });
 db.User.hasMany(db.KYCDocument, { foreignKey: 'userId' });
 db.KYCDocument.belongsTo(db.User, { foreignKey: 'userId' });
+db.SavingsGoal = require('./savings_goal.model.js')(sequelize, Sequelize.DataTypes);
+db.User.hasMany(db.SavingsGoal, { foreignKey: 'userId' });
+db.SavingsGoal.belongsTo(db.User, { foreignKey: 'userId' });
 
 
 // ==========================
