@@ -125,10 +125,11 @@ db.TransactionDispute.belongsTo(db.User, { foreignKey: 'userId' });
 
 db.WebhookLog.belongsTo(db.User, { foreignKey: 'userId' });
 db.User.hasMany(db.WebhookLog, { foreignKey: 'userId' });
-
+db.KYCDocument = require('./kyc_document.model.js')(sequelize, Sequelize.DataTypes);
 
 db.AuditLog.belongsTo(db.User, { foreignKey: 'userId' });
-
+db.User.hasMany(db.KYCDocument, { foreignKey: 'userId' });
+db.KYCDocument.belongsTo(db.User, { foreignKey: 'userId' });
 
 
 // ==========================
@@ -139,6 +140,7 @@ Object.keys(db).forEach((modelName) => {
     db[modelName].associate(db);
   }
 });
+
 
 
 db.sequelize = sequelize;
