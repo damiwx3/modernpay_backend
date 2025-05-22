@@ -2,6 +2,11 @@ const sendEmail = require('../utils/sendEmail');
 const sendSms = require('../utils/sendSms');
 const db = require('../models');
 
+// Placeholder for rate limiting (implement as needed)
+async function checkNotificationRateLimit(userId, action) {
+  // Example: throw new Error('Too many notifications sent');
+}
+
 // 🔹 Single-user notification
 exports.sendNotification = async (req, res) => {
   const { userId, email, phone, subject, message, via } = req.body;
@@ -23,6 +28,7 @@ exports.sendNotification = async (req, res) => {
 
     if (via?.includes('email') && recipientEmail) {
       try {
+        await checkNotificationRateLimit(user?.id || null, 'email');
         await sendEmail(recipientEmail, subject || 'Notification', message);
         results.push(`✅ Email sent to ${recipientEmail}`);
 
@@ -48,6 +54,7 @@ exports.sendNotification = async (req, res) => {
 
     if (via?.includes('sms') && recipientPhone) {
       try {
+        await checkNotificationRateLimit(user?.id || null, 'sms');
         await sendSms(recipientPhone, message);
         results.push(`✅ SMS sent to ${recipientPhone}`);
 
@@ -75,11 +82,11 @@ exports.sendNotification = async (req, res) => {
 
     res.status(200).json({ message: 'Notification sent.', results });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to send notification', error: err.message });
+    res.status(500).json({ message: 'Failed to send notification' });
   }
 };
 
-// 🔸 Bulk notification to multiple users
+// 🔸 Bulk notification to multiple users (with batching and Promise.allSettled)
 exports.sendBulkNotification = async (req, res) => {
   const { audience, subject, message, via } = req.body;
 
@@ -100,52 +107,63 @@ exports.sendBulkNotification = async (req, res) => {
       return res.status(400).json({ message: 'Unsupported audience type.' });
     }
 
+    // Batch size for sending (adjust as needed for provider limits)
+    const BATCH_SIZE = 50;
     let sentCount = 0;
     let failed = 0;
 
-    for (const user of users) {
-      for (const method of via) {
-        try {
-          if (method === 'email' && user.email) {
-            await sendEmail(user.email, subject || 'Notification', message);
+    for (let i = 0; i < users.length; i += BATCH_SIZE) {
+      const batch = users.slice(i, i + BATCH_SIZE);
 
-            await db.NotificationLog.create({
-              userId: user.id,
-              email: user.email,
-              channel: 'email',
-              subject,
-              message,
-              status: 'sent'
-            });
-          }
-
-          if (method === 'sms' && user.phoneNumber) {
-            await sendSms(user.phoneNumber, message);
-
-            await db.NotificationLog.create({
-              userId: user.id,
-              phone: user.phoneNumber,
-              channel: 'sms',
-              message,
-              status: 'sent'
-            });
-          }
-
-          sentCount++;
-        } catch (err) {
-          console.error(`❌ Failed for ${user.email || user.phoneNumber}:`, err.message);
-          await db.NotificationLog.create({
-            userId: user.id,
-            email: user.email,
-            phone: user.phoneNumber,
-            channel: method,
-            subject,
-            message,
-            status: 'failed'
-          });
-          failed++;
+      // Send notifications in parallel for this batch
+      const promises = [];
+      for (const user of batch) {
+        for (const method of via) {
+          promises.push((async () => {
+            try {
+              await checkNotificationRateLimit(user.id, method);
+              if (method === 'email' && user.email) {
+                await sendEmail(user.email, subject || 'Notification', message);
+                await db.NotificationLog.create({
+                  userId: user.id,
+                  email: user.email,
+                  channel: 'email',
+                  subject,
+                  message,
+                  status: 'sent'
+                });
+              }
+              if (method === 'sms' && user.phoneNumber) {
+                await sendSms(user.phoneNumber, message);
+                await db.NotificationLog.create({
+                  userId: user.id,
+                  phone: user.phoneNumber,
+                  channel: 'sms',
+                  message,
+                  status: 'sent'
+                });
+              }
+              sentCount++;
+            } catch (err) {
+              await db.NotificationLog.create({
+                userId: user.id,
+                email: user.email,
+                phone: user.phoneNumber,
+                channel: method,
+                subject,
+                message,
+                status: 'failed'
+              });
+              failed++;
+            }
+          })());
         }
       }
+      // Wait for all in this batch to finish
+      await Promise.allSettled(promises);
+
+      // Optional: Add a delay between batches to avoid rate limits
+      // await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     res.status(200).json({
@@ -155,6 +173,6 @@ exports.sendBulkNotification = async (req, res) => {
       failed,
     });
   } catch (err) {
-    res.status(500).json({ message: 'Bulk notification failed', error: err.message });
+    res.status(500).json({ message: 'Bulk notification failed' });
   }
 };
