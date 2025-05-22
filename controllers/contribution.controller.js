@@ -40,7 +40,54 @@ exports.createGroup = async (req, res) => {
   }
 };
 
-// ...existing code...
+// In contribution.controller.js
+exports.sendGroupInvite = async (req, res) => {
+  try {
+    const { groupId, invitedUserId } = req.body;
+    const invite = await db.ContributionInvite.create({
+      groupId,
+      invitedBy: req.user.id,
+      invitedUserId,
+      status: 'pending'
+    });
+    res.status(201).json({ message: 'Invitation sent', invite });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to send invite', error: err.message });
+  }
+};
+
+exports.respondToInvite = async (req, res) => {
+  try {
+    const { inviteId } = req.params;
+    const { action } = req.body; // 'accepted' or 'declined'
+    const invite = await db.ContributionInvite.findByPk(inviteId);
+    if (!invite) return res.status(404).json({ message: 'Invite not found' });
+    invite.status = action;
+    await invite.save();
+    if (action === 'accepted') {
+      await db.ContributionMember.create({
+        userId: invite.invitedUserId,
+        groupId: invite.groupId
+      });
+    }
+    res.status(200).json({ message: `Invite ${action}` });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to respond to invite', error: err.message });
+  }
+};
+
+exports.addContact = async (req, res) => {
+  try {
+    const { contactUserId } = req.body;
+    const contact = await db.UserContact.create({
+      userId: req.user.id,
+      contactUserId
+    });
+    res.status(201).json({ message: 'Contact added', contact });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to add contact', error: err.message });
+  }
+};
 
 // Update a contribution group
 exports.updateGroup = async (req, res) => {
