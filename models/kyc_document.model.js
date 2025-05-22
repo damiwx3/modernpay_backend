@@ -1,31 +1,15 @@
 module.exports = (sequelize, DataTypes) => {
-  const KYCDocument = sequelize.define('KYCDocument', {
-    userId: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-    },
-    documentUrl: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    documentType: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    status: {
-      type: DataTypes.STRING,
-      defaultValue: 'pending',
-    },
-    rejectionReason: {
-      type: DataTypes.STRING,
-    },
-    submittedAt: {
-      type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW,
-    },
+  const KYCDocument = sequelize.define("KYCDocument", {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    userId: { type: DataTypes.INTEGER, allowNull: false },
+    type: { type: DataTypes.STRING, allowNull: false }, // e.g., 'ID card', 'utility bill'
+    url: { type: DataTypes.STRING, allowNull: false },  // file path or URL
+    status: { type: DataTypes.STRING, defaultValue: 'pending' } // pending, approved, rejected
+  }, {
+    timestamps: true
   });
 
-  KYCDocument.associate = function(models) {
+  KYCDocument.associate = (models) => {
     KYCDocument.belongsTo(models.User, { foreignKey: 'userId' });
   };
 
