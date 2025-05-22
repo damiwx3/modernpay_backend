@@ -151,6 +151,58 @@ router.post('/scheduler/trigger', auth, controller.runScheduler);
  */
 router.post('/groups/:groupId/payout', auth, controller.processPayout);
 
+// ...existing code...
+
+/**
+ * @swagger
+ * /api/contributions/groups/{groupId}/leave:
+ *   post:
+ *     summary: Leave a contribution group
+ *     tags: [Contributions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Left group successfully
+ */
+router.post('/groups/:groupId/leave', auth, controller.leaveGroup);
+
+/**
+ * @swagger
+ * /api/contributions/contribute:
+ *   post:
+ *     summary: Make a contribution to a cycle
+ *     tags: [Contributions]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - cycleId
+ *               - amount
+ *             properties:
+ *               cycleId:
+ *                 type: integer
+ *               amount:
+ *                 type: number
+ *     responses:
+ *       201:
+ *         description: Contribution made
+ */
+router.post('/contribute', auth, controller.makeContribution);
+
+// ...existing code...
+
 /**
  * @swagger
  * /api/contributions/groups/{groupId}/summary:
