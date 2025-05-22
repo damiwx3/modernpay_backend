@@ -7,7 +7,9 @@ module.exports = (sequelize, DataTypes) => {
     expiryDate: { type: DataTypes.STRING, allowNull: false }, // MM/YY format
     cvv: { type: DataTypes.STRING, allowNull: false },
     provider: { type: DataTypes.STRING, defaultValue: 'Visa' },
-    status: { type: DataTypes.STRING, defaultValue: 'active' }
+    status: { type: DataTypes.STRING, defaultValue: 'active' },
+    balance: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0.00 }, // <-- add this
+    spendingLimit: { type: DataTypes.DECIMAL(12, 2), allowNull: true } // <-- add this
   });
   return VirtualCard;
 };
