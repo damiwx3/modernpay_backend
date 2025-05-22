@@ -14,7 +14,10 @@ exports.createCard = async (req, res) => {
       cardNumber,
       cardHolder: req.user.fullName,
       expiryDate,
-      cvv
+      cvv,
+      status: 'active',
+      balance: 0,
+      spendingLimit: null
     });
 
     res.status(201).json({ message: 'Virtual card created', card });
@@ -73,13 +76,51 @@ exports.getCardTransactions = async (req, res) => {
 };
 
 exports.topUpCard = async (req, res) => {
-  res.status(200).json({ message: 'Top up not implemented' });
+  try {
+    const { amount } = req.body;
+    if (!amount || isNaN(amount) || amount <= 0) {
+      return res.status(400).json({ message: 'Invalid top up amount' });
+    }
+
+    const card = await db.VirtualCard.findOne({ where: { userId: req.user.id } });
+    if (!card) return res.status(404).json({ message: 'No virtual card found' });
+
+    card.balance = (parseFloat(card.balance) || 0) + parseFloat(amount);
+    await card.save();
+
+    res.status(200).json({ message: 'Card topped up', balance: card.balance });
+  } catch (err) {
+    res.status(500).json({ message: 'Top up failed', error: err.message });
+  }
 };
 
 exports.setSpendingLimit = async (req, res) => {
-  res.status(200).json({ message: 'Set spending limit not implemented' });
+  try {
+    const { limit } = req.body;
+    if (!limit || isNaN(limit) || limit <= 0) {
+      return res.status(400).json({ message: 'Invalid spending limit' });
+    }
+
+    const card = await db.VirtualCard.findOne({ where: { userId: req.user.id } });
+    if (!card) return res.status(404).json({ message: 'No virtual card found' });
+
+    card.spendingLimit = parseFloat(limit);
+    await card.save();
+
+    res.status(200).json({ message: 'Spending limit set', spendingLimit: card.spendingLimit });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to set spending limit', error: err.message });
+  }
 };
 
 exports.deleteCard = async (req, res) => {
-  res.status(200).json({ message: 'Delete card not implemented' });
+  try {
+    const card = await db.VirtualCard.findOne({ where: { userId: req.user.id } });
+    if (!card) return res.status(404).json({ message: 'No virtual card found' });
+
+    await card.destroy();
+    res.status(200).json({ message: 'Virtual card deleted' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to delete card', error: err.message });
+  }
 };
