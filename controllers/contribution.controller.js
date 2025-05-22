@@ -27,6 +27,12 @@ exports.createGroup = async (req, res) => {
       status: 'active'
     });
 
+    // Automatically add the creator as a member
+    await db.ContributionMember.create({
+      userId: req.user.id,
+      groupId: group.id
+    });
+
     res.status(201).json({ message: 'Group created successfully', group });
   } catch (err) {
     console.error('Create group error:', err);
@@ -38,6 +44,15 @@ exports.createGroup = async (req, res) => {
 exports.joinGroup = async (req, res) => {
   try {
     const groupId = req.params.groupId;
+    const group = await db.ContributionGroup.findByPk(groupId);
+    if (!group) return res.status(404).json({ message: 'Group not found' });
+
+    // Check if group is full
+    const memberCount = await db.ContributionMember.count({ where: { groupId } });
+    if (memberCount >= group.maxMembers) {
+      return res.status(400).json({ message: 'Group is full' });
+    }
+
     const existing = await db.ContributionMember.findOne({
       where: { userId: req.user.id, groupId }
     });
@@ -53,17 +68,55 @@ exports.joinGroup = async (req, res) => {
   }
 };
 
-// Make a contribution (stub)
+// Make a contribution
 exports.makeContribution = async (req, res) => {
-  res.status(200).json({ message: 'makeContribution not implemented' });
+  try {
+    const { cycleId, amount } = req.body;
+    const member = await db.ContributionMember.findOne({
+      where: { userId: req.user.id }
+    });
+    if (!member) return res.status(404).json({ message: 'Not a group member' });
+
+    const cycle = await db.ContributionCycle.findByPk(cycleId);
+    if (!cycle) return res.status(404).json({ message: 'Cycle not found' });
+
+    // Optionally: check if already contributed
+    const existing = await db.ContributionPayment.findOne({
+      where: { memberId: member.id, cycleId }
+    });
+    if (existing) return res.status(400).json({ message: 'Already contributed for this cycle' });
+
+    const payment = await db.ContributionPayment.create({
+      memberId: member.id,
+      cycleId,
+      amount,
+      status: 'paid',
+      paidAt: new Date()
+    });
+
+    res.status(201).json({ message: 'Contribution made', payment });
+  } catch (err) {
+    res.status(500).json({ message: 'Contribution failed', error: err.message });
+  }
 };
 
-// Leave a group (stub)
+// Leave a group
 exports.leaveGroup = async (req, res) => {
-  res.status(200).json({ message: 'leaveGroup not implemented' });
+  try {
+    const groupId = req.params.groupId;
+    const member = await db.ContributionMember.findOne({
+      where: { userId: req.user.id, groupId }
+    });
+    if (!member) return res.status(404).json({ message: 'Not a group member' });
+
+    await member.destroy();
+    res.status(200).json({ message: 'Left group successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Leave group failed', error: err.message });
+  }
 };
 
-// Get all groups (stub)
+// Get all groups
 exports.getGroups = async (req, res) => {
   try {
     const groups = await db.ContributionGroup.findAll();
@@ -73,7 +126,7 @@ exports.getGroups = async (req, res) => {
   }
 };
 
-// Get members of a group (stub)
+// Get members of a group
 exports.getMembers = async (req, res) => {
   try {
     const members = await db.ContributionMember.findAll({
@@ -128,7 +181,7 @@ exports.processPayout = async (req, res) => {
     cycle.status = 'closed';
     await cycle.save();
 
-    res.status(200).json({ message: `Payout sent to ${winner.id}` });
+    res.status(200).json({ message: `Payout sent to member ${winner.id}` });
   } catch (err) {
     res.status(500).json({ message: 'Payout failed', error: err.message });
   }
