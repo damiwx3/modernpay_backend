@@ -223,4 +223,49 @@ router.post('/contribute', auth, controller.makeContribution);
  */
 router.get('/groups/:groupId/summary', auth, controller.getGroupSummary);
 
+/**
+ * @swagger
+ * /api/contributions/groups/{groupId}:
+ *   put:
+ *     summary: Update a contribution group
+ *     tags: [Contributions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               maxMembers:
+ *                 type: integer
+ *               amountPerMember:
+ *                 type: number
+ *               frequency:
+ *                 type: string
+ *               payoutSchedule:
+ *                 type: string
+ *               imageUrl:
+ *                 type: string
+ *               status:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Group updated successfully
+ *       400:
+ *         description: Update failed
+ */
+router.put('/groups/:groupId', auth, controller.updateGroup);
+
 module.exports = router;
