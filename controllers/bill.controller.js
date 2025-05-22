@@ -1,20 +1,93 @@
 const db = require('../models');
 const axios = require('axios');
 
+const FLW_BASE = 'https://api.flutterwave.com/v3';
+const HEADERS = {
+  Authorization: `Bearer ${process.env.FLW_SECRET_KEY}`,
+  'Content-Type': 'application/json'
+};
+
 // List available bill categories from Flutterwave
 exports.getCategories = async (req, res) => {
   try {
-    const flutterRes = await axios.get('https://api.flutterwave.com/v3/bill-categories', {
-      headers: {
-        Authorization: `Bearer ${process.env.FLW_SECRET_KEY}`
-      }
-    });
-
+    const flutterRes = await axios.get(`${FLW_BASE}/bill-categories`, { headers: HEADERS });
     res.status(200).json({ categories: flutterRes.data.data });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch categories', error: err.message });
   }
 };
+
+// Airtime for Nigeria only (MTN, GLO, Airtel, 9mobile)
+exports.getAirtimeCategories = async (req, res) => {
+  try {
+    const flutterRes = await axios.get(`${FLW_BASE}/bill-categories`, { headers: HEADERS });
+    const allowed = ['MTN', 'GLO', 'AIRTEL', '9MOBILE'];
+    const airtime = flutterRes.data.data.filter(
+      cat =>
+        cat.country === 'NG' &&
+        cat.biller_code &&
+        cat.biller_code.toUpperCase().includes('AIRTIME') &&
+        allowed.some(net => cat.name.toUpperCase().includes(net))
+    );
+    res.status(200).json({ categories: airtime });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch airtime categories', error: err.message });
+  }
+};
+
+// Data for Nigeria only (MTN, GLO, Airtel, 9mobile)
+exports.getDataCategories = async (req, res) => {
+  try {
+    const flutterRes = await axios.get(`${FLW_BASE}/bill-categories`, { headers: HEADERS });
+    const allowed = ['MTN', 'GLO', 'AIRTEL', '9MOBILE'];
+    const data = flutterRes.data.data.filter(
+      cat =>
+        cat.country === 'NG' &&
+        cat.biller_code &&
+        cat.biller_code.toUpperCase().includes('DATA') &&
+        allowed.some(net => cat.name.toUpperCase().includes(net))
+    );
+    res.status(200).json({ categories: data });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch data categories', error: err.message });
+  }
+};
+
+// Other Nigerian bills (excluding airtime/data)
+exports.getNigerianBills = async (req, res) => {
+  try {
+    const flutterRes = await axios.get(`${FLW_BASE}/bill-categories`, { headers: HEADERS });
+    const bills = flutterRes.data.data.filter(
+      cat =>
+        cat.country === 'NG' &&
+        !(cat.biller_code && (cat.biller_code.toUpperCase().includes('AIRTIME') || cat.biller_code.toUpperCase().includes('DATA')))
+    );
+    res.status(200).json({ categories: bills });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch Nigerian bills', error: err.message });
+  }
+};
+
+// All other bills (not Nigerian or not airtime/data)
+exports.getOtherBills = async (req, res) => {
+  try {
+    const flutterRes = await axios.get(`${FLW_BASE}/bill-categories`, { headers: HEADERS });
+    const bills = flutterRes.data.data.filter(
+      cat =>
+        cat.country !== 'NG' ||
+        (
+          cat.biller_code &&
+          !cat.biller_code.toUpperCase().includes('AIRTIME') &&
+          !cat.biller_code.toUpperCase().includes('DATA')
+        )
+    );
+    res.status(200).json({ categories: bills });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch other bills', error: err.message });
+  }
+};
+
+// ... (keep your other existing functions: validateCustomer, payBill, getHistory, getBundles)
 
 // Validate customer (smartcard, phone, meter, etc.)
 exports.validateCustomer = async (req, res) => {
@@ -26,18 +99,13 @@ exports.validateCustomer = async (req, res) => {
 
   try {
     const response = await axios.post(
-      'https://api.flutterwave.com/v3/bill-items/validate',
+      `${FLW_BASE}/bill-items/validate`,
       {
         item_code: serviceType,
         code: customer,
         customer: customer
       },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.FLW_SECRET_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
+      { headers: HEADERS }
     );
 
     const result = response.data;
@@ -73,12 +141,7 @@ exports.payBill = async (req, res) => {
       reference
     };
 
-    const flwRes = await axios.post('https://api.flutterwave.com/v3/bills', payload, {
-      headers: {
-        Authorization: `Bearer ${process.env.FLW_SECRET_KEY}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    const flwRes = await axios.post(`${FLW_BASE}/bills`, payload, { headers: HEADERS });
 
     const response = flwRes.data;
     const status = response.status === 'success' ? 'success' : 'failed';
@@ -117,7 +180,7 @@ exports.getHistory = async (req, res) => {
   }
 };
 
-// 5. Get bundles (for data, TV, etc.)
+// Get bundles (for data, TV, etc.)
 exports.getBundles = async (req, res) => {
   const billerCode = req.params.billerCode;
 
