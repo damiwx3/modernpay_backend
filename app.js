@@ -23,6 +23,9 @@ const campaignRoutes = require('./routes/campaign.routes');
 // ...existing code...
 const contributionRoutes = require('./routes/contribution.routes');
 const userContactRoutes = require('./routes/user_contact.routes');
+const disputeRoutes = require('./routes/dispute.routes');
+
+app.use('/api/disputes', disputeRoutes);
 
 
 app.use('/api/contacts', userContactRoutes);
