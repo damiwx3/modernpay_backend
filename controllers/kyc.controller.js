@@ -20,7 +20,27 @@ exports.verifyBvnOrNinAndAddress = async (req, res) => {
   res.status(200).json({ message: 'Tier 2 unlocked (NIN/BVN, ID, address verified)' });
 };
 
-// ...existing code...
+exports.uploadKycDocument = async (req, res) => {
+  // Example implementation
+  if (!req.file) {
+    return res.status(400).json({ message: 'No document uploaded' });
+  }
+  // Save file info to DB or process as needed
+  res.status(201).json({ message: 'KYC document uploaded successfully', file: req.file });
+};
+exports.getKycStatus = async (req, res) => {
+  // Example implementation
+  const user = await db.User.findByPk(req.user.id, {
+    attributes: ['kycLevel', 'kycStatus']
+  });
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+  res.status(200).json({
+    kycLevel: user.kycLevel,
+    kycStatus: user.kycStatus
+  });
+};
 
 // Tier 3: Address or Selfie Verification (Unlimited)
 exports.verifyAddressOrSelfie = async (req, res) => {
