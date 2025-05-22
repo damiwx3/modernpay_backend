@@ -19,6 +19,7 @@ const walletRoutes = require('./routes/wallet.routes');
 const contributionCycleRoutes = require('./routes/contribution_cycle.routes');
 const auditRoutes = require('./routes/audit.routes');
 const billRoutes = require('./routes/bill.routes');
+const campaignRoutes = require('./routes/campaign.routes');
 
 app.use('/api/contribution-cycles', contributionCycleRoutes);
 
@@ -31,7 +32,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(maintenanceCheck);
 app.use(maintenance);
 app.use(checkMaintenance);
-
+app.use('/api/campaigns', campaignRoutes);
 // Routes
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/savings', savingsRoutes);
