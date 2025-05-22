@@ -6,5 +6,12 @@ module.exports = (sequelize, DataTypes) => {
     joinedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
     role: { type: DataTypes.STRING, defaultValue: 'member' }
   });
+
+  ContributionMember.associate = (models) => {
+    ContributionMember.belongsTo(models.User, { foreignKey: 'userId' });
+    ContributionMember.belongsTo(models.ContributionGroup, { foreignKey: 'groupId' });
+    ContributionMember.hasMany(models.ContributionPayment, { foreignKey: 'memberId' });
+  };
+
   return ContributionMember;
 };
