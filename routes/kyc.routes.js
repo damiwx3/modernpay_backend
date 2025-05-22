@@ -6,6 +6,52 @@ const upload = require('../middleware/upload.middleware'); // Multer middleware 
 
 /**
  * @swagger
+ * tags:
+ *   name: KYC
+ *   description: KYC verification and document upload
+ */
+
+/**
+ * @swagger
+ * /api/kyc/verify-phone-selfie:
+ *   post:
+ *     summary: Tier 1 - Verify phone number and selfie
+ *     tags: [KYC]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Tier 1 unlocked (phone & selfie verified)
+ */
+
+/**
+ * @swagger
+ * /api/kyc/verify-bvn-or-nin-address:
+ *   post:
+ *     summary: Tier 2 - Verify NIN/BVN, ID, and address
+ *     tags: [KYC]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Tier 2 unlocked (NIN/BVN, ID, address verified)
+ */
+
+/**
+ * @swagger
+ * /api/kyc/verify-address-or-selfie:
+ *   post:
+ *     summary: Tier 3 - Address or Selfie Verification
+ *     tags: [KYC]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Tier 3 unlocked (address or selfie verified)
+ */
+
+/**
+ * @swagger
  * /api/kyc/upload:
  *   post:
  *     summary: Upload KYC documents
@@ -29,6 +75,21 @@ const upload = require('../middleware/upload.middleware'); // Multer middleware 
  *         description: KYC document uploaded successfully
  *       400:
  *         description: Invalid or missing data
+ */
+
+/**
+ * @swagger
+ * /api/kyc/status:
+ *   get:
+ *     summary: Get KYC status and documents
+ *     tags: [KYC]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Returns KYC status and level
+ *       404:
+ *         description: User not found
  */
 
 // Tier 1: Phone number and selfie verification (NGN 200,000 limit)
