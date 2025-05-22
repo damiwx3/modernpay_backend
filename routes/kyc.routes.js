@@ -31,14 +31,17 @@ const upload = require('../middleware/upload.middleware'); // Multer middleware 
  *         description: Invalid or missing data
  */
 
+// Tier 1: Phone number and selfie verification (NGN 200,000 limit)
+router.post('/verify-phone-selfie', auth, kycController.verifyPhoneAndSelfie);
+
+// Tier 2: NIN/BVN, ID, and address verification (NGN 5,000,000 limit)
+router.post('/verify-bvn-or-nin-address', auth, kycController.verifyBvnOrNinAndAddress);
+
+// Tier 3: Address or Selfie Verification (Unlimited)
+router.post('/verify-address-or-selfie', auth, kycController.verifyAddressOrSelfie);
+
 // Tier 3: Upload KYC Document (ID card, etc.)
 router.post('/upload', auth, upload.single('document'), kycController.uploadKycDocument);
-
-// Tier 2: Verify BVN
-router.post('/verify-bvn', auth, kycController.verifyBvn);
-
-// Tier 4: Address or Selfie Verification
-router.post('/verify-address-or-selfie', auth, kycController.verifyAddressOrSelfie);
 
 // Get KYC Status and documents
 router.get('/status', auth, kycController.getKycStatus);
