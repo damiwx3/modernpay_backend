@@ -267,5 +267,93 @@ router.get('/groups/:groupId/summary', auth, controller.getGroupSummary);
  *         description: Update failed
  */
 router.put('/groups/:groupId', auth, controller.updateGroup);
+// In contribution.routes.js or a new invite.routes.js
+/***********************************
+ * @swagger
+ * /api/contributions/groups/{groupId}/invite:
+ *   post:
+ *     summary: Send an invitation to a user to join a group
+ *     tags: [Contributions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - invitedUserId
+ *             properties:
+ *               invitedUserId:
+ *                 type: integer
+ *     responses:
+ *       201:
+ *         description: Invitation sent
+ */
+router.post('/groups/:groupId/invite', auth, controller.sendGroupInvite);
+
+/**
+ * @swagger
+ * /api/contributions/invites/{inviteId}/respond:
+ *   post:
+ *     summary: Respond to a group invitation (accept or decline)
+ *     tags: [Contributions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: inviteId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - action
+ *             properties:
+ *               action:
+ *                 type: string
+ *                 enum: [accepted, declined]
+ *     responses:
+ *       200:
+ *         description: Invite responded
+ */
+router.post('/invites/:inviteId/respond', auth, controller.respondToInvite);
+
+/**
+ * @swagger
+ * /api/contributions/contacts:
+ *   post:
+ *     summary: Add a user contact for peer-to-peer transactions
+ *     tags: [Contributions]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - contactUserId
+ *             properties:
+ *               contactUserId:
+ *                 type: integer
+ *     responses:
+ *       201:
+ *         description: Contact added
+ */
+router.post('/contacts', auth, controller.addContact);
 
 module.exports = router;
