@@ -23,8 +23,22 @@ exports.flutterwaveWebhook = async (req, res) => {
     });
 
     // 2️⃣ Virtual Account Wallet Funding
-    if (event === 'charge.completed' && payload.data.payment_type === 'bank_transfer') {
+    if (
+      event === 'charge.completed' &&
+      payload.data &&
+      payload.data.payment_type === 'bank_transfer'
+    ) {
       const { account_number, amount } = payload.data;
+
+      // Validate amount
+      if (isNaN(amount) || Number(amount) <= 0) {
+        console.warn('⚠️ Invalid amount in webhook:', amount);
+        return res.status(400).json({ message: 'Invalid amount in webhook' });
+      }
+
+      if (!account_number) {
+        return res.status(400).json({ message: 'Missing account number in webhook' });
+      }
 
       const wallet = await db.Wallet.findOne({ where: { accountNumber: account_number } });
       if (!wallet) return res.status(404).json({ message: 'Wallet not found' });
@@ -49,8 +63,19 @@ exports.flutterwaveWebhook = async (req, res) => {
     }
 
     // 3️⃣ Bank Transfer Confirmation
-    else if (event === 'transfer.completed') {
+    else if (
+      event === 'transfer.completed' &&
+      payload.data &&
+      typeof payload.data.reference !== 'undefined' &&
+      typeof payload.data.status !== 'undefined'
+    ) {
       const { reference, status, amount } = payload.data;
+
+      // Validate amount
+      if (isNaN(amount) || Number(amount) < 0) {
+        console.warn('⚠️ Invalid amount in transfer webhook:', amount);
+        return res.status(400).json({ message: 'Invalid amount in webhook' });
+      }
 
       const txn = await db.Transaction.findOne({ where: { reference } });
       if (!txn) return res.status(404).json({ message: 'Transaction not found' });
@@ -69,9 +94,11 @@ exports.flutterwaveWebhook = async (req, res) => {
       }
     }
 
+    // Always respond 200 OK to prevent repeated webhook calls
     res.status(200).send('Webhook received');
   } catch (err) {
     console.error('❌ Webhook error:', err.message);
-    res.status(500).json({ message: 'Internal webhook error', error: err.message });
+    // Do not leak stack traces or sensitive info
+    res.status(500).json({ message: 'Internal webhook error' });
   }
 };
