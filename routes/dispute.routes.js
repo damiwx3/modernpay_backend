@@ -2,20 +2,12 @@ const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/dispute.controller');
 const auth = require('../middleware/auth.middleware');
-const adminAuth = require('../middleware/admin_auth.middleware');
-
-/**
- * @swagger
- * tags:
- *   name: Disputes
- *   description: Handle transaction-related disputes
- */
 
 /**
  * @swagger
  * /api/disputes:
  *   post:
- *     summary: Raise a transaction dispute
+ *     summary: Raise a dispute for a transaction
  *     tags: [Disputes]
  *     security:
  *       - bearerAuth: []
@@ -35,7 +27,7 @@ const adminAuth = require('../middleware/admin_auth.middleware');
  *                 type: string
  *     responses:
  *       201:
- *         description: Dispute submitted
+ *         description: Dispute raised
  */
 router.post('/', auth, controller.raiseDispute);
 
@@ -43,35 +35,64 @@ router.post('/', auth, controller.raiseDispute);
  * @swagger
  * /api/disputes:
  *   get:
- *     summary: Get all user disputes
+ *     summary: Admin - Get all disputes
  *     tags: [Disputes]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Dispute list
+ *         description: List of disputes
  */
-router.get('/', auth, controller.getMyDisputes);
+router.get('/', auth, controller.getAllDisputes);
 
 /**
  * @swagger
- * /api/disputes/admin:
+ * /api/disputes/my:
  *   get:
- *     summary: Admin view of all disputes
+ *     summary: Get my disputes
  *     tags: [Disputes]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: All disputes fetched
+ *         description: List of my disputes
  */
-router.get('/admin', adminAuth, controller.getAllDisputes);
+router.get('/my', auth, controller.getMyDisputes);
 
 /**
  * @swagger
- * /api/disputes/admin/{id}/resolve:
- *   put:
- *     summary: Admin resolves a dispute
+ * /api/disputes/{id}/resolve:
+ *   post:
+ *     summary: Resolve a dispute
+ *     tags: [Disputes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Dispute resolved
+ */
+router.post('/:id/resolve', auth, controller.resolveDispute);
+
+/**
+ * @swagger
+ * /api/disputes/{id}:
+ *   patch:
+ *     summary: Update dispute status
  *     tags: [Disputes]
  *     security:
  *       - bearerAuth: []
@@ -92,11 +113,10 @@ router.get('/admin', adminAuth, controller.getAllDisputes);
  *             properties:
  *               status:
  *                 type: string
- *                 enum: [resolved, rejected]
  *     responses:
  *       200:
  *         description: Dispute updated
  */
-router.put('/admin/:id/resolve', adminAuth, controller.resolveDispute);
+router.patch('/:id', auth, controller.updateDispute);
 
 module.exports = router;
