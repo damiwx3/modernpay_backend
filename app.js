@@ -16,8 +16,11 @@ const userRoutes = require('./routes/user.routes');
 const savingsRoutes = require('./routes/savings.routes');
 const ticketRoutes = require('./routes/ticket.routes');
 const walletRoutes = require('./routes/wallet.routes');
-const contributionCycleRoutes = require('./routes/contributionCycle.routes');
+const contributionCycleRoutes = require('./routes/contribution_cycle.routes');
 const auditRoutes = require('./routes/audit.routes');
+const billRoutes = require('./routes/bill.routes');
+
+app.use('/api/contribution-cycles', contributionCycleRoutes);
 
 
 // Middleware
