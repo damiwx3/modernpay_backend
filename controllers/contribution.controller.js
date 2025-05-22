@@ -40,6 +40,22 @@ exports.createGroup = async (req, res) => {
   }
 };
 
+// ...existing code...
+
+// Update a contribution group
+exports.updateGroup = async (req, res) => {
+  try {
+    const groupId = req.params.groupId;
+    const updateFields = req.body;
+    const updatedGroup = await db.ContributionGroup.updateGroup(groupId, updateFields);
+    res.status(200).json({ message: 'Group updated successfully', group: updatedGroup });
+  } catch (err) {
+    res.status(400).json({ message: 'Update failed', error: err.message });
+  }
+};
+
+// ...existing code...
+
 // Join a contribution group
 exports.joinGroup = async (req, res) => {
   try {
