@@ -20,6 +20,18 @@ exports.verifyBvnOrNinAndAddress = async (req, res) => {
   res.status(200).json({ message: 'Tier 2 unlocked (NIN/BVN, ID, address verified)' });
 };
 
+// ...existing code...
+
+// Tier 3: Address or Selfie Verification (Unlimited)
+exports.verifyAddressOrSelfie = async (req, res) => {
+  // Implement address or selfie verification logic here
+  // After successful verification:
+  await db.User.update(
+    { kycLevel: 3 },
+    { where: { id: req.user.id } }
+  );
+  res.status(200).json({ message: 'Tier 3 unlocked (address or selfie verified)' });
+};
 // Tier 4: Utility bill verification (Unlimited)
 exports.verifyUtilityBill = async (req, res) => {
   // Implement utility bill verification logic here
