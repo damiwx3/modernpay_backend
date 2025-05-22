@@ -3,12 +3,24 @@ const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const generateAccountNumber = require('../utils/generateAccountNumber');
 
+// Placeholder for logging (replace with your logger or audit system)
+function logWalletAction(userId, action, details) {
+  // Example: console.log(`[WALLET LOG] User ${userId}: ${action}`, details);
+}
+
+// Placeholder for rate limiting/fraud check (implement as needed)
+async function checkRateLimitOrFraud(userId, action) {
+  // Example: throw new Error('Too many requests');
+}
+
 // 📘 Get Wallet Balance & Account Info
 exports.getBalance = async (req, res) => {
   try {
+    await checkRateLimitOrFraud(req.user.id, 'getBalance');
     const wallet = await db.Wallet.findOne({ where: { userId: req.user.id } });
     if (!wallet) return res.status(404).json({ message: 'Wallet not found' });
 
+    logWalletAction(req.user.id, 'getBalance', { balance: wallet.balance });
     res.status(200).json({
       balance: wallet.balance,
       accountNumber: wallet.accountNumber,
@@ -29,6 +41,7 @@ exports.fundWallet = async (req, res) => {
   }
 
   try {
+    await checkRateLimitOrFraud(req.user.id, 'fundWallet');
     let wallet = await db.Wallet.findOne({ where: { userId: req.user.id } });
 
     if (!wallet) {
@@ -52,6 +65,7 @@ exports.fundWallet = async (req, res) => {
       status: 'success',
     });
 
+    logWalletAction(req.user.id, 'fundWallet', { amount: value, newBalance: wallet.balance });
     res.status(200).json({ message: 'Wallet funded successfully', newBalance: wallet.balance });
   } catch (err) {
     res.status(500).json({ message: 'Funding failed', error: err.message });
@@ -68,6 +82,7 @@ exports.transferFunds = async (req, res) => {
   }
 
   try {
+    await checkRateLimitOrFraud(req.user.id, 'transferFunds');
     const senderWallet = await db.Wallet.findOne({ where: { userId: req.user.id } });
     const recipientWallet = await db.Wallet.findOne({ where: { accountNumber: recipientAccountNumber } });
 
@@ -101,6 +116,7 @@ exports.transferFunds = async (req, res) => {
       },
     ]);
 
+    logWalletAction(req.user.id, 'transferFunds', { to: recipientAccountNumber, amount: value });
     res.status(200).json({ message: 'Transfer successful', senderBalance: senderWallet.balance });
   } catch (err) {
     res.status(500).json({ message: 'Transfer failed', error: err.message });
@@ -117,6 +133,7 @@ exports.transferToBank = async (req, res) => {
   }
 
   try {
+    await checkRateLimitOrFraud(req.user.id, 'transferToBank');
     const wallet = await db.Wallet.findOne({ where: { userId: req.user.id } });
     if (!wallet || wallet.balance < value) {
       return res.status(400).json({ message: 'Insufficient wallet balance' });
@@ -158,15 +175,18 @@ exports.transferToBank = async (req, res) => {
         status: 'success',
       });
 
+      logWalletAction(req.user.id, 'transferToBank', { to: accountNumber, amount: value, bankCode });
       return res.status(200).json({ message: 'Transfer successful', data: result.data });
     } else {
       wallet.balance += value;
       await wallet.save();
 
+      logWalletAction(req.user.id, 'transferToBankFailed', { to: accountNumber, amount: value, bankCode, error: result.message });
       return res.status(500).json({ message: 'Flutterwave transfer failed', error: result.message });
     }
 
   } catch (err) {
+    logWalletAction(req.user.id, 'transferToBankError', { error: err.message });
     return res.status(500).json({ message: 'Bank transfer error', error: err.message });
   }
 };
@@ -177,6 +197,7 @@ exports.createVirtualAccount = async (req, res) => {
   if (!user) return res.status(404).json({ message: 'User not found' });
 
   try {
+    await checkRateLimitOrFraud(req.user.id, 'createVirtualAccount');
     const response = await axios.post(
       'https://api.flutterwave.com/v3/virtual-account-numbers',
       {
@@ -203,6 +224,7 @@ exports.createVirtualAccount = async (req, res) => {
       { where: { userId: req.user.id } }
     );
 
+    logWalletAction(req.user.id, 'createVirtualAccount', { accountNumber: account.account_number, bank: account.bank_name });
     return res.status(201).json({
       message: 'Virtual account created',
       accountNumber: account.account_number,
@@ -210,6 +232,7 @@ exports.createVirtualAccount = async (req, res) => {
     });
   } catch (err) {
     console.error('Flutterwave VA error:', err.response?.data || err.message);
+    logWalletAction(req.user.id, 'createVirtualAccountError', { error: err.message });
     return res.status(500).json({ message: 'Failed to create virtual account', error: err.message });
   }
 };
