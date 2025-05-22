@@ -3,7 +3,8 @@ const router = express.Router();
 const kycController = require('../controllers/kyc.controller');
 const auth = require('../middleware/auth.middleware');
 const upload = require('../middleware/upload.middleware'); // Multer middleware for file uploads
-
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' }); // or your custom config
 /**
  * @swagger
  * /api/kyc/upload:
