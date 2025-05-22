@@ -25,6 +25,8 @@ router.use('/disputes', require('./dispute.routes'));
 router.use('/reports', require('./report.routes'));
 router.use('/audit', require('./audit.routes'));
 router.use('/settings', require('./setting.routes'));
+router.use('/contacts', require('./user_contact.routes'));
+router.use('/contribution-cycles', require('./contribution_cycle.routes'));
 
 
 
