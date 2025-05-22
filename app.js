@@ -21,8 +21,6 @@ const auditRoutes = require('./routes/audit.routes');
 const billRoutes = require('./routes/bill.routes');
 const campaignRoutes = require('./routes/campaign.routes');
 
-app.use('/api/contribution-cycles', contributionCycleRoutes);
-
 
 // Middleware
 app.use(cors());
