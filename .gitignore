@@ -1,0 +1,40 @@
+# Node dependencies
+node_modules/
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+log.txt
+
+# DB
+*.sqlite
+*.sqlite3
+*.db
+
+# Uploads & Generated Files
+uploads/
+tmp/
+coverage/
+
+# IDE / OS metadata
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Sequelize
+migrations/*.js
+seeders/*.js
+
+# Swagger cache
+swagger.json
+
+# Backup or archive
+*.zip
+*.tar.gz
