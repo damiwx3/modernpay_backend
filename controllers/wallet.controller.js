@@ -1,7 +1,7 @@
 const db = require('../models');
 const { v4: uuidv4 } = require('uuid');
-const monnify = require('../utils/monnify');
 const logger = require('../utils/logger');
+const flutterwave = require('../utils/flutterwave');
 
 function logWalletAction(userId, action, details) {
   logger.info({ userId, action, ...details });
@@ -76,7 +76,7 @@ exports.fundWallet = async (req, res) => {
   }
 };
 
-// 🔁 Transfer to another user via account number (Monnify)
+// 🔁 Transfer to another user via account number
 exports.transferFunds = async (req, res) => {
   if (!req.user || !req.user.id) {
     return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
@@ -130,7 +130,7 @@ exports.transferFunds = async (req, res) => {
   }
 };
 
-// 🧾 Create Virtual Account using Monnify util (with BVN/NIN)
+// 🧾 Create Virtual Account using Flutterwave (with BVN/NIN)
 exports.createVirtualAccount = async (req, res) => {
   if (!req.user || !req.user.id) {
     return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
@@ -145,9 +145,8 @@ exports.createVirtualAccount = async (req, res) => {
   }
 
   try {
-    const accountReference = `VA-${Date.now()}-${user.id}`;
-    // Pass BVN or NIN to Monnify util
-    const reservedAccount = await monnify.createReservedAccount(user, accountReference, bvnOrNin);
+    // Call Flutterwave util to create a virtual account
+    const reservedAccount = await flutterwave.createVirtualAccount(user, bvnOrNin);
 
     await db.Wallet.update(
       {
@@ -164,8 +163,27 @@ exports.createVirtualAccount = async (req, res) => {
       bank: reservedAccount.bankName,
     });
   } catch (err) {
-    console.error('Monnify VA error:', err.response?.data || err.message);
+    console.error('Flutterwave VA error:', err.response?.data || err.message);
     logWalletAction(req.user.id, 'createVirtualAccountError', { error: err.message });
     return res.status(500).json({ message: 'Failed to create virtual account', error: err.message });
+  }
+};
+
+// 💳 Initiate Flutterwave Payment
+exports.initiateFlutterwavePayment = async (req, res) => {
+  const { amount } = req.body;
+  if (!req.user || !req.user.email) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+  try {
+    const tx_ref = `WALLET-${Date.now()}-${req.user.id}`;
+    const payment = await flutterwave.initiatePayment({
+      amount,
+      email: req.user.email,
+      tx_ref,
+    });
+    res.status(200).json(payment);
+  } catch (err) {
+    res.status(500).json({ message: 'Flutterwave payment initiation failed', error: err.message });
   }
 };
