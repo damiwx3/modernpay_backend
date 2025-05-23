@@ -1,7 +1,6 @@
 const db = require('../models');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
-const generateAccountNumber = require('../utils/generateAccountNumber');
 
 // Placeholder for logging (replace with your logger or audit system)
 function logWalletAction(userId, action, details) {
@@ -23,7 +22,7 @@ exports.getBalance = async (req, res) => {
     logWalletAction(req.user.id, 'getBalance', { balance: wallet.balance });
     res.status(200).json({
       balance: wallet.balance,
-      accountNumber: wallet.accountNumber,
+      accountNumber: wallet.accountNumber, // Always Flutterwave's
       bankName: wallet.bankName,
     });
   } catch (err) {
@@ -45,11 +44,10 @@ exports.fundWallet = async (req, res) => {
     let wallet = await db.Wallet.findOne({ where: { userId: req.user.id } });
 
     if (!wallet) {
-      const accountNumber = await generateAccountNumber();
       wallet = await db.Wallet.create({
         userId: req.user.id,
         balance: 0,
-        accountNumber,
+        accountNumber: null, // No backend account number
       });
     }
 
@@ -72,7 +70,7 @@ exports.fundWallet = async (req, res) => {
   }
 };
 
-// 🔁 Transfer to another user via account number
+// 🔁 Transfer to another user via account number (Flutterwave only)
 exports.transferFunds = async (req, res) => {
   const { recipientAccountNumber, amount } = req.body;
   const value = parseFloat(amount);
@@ -218,7 +216,7 @@ exports.createVirtualAccount = async (req, res) => {
 
     await db.Wallet.update(
       {
-        accountNumber: account.account_number,
+        accountNumber: account.account_number, // Only Flutterwave's number is ever set
         bankName: account.bank_name,
       },
       { where: { userId: req.user.id } }
