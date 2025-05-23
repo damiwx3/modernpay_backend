@@ -2,9 +2,10 @@ const db = require('../models');
 const { v4: uuidv4 } = require('uuid');
 const monnify = require('../utils/monnify'); // ✅ Use the Monnify util
 
-// Placeholder for logging (replace with your logger or audit system)
+const logger = require('../utils/logger');
+
 function logWalletAction(userId, action, details) {
-  // Example: console.log(`[WALLET LOG] User ${userId}: ${action}`, details);
+  logger.info({ userId, action, ...details });
 }
 
 // Placeholder for rate limiting/fraud check (implement as needed)
