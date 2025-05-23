@@ -11,8 +11,9 @@ exports.getBankList = async (req, res) => {
         }
       }
     );
-    // Flutterwave returns banks in response.data.data
-    res.status(200).json({ banks: response.data.data });
+    // Map to only bank names
+    const bankNames = response.data.data.map(bank => bank.name);
+    res.status(200).json({ banks: bankNames });
   } catch (err) {
     console.error('Flutterwave bank list error:', err.response?.data || err.message);
     res.status(500).json({ error: 'Failed to fetch banks', details: err.message });
