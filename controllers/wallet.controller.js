@@ -130,6 +130,44 @@ exports.transferFunds = async (req, res) => {
   }
 };
 
+exports.createVirtualAccount = async (req, res) => {
+  if (!req.user || !req.user.id) {
+    return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
+  }
+  const user = await db.User.findByPk(req.user.id);
+  if (!user) return res.status(404).json({ message: 'User not found' });
+
+  // Get BVN or NIN from request body
+  const { bvnOrNin } = req.body;
+  if (!bvnOrNin) {
+    return res.status(400).json({ message: 'BVN or NIN is required to create a virtual account.' });
+  }
+
+  try {
+    const accountReference = `VA-${Date.now()}-${user.id}`;
+    // Pass BVN or NIN to Monnify util
+    const reservedAccount = await monnify.createReservedAccount(user, accountReference, bvnOrNin);
+
+    await db.Wallet.update(
+      {
+        accountNumber: reservedAccount.accountNumber,
+        bankName: reservedAccount.bankName,
+      },
+      { where: { userId: req.user.id } }
+    );
+
+    logWalletAction(req.user.id, 'createVirtualAccount', { accountNumber: reservedAccount.accountNumber, bank: reservedAccount.bankName });
+    return res.status(201).json({
+      message: 'Virtual account created',
+      accountNumber: reservedAccount.accountNumber,
+      bank: reservedAccount.bankName,
+    });
+  } catch (err) {
+    console.error('Monnify VA error:', err.response?.data || err.message);
+    logWalletAction(req.user.id, 'createVirtualAccountError', { error: err.message });
+    return res.status(500).json({ message: 'Failed to create virtual account', error: err.message });
+  }
+};
 // 🧾 Create Virtual Account using Monnify util
 exports.createVirtualAccount = async (req, res) => {
   if (!req.user || !req.user.id) {
