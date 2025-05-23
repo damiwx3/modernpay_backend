@@ -17,19 +17,34 @@ async function getAccessToken() {
   return authRes.data.responseBody.accessToken;
 }
 
-async function createReservedAccount(user, accountReference) {
+// Accept bvnOrNin and include it in the payload
+async function createReservedAccount(user, accountReference, bvnOrNin) {
   const accessToken = await getAccessToken();
+
+  // Determine if it's a BVN or NIN (simple check: BVN is 11 digits, NIN is 11 or more)
+  let bvn = undefined;
+  let nin = undefined;
+  if (bvnOrNin && /^\d{11}$/.test(bvnOrNin)) {
+    bvn = bvnOrNin;
+  } else if (bvnOrNin) {
+    nin = bvnOrNin;
+  }
+
+  const payload = {
+    accountReference,
+    accountName: user.fullName || user.email,
+    currencyCode: 'NGN',
+    contractCode: process.env.MONNIFY_CONTRACT_CODE,
+    customerEmail: user.email,
+    customerName: user.fullName || user.email,
+    getAllAvailableBanks: true,
+    ...(bvn ? { bvn } : {}),
+    ...(nin ? { nin } : {}),
+  };
+
   const accountRes = await axios.post(
     `${MONNIFY_BASE_URL}/bank-transfer/reserved-accounts`,
-    {
-      accountReference,
-      accountName: user.fullName || user.email,
-      currencyCode: 'NGN',
-      contractCode: process.env.MONNIFY_CONTRACT_CODE,
-      customerEmail: user.email,
-      customerName: user.fullName || user.email,
-      getAllAvailableBanks: true
-    },
+    payload,
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
