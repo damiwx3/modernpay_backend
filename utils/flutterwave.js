@@ -1,14 +1,21 @@
 const axios = require('axios');
 
-const FLW_BASE_URL = 'https://api.flutterwave.com/v3';
-const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY;
+const FLW_SECRET_KEY = process.env.FLUTTERWAVE_SECRET_KEY;
 
-const flutterwave = axios.create({
-  baseURL: FLW_BASE_URL,
-  headers: {
-    Authorization: `Bearer ${FLW_SECRET_KEY}`, // Use backticks for template literal
-    'Content-Type': 'application/json',
-  }
-});
-
-module.exports = flutterwave;
+exports.initiatePayment = async ({ amount, email, tx_ref, currency = 'NGN' }) => {
+  const response = await axios.post(
+    'https://api.flutterwave.com/v3/payments',
+    {
+      tx_ref,
+      amount,
+      currency,
+      redirect_url: 'https://modernpay-backend.onrender.com/payment-callback',
+      customer: { email },
+      customizations: { title: 'Wallet Funding' }
+    },
+    {
+      headers: { Authorization: `Bearer ${FLW_SECRET_KEY}` }
+    }
+  );
+  return response.data;
+};
