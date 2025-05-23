@@ -106,7 +106,8 @@ router.post('/transfer', auth, walletController.transferFunds);
  *       200:
  *         description: Bank transfer successful
  */
-router.post('/transfer-to-bank', auth, walletController.transferToBank);
+//router.post('/transfer-to-bank', auth, walletController.transferToBank);
+
 /**
  * @swagger
  * /api/wallets/create-account:
@@ -119,7 +120,7 @@ router.post('/transfer-to-bank', auth, walletController.transferToBank);
  *       201:
  *         description: Virtual account created successfully
  */
-router.post('/create-account', auth, walletController.createVirtualAccount);
+router.post('/create-virtual-account', walletController.createVirtualAccount);
 
 
 module.exports = router;
