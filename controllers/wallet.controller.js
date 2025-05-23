@@ -1,7 +1,6 @@
 const db = require('../models');
 const { v4: uuidv4 } = require('uuid');
 const monnify = require('../utils/monnify'); // ✅ Use the Monnify util
-
 const logger = require('../utils/logger');
 
 function logWalletAction(userId, action, details) {
@@ -15,6 +14,9 @@ async function checkRateLimitOrFraud(userId, action) {
 
 // 📘 Get Wallet Balance & Account Info
 exports.getBalance = async (req, res) => {
+  if (!req.user || !req.user.id) {
+    return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
+  }
   try {
     await checkRateLimitOrFraud(req.user.id, 'getBalance');
     const wallet = await db.Wallet.findOne({ where: { userId: req.user.id } });
@@ -33,6 +35,9 @@ exports.getBalance = async (req, res) => {
 
 // 💰 Manual Wallet Funding
 exports.fundWallet = async (req, res) => {
+  if (!req.user || !req.user.id) {
+    return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
+  }
   const { amount } = req.body;
   const value = parseFloat(amount);
 
@@ -73,6 +78,9 @@ exports.fundWallet = async (req, res) => {
 
 // 🔁 Transfer to another user via account number (Monnify)
 exports.transferFunds = async (req, res) => {
+  if (!req.user || !req.user.id) {
+    return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
+  }
   const { recipientAccountNumber, amount } = req.body;
   const value = parseFloat(amount);
 
@@ -122,10 +130,11 @@ exports.transferFunds = async (req, res) => {
   }
 };
 
-// 🏦 External bank transfer (Monnify does not support direct payouts to other banks via API for all businesses; you may need to use a payout partner or Monnify's disbursement product if available)
-
 // 🧾 Create Virtual Account using Monnify util
 exports.createVirtualAccount = async (req, res) => {
+  if (!req.user || !req.user.id) {
+    return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
+  }
   const user = await db.User.findByPk(req.user.id);
   if (!user) return res.status(404).json({ message: 'User not found' });
 
