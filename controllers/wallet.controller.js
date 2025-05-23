@@ -1,6 +1,6 @@
 const db = require('../models');
 const { v4: uuidv4 } = require('uuid');
-const monnify = require('../utils/monnify'); // ✅ Use the Monnify util
+const monnify = require('../utils/monnify');
 const logger = require('../utils/logger');
 
 function logWalletAction(userId, action, details) {
@@ -130,6 +130,7 @@ exports.transferFunds = async (req, res) => {
   }
 };
 
+// 🧾 Create Virtual Account using Monnify util (with BVN/NIN)
 exports.createVirtualAccount = async (req, res) => {
   if (!req.user || !req.user.id) {
     return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
@@ -147,38 +148,6 @@ exports.createVirtualAccount = async (req, res) => {
     const accountReference = `VA-${Date.now()}-${user.id}`;
     // Pass BVN or NIN to Monnify util
     const reservedAccount = await monnify.createReservedAccount(user, accountReference, bvnOrNin);
-
-    await db.Wallet.update(
-      {
-        accountNumber: reservedAccount.accountNumber,
-        bankName: reservedAccount.bankName,
-      },
-      { where: { userId: req.user.id } }
-    );
-
-    logWalletAction(req.user.id, 'createVirtualAccount', { accountNumber: reservedAccount.accountNumber, bank: reservedAccount.bankName });
-    return res.status(201).json({
-      message: 'Virtual account created',
-      accountNumber: reservedAccount.accountNumber,
-      bank: reservedAccount.bankName,
-    });
-  } catch (err) {
-    console.error('Monnify VA error:', err.response?.data || err.message);
-    logWalletAction(req.user.id, 'createVirtualAccountError', { error: err.message });
-    return res.status(500).json({ message: 'Failed to create virtual account', error: err.message });
-  }
-};
-// 🧾 Create Virtual Account using Monnify util
-exports.createVirtualAccount = async (req, res) => {
-  if (!req.user || !req.user.id) {
-    return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
-  }
-  const user = await db.User.findByPk(req.user.id);
-  if (!user) return res.status(404).json({ message: 'User not found' });
-
-  try {
-    const accountReference = `VA-${Date.now()}-${user.id}`;
-    const reservedAccount = await monnify.createReservedAccount(user, accountReference);
 
     await db.Wallet.update(
       {
