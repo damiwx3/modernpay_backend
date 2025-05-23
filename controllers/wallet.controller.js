@@ -130,6 +130,58 @@ exports.transferFunds = async (req, res) => {
   }
 };
 
+// 🏦 Transfer to Bank using Flutterwave
+exports.transferToBank = async (req, res) => {
+  if (!req.user || !req.user.id) {
+    return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
+  }
+  const { bankCode, accountNumber, amount, narration } = req.body;
+  const value = parseFloat(amount);
+
+  if (!bankCode || !accountNumber || isNaN(value) || value <= 0) {
+    return res.status(400).json({ message: 'Invalid transfer input' });
+  }
+
+  try {
+    await checkRateLimitOrFraud(req.user.id, 'transferToBank');
+    const wallet = await db.Wallet.findOne({ where: { userId: req.user.id } });
+    if (!wallet || wallet.balance < value) {
+      return res.status(400).json({ message: 'Insufficient balance' });
+    }
+
+    // Call Flutterwave util to initiate transfer
+    const transferResult = await flutterwave.transferToBank({
+      bankCode,
+      accountNumber,
+      amount: value,
+      narration: narration || 'Wallet withdrawal',
+      user: req.user,
+    });
+
+    // Deduct from wallet if transfer is successful
+    if (transferResult.status === 'success') {
+      wallet.balance -= value;
+      await wallet.save();
+
+      await db.Transaction.create({
+        userId: req.user.id,
+        type: 'debit',
+        amount: value,
+        reference: transferResult.reference || transferResult.id || uuidv4(),
+        description: `Transfer to bank (${accountNumber})`,
+        status: 'success',
+      });
+
+      logWalletAction(req.user.id, 'transferToBank', { bankCode, accountNumber, amount: value });
+      return res.status(200).json({ message: 'Bank transfer successful', transfer: transferResult });
+    } else {
+      return res.status(400).json({ message: 'Bank transfer failed', transfer: transferResult });
+    }
+  } catch (err) {
+    res.status(500).json({ message: 'Bank transfer failed', error: err.message });
+  }
+};
+
 // 🧾 Create Virtual Account using Flutterwave (with BVN/NIN)
 exports.createVirtualAccount = async (req, res) => {
   if (!req.user || !req.user.id) {
