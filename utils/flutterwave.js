@@ -27,6 +27,27 @@ exports.transferToBank = async ({ bankCode, accountNumber, amount, narration, us
   return response.data.data; // Adjust as needed based on Flutterwave's response
 };
 
+exports.createVirtualAccount = async (user, bvnOrNin) => {
+  const payload = {
+    email: user.email,
+    bvn: bvnOrNin,
+    is_permanent: true,
+    tx_ref: `VA-${Date.now()}-${user.id}`,
+  };
+
+  const response = await axios.post(
+    'https://api.flutterwave.com/v3/virtual-account-numbers',
+    payload,
+    { headers: { Authorization: `Bearer ${FLW_SECRET_KEY}` } }
+  );
+
+  // Adjust according to Flutterwave's actual response structure
+  return {
+    accountNumber: response.data.data.account_number,
+    bankName: response.data.data.bank_name,
+  };
+};
+
 exports.initiatePayment = async ({ amount, email, tx_ref, currency = 'NGN' }) => {
   try {
     const response = await axios.post(
