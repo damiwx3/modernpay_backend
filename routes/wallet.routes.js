@@ -120,7 +120,7 @@ router.post('/transfer', auth, walletController.transferFunds);
  *       201:
  *         description: Virtual account created successfully
  */
-router.post('/create-virtual-account', walletController.createVirtualAccount);
+router.post('/create-virtual-account', auth, walletController.createVirtualAccount);
 
 
 module.exports = router;
