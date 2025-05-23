@@ -6,7 +6,7 @@ const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY;
 const flutterwave = axios.create({
   baseURL: FLW_BASE_URL,
   headers: {
-    Authorization: 'Bearer ${FLW_SECRET_KEY}',
+    Authorization: `Bearer ${FLW_SECRET_KEY}`, // Use backticks for template literal
     'Content-Type': 'application/json',
   }
 });
