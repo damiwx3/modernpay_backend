@@ -12,7 +12,7 @@ exports.flutterwaveWebhook = async (req, res) => {
 
   try {
     const event = payload.event;
-    const reference = payload.data?.tx_ref || payload.data?.flw_ref;
+    const reference = payload.data?.tx_ref || payload.data?.flw_ref || payload.data?.reference;
 
     // 1️⃣ Log Webhook
     await db.WebhookLog.create({
@@ -22,13 +22,13 @@ exports.flutterwaveWebhook = async (req, res) => {
       payload,
     });
 
-    // 2️⃣ Virtual Account Wallet Funding
+    // 2️⃣ Virtual Account Wallet Funding (supports both charge.completed and virtualaccount.credit)
     if (
-      event === 'charge.completed' &&
-      payload.data &&
-      payload.data.payment_type === 'bank_transfer'
+      (event === 'charge.completed' && payload.data?.payment_type === 'bank_transfer') ||
+      event === 'virtualaccount.credit'
     ) {
-      const { account_number, amount } = payload.data;
+      const account_number = payload.data.account_number || payload.data.accountnumber;
+      const amount = payload.data.amount;
 
       // Validate amount
       if (isNaN(amount) || Number(amount) <= 0) {
