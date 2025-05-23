@@ -1,6 +1,6 @@
 const db = require('../models');
-const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
+const monnify = require('../utils/monnify'); // ✅ Use the Monnify util
 
 // Placeholder for logging (replace with your logger or audit system)
 function logWalletAction(userId, action, details) {
@@ -22,7 +22,7 @@ exports.getBalance = async (req, res) => {
     logWalletAction(req.user.id, 'getBalance', { balance: wallet.balance });
     res.status(200).json({
       balance: wallet.balance,
-      accountNumber: wallet.accountNumber, // Always Flutterwave's
+      accountNumber: wallet.accountNumber,
       bankName: wallet.bankName,
     });
   } catch (err) {
@@ -47,7 +47,7 @@ exports.fundWallet = async (req, res) => {
       wallet = await db.Wallet.create({
         userId: req.user.id,
         balance: 0,
-        accountNumber: null, // No backend account number
+        accountNumber: null,
       });
     }
 
@@ -70,7 +70,7 @@ exports.fundWallet = async (req, res) => {
   }
 };
 
-// 🔁 Transfer to another user via account number (Flutterwave only)
+// 🔁 Transfer to another user via account number (Monnify)
 exports.transferFunds = async (req, res) => {
   const { recipientAccountNumber, amount } = req.body;
   const value = parseFloat(amount);
@@ -121,115 +121,33 @@ exports.transferFunds = async (req, res) => {
   }
 };
 
-// 🏦 External bank transfer using Flutterwave
-exports.transferToBank = async (req, res) => {
-  const { bankCode, accountNumber, amount, narration } = req.body;
-  const value = parseFloat(amount);
+// 🏦 External bank transfer (Monnify does not support direct payouts to other banks via API for all businesses; you may need to use a payout partner or Monnify's disbursement product if available)
 
-  if (!bankCode || !accountNumber || isNaN(value) || value <= 0) {
-    return res.status(400).json({ message: 'Invalid transfer data' });
-  }
-
-  try {
-    await checkRateLimitOrFraud(req.user.id, 'transferToBank');
-    const wallet = await db.Wallet.findOne({ where: { userId: req.user.id } });
-    if (!wallet || wallet.balance < value) {
-      return res.status(400).json({ message: 'Insufficient wallet balance' });
-    }
-
-    wallet.balance -= value;
-    await wallet.save();
-
-    const payload = {
-      account_bank: bankCode,
-      account_number: accountNumber,
-      amount: value,
-      narration: narration || 'ModernPay bank payout',
-      currency: 'NGN',
-      callback_url: 'https://modernpay-backend.onrender.com/api/webhooks/flutterwave',
-      debit_currency: 'NGN',
-    };
-
-    const flutterRes = await axios.post(
-      'https://api.flutterwave.com/v3/transfers',
-      payload,
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.FLW_SECRET_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    const result = flutterRes.data;
-
-    if (result.status === 'success') {
-      await db.Transaction.create({
-        userId: req.user.id,
-        type: 'debit',
-        amount: value,
-        reference: result.data.reference || uuidv4(),
-        description: `Bank transfer to ${accountNumber}`,
-        status: 'success',
-      });
-
-      logWalletAction(req.user.id, 'transferToBank', { to: accountNumber, amount: value, bankCode });
-      return res.status(200).json({ message: 'Transfer successful', data: result.data });
-    } else {
-      wallet.balance += value;
-      await wallet.save();
-
-      logWalletAction(req.user.id, 'transferToBankFailed', { to: accountNumber, amount: value, bankCode, error: result.message });
-      return res.status(500).json({ message: 'Flutterwave transfer failed', error: result.message });
-    }
-
-  } catch (err) {
-    logWalletAction(req.user.id, 'transferToBankError', { error: err.message });
-    return res.status(500).json({ message: 'Bank transfer error', error: err.message });
-  }
-};
-
-// 🧾 Create Virtual Account using Flutterwave
+// 🧾 Create Virtual Account using Monnify util
 exports.createVirtualAccount = async (req, res) => {
   const user = await db.User.findByPk(req.user.id);
   if (!user) return res.status(404).json({ message: 'User not found' });
 
   try {
-    await checkRateLimitOrFraud(req.user.id, 'createVirtualAccount');
-    const response = await axios.post(
-      'https://api.flutterwave.com/v3/virtual-account-numbers',
-      {
-        email: user.email,
-        is_permanent: true,
-        tx_ref: `VA-${Date.now()}`,
-        narration: user.fullName || 'ModernPay Virtual Account',
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.FLW_SECRET_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    const account = response.data.data;
+    const accountReference = `VA-${Date.now()}-${user.id}`;
+    const reservedAccount = await monnify.createReservedAccount(user, accountReference);
 
     await db.Wallet.update(
       {
-        accountNumber: account.account_number, // Only Flutterwave's number is ever set
-        bankName: account.bank_name,
+        accountNumber: reservedAccount.accountNumber,
+        bankName: reservedAccount.bankName,
       },
       { where: { userId: req.user.id } }
     );
 
-    logWalletAction(req.user.id, 'createVirtualAccount', { accountNumber: account.account_number, bank: account.bank_name });
+    logWalletAction(req.user.id, 'createVirtualAccount', { accountNumber: reservedAccount.accountNumber, bank: reservedAccount.bankName });
     return res.status(201).json({
       message: 'Virtual account created',
-      accountNumber: account.account_number,
-      bank: account.bank_name,
+      accountNumber: reservedAccount.accountNumber,
+      bank: reservedAccount.bankName,
     });
   } catch (err) {
-    console.error('Flutterwave VA error:', err.response?.data || err.message);
+    console.error('Monnify VA error:', err.response?.data || err.message);
     logWalletAction(req.user.id, 'createVirtualAccountError', { error: err.message });
     return res.status(500).json({ message: 'Failed to create virtual account', error: err.message });
   }
