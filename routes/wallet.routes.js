@@ -106,7 +106,7 @@ router.post('/transfer', auth, walletController.transferFunds);
  *       200:
  *         description: Bank transfer successful
  */
-//router.post('/transfer-to-bank', auth, walletController.transferToBank);
+router.post('/transfer-to-bank', auth, walletController.transferToBank);
 
 /**
  * @swagger
