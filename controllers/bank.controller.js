@@ -1,23 +1,26 @@
 const axios = require('axios');
-const { Bank } = require('../models');
 
-// GET /api/bank/list
+// GET /api/bank/list - Fetch banks from Flutterwave
 exports.getBankList = async (req, res) => {
   try {
-    const banks = await Bank.findAll({
-      where: { active: true },
-      attributes: ['name', 'code'],
-      order: [['name', 'ASC']]
-    });
-    res.status(200).json(banks);
+    const response = await axios.get(
+      'https://api.flutterwave.com/v3/banks/NG',
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.FLW_SECRET_KEY}`
+        }
+      }
+    );
+    // Flutterwave returns banks in response.data.data
+    res.status(200).json({ banks: response.data.data });
   } catch (err) {
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Flutterwave bank list error:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to fetch banks', details: err.message });
   }
 };
 
-// POST /api/bank/verify
+// POST /api/bank/verify - Verify account number using Flutterwave
 exports.verifyAccountNumber = async (req, res) => {
-  // Use the correct parameter names for Flutterwave
   const { account_number, account_bank } = req.body;
   if (!account_number || !account_bank) {
     return res.status(400).json({ error: 'account_number and account_bank are required' });
