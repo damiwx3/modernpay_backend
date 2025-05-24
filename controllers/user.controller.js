@@ -13,24 +13,29 @@ exports.getProfile = async (req, res) => {
   }
 };
 
+// Verify account number for internal wallet transfer
 exports.verifyAccount = async (req, res) => {
   const { accountNumber } = req.body;
   if (!accountNumber) {
     return res.status(400).json({ message: 'Account number is required' });
   }
 
-  const wallet = await db.Wallet.findOne({ where: { accountNumber } });
-  if (!wallet) {
-    return res.status(404).json({ message: 'Account not found' });
-  }
+  try {
+    const wallet = await db.Wallet.findOne({ where: { accountNumber } });
+    if (!wallet) {
+      return res.status(404).json({ message: 'Account not found' });
+    }
 
-  const user = await db.User.findByPk(wallet.userId);
-  if (!user) {
-    return res.status(404).json({ message: 'User not found' });
-  }
+    const user = await db.User.findByPk(wallet.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
-  // Return the user's name (customize as needed)
-  return res.status(200).json({ name: `${user.firstName} ${user.lastName}` });
+    // Return the user's name (customize as needed)
+    return res.status(200).json({ name: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to verify account' });
+  }
 };
 
 // Update current user's profile
