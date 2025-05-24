@@ -13,6 +13,26 @@ exports.getProfile = async (req, res) => {
   }
 };
 
+exports.verifyAccount = async (req, res) => {
+  const { accountNumber } = req.body;
+  if (!accountNumber) {
+    return res.status(400).json({ message: 'Account number is required' });
+  }
+
+  const wallet = await db.Wallet.findOne({ where: { accountNumber } });
+  if (!wallet) {
+    return res.status(404).json({ message: 'Account not found' });
+  }
+
+  const user = await db.User.findByPk(wallet.userId);
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  // Return the user's name (customize as needed)
+  return res.status(200).json({ name: `${user.firstName} ${user.lastName}` });
+};
+
 // Update current user's profile
 exports.updateProfile = async (req, res) => {
   try {
