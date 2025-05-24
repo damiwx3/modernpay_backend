@@ -7,7 +7,7 @@ exports.getBankList = async (req, res) => {
       'https://api.flutterwave.com/v3/banks/NG',
       {
         headers: {
-          Authorization: `Bearer ${process.env.FLW_SECRET_KEY}`
+          Authorization: `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}`
         }
       }
     );
@@ -37,7 +37,7 @@ exports.verifyAccountNumber = async (req, res) => {
       },
       {
         headers: {
-          Authorization: `Bearer ${process.env.FLW_SECRET_KEY}`
+          Authorization: `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}`
         }
       }
     );
