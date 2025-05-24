@@ -65,7 +65,42 @@ router.put('/profile', authMiddleware, userController.updateProfile);
  */
 router.get('/:id', authMiddleware, userController.getUserById);
 
-// FIX: Use authMiddleware instead of undefined 'auth'
+/**
+ * @swagger
+ * /api/users/verify-account:
+ *   post:
+ *     summary: Verify a user's account number (for internal wallet transfers)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - accountNumber
+ *             properties:
+ *               accountNumber:
+ *                 type: string
+ *                 description: The account number to verify
+ *     responses:
+ *       200:
+ *         description: Returns the user's name
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 name:
+ *                   type: string
+ *                   description: The user's full name
+ *       400:
+ *         description: Account number is required
+ *       404:
+ *         description: Account not found
+ */
 router.post('/verify-account', authMiddleware, userController.verifyAccount);
 
 module.exports = router;
