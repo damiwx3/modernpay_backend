@@ -41,14 +41,14 @@ exports.getDataCategories = async (req, res) => {
     const flutterRes = await axios.get(`${FLW_BASE}/bill-categories`, { headers: HEADERS });
     console.log('FLW bill-categories:', flutterRes.data.data);
 
-    // New filter: Nigerian, not airtime, and name or biller_name contains 'data bundle'
+    // Broader filter: Nigerian, not airtime, and name or biller_name contains 'data'
     const data = flutterRes.data.data.filter(
       cat =>
         cat.country === 'NG' &&
         cat.is_airtime === false &&
         (
-          (cat.name && cat.name.toLowerCase().includes('data bundle')) ||
-          (cat.biller_name && cat.biller_name.toLowerCase().includes('data bundle'))
+          (cat.name && cat.name.toLowerCase().includes('data')) ||
+          (cat.biller_name && cat.biller_name.toLowerCase().includes('data'))
         )
     );
     console.log('Filtered data categories:', data);
