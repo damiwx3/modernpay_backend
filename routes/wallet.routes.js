@@ -79,7 +79,7 @@ router.post('/transfer', auth, walletController.transferFunds);
  * @swagger
  * /api/wallets/transfer-to-bank:
  *   post:
- *     summary: Transfer funds to external bank using Flutterwave
+ *     summary: Transfer funds to external bank using Moniepoint
  *     tags: [Wallet]
  *     security:
  *       - bearerAuth: []
@@ -110,9 +110,9 @@ router.post('/transfer-to-bank', auth, walletController.transferToBank);
 
 /**
  * @swagger
- * /api/wallets/create-account:
+ * /api/wallets/create-virtual-account:
  *   post:
- *     summary: Create a virtual account using Flutterwave
+ *     summary: Create a virtual account using Moniepoint
  *     tags: [Wallet]
  *     security:
  *       - bearerAuth: []
@@ -121,6 +121,5 @@ router.post('/transfer-to-bank', auth, walletController.transferToBank);
  *         description: Virtual account created successfully
  */
 router.post('/create-virtual-account', auth, walletController.createVirtualAccount);
-
 
 module.exports = router;
