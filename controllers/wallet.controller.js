@@ -1,7 +1,7 @@
 const db = require('../models');
 const { v4: uuidv4 } = require('uuid');
 const logger = require('../utils/logger');
-const flutterwave = require('../utils/flutterwave');
+const moniepoint = require('../utils/moniepoint');
 
 function logWalletAction(userId, action, details) {
   logger.info({ userId, action, ...details });
@@ -33,7 +33,7 @@ exports.getBalance = async (req, res) => {
   }
 };
 
-// 💰 Manual Wallet Funding
+// 💰 Manual Wallet Funding (for admin/testing only)
 exports.fundWallet = async (req, res) => {
   if (!req.user || !req.user.id) {
     return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
@@ -130,7 +130,7 @@ exports.transferFunds = async (req, res) => {
   }
 };
 
-// 🏦 Transfer to Bank using Flutterwave
+// 🏦 Transfer to Bank using Moniepoint
 exports.transferToBank = async (req, res) => {
   if (!req.user || !req.user.id) {
     return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
@@ -149,9 +149,9 @@ exports.transferToBank = async (req, res) => {
       return res.status(400).json({ message: 'Insufficient balance' });
     }
 
-    // Call Flutterwave util to initiate transfer
-    const transferResult = await flutterwave.transferToBank({
-      bankCode, // <-- Make sure this is the code, e.g. "999992" for Opay
+    // Call Moniepoint util to initiate transfer
+    const transferResult = await moniepoint.transferToBank({
+      bankCode,
       accountNumber,
       amount: value,
       narration: narration || 'Wallet withdrawal',
@@ -159,7 +159,7 @@ exports.transferToBank = async (req, res) => {
     });
 
     // Deduct from wallet if transfer is successful
-    if (transferResult.status === 'success') {
+    if (transferResult.status === 'SUCCESSFUL') {
       wallet.balance -= value;
       await wallet.save();
 
@@ -182,7 +182,7 @@ exports.transferToBank = async (req, res) => {
   }
 };
 
-// 🧾 Create Virtual Account using Flutterwave (with BVN/NIN)
+// 🧾 Create Virtual Account using Moniepoint
 exports.createVirtualAccount = async (req, res) => {
   if (!req.user || !req.user.id) {
     return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
@@ -197,8 +197,8 @@ exports.createVirtualAccount = async (req, res) => {
   }
 
   try {
-    // Call Flutterwave util to create a virtual account
-    const reservedAccount = await flutterwave.createVirtualAccount(user, bvnOrNin);
+    // Call Moniepoint util to create a virtual account
+    const reservedAccount = await moniepoint.createVirtualAccount(user, bvnOrNin);
 
     await db.Wallet.update(
       {
@@ -215,27 +215,8 @@ exports.createVirtualAccount = async (req, res) => {
       bank: reservedAccount.bankName,
     });
   } catch (err) {
-    console.error('Flutterwave VA error:', err.response?.data || err.message);
+    console.error('Moniepoint VA error:', err.response?.data || err.message);
     logWalletAction(req.user.id, 'createVirtualAccountError', { error: err.message });
     return res.status(500).json({ message: 'Failed to create virtual account', error: err.message });
-  }
-};
-
-// 💳 Initiate Flutterwave Payment
-exports.initiateFlutterwavePayment = async (req, res) => {
-  const { amount } = req.body;
-  if (!req.user || !req.user.email) {
-    return res.status(401).json({ message: 'Unauthorized' });
-  }
-  try {
-    const tx_ref = `WALLET-${Date.now()}-${req.user.id}`;
-    const payment = await flutterwave.initiatePayment({
-      amount,
-      email: req.user.email,
-      tx_ref,
-    });
-    res.status(200).json(payment);
-  } catch (err) {
-    res.status(500).json({ message: 'Flutterwave payment initiation failed', error: err.message });
   }
 };
