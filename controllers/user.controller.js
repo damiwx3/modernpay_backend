@@ -13,6 +13,43 @@ exports.getProfile = async (req, res) => {
   }
 };
 
+exports.transferFunds = async (req, res) => {
+  if (!req.user || !req.user.id) {
+    return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
+  }
+  const { recipientAccountNumber, amount } = req.body;
+  const value = parseFloat(amount);
+
+  if (!recipientAccountNumber || isNaN(value) || value <= 0) {
+    return res.status(400).json({ message: 'Invalid transfer input' });
+  }
+
+  try {
+    // Find sender and recipient wallets
+    const senderWallet = await db.Wallet.findOne({ where: { userId: req.user.id } });
+    const recipientWallet = await db.Wallet.findOne({ where: { accountNumber: recipientAccountNumber } });
+
+    if (!recipientWallet) return res.status(404).json({ message: 'Recipient not found' });
+    if (recipientWallet.userId === req.user.id) return res.status(400).json({ message: 'Cannot transfer to yourself' });
+    if (!senderWallet || senderWallet.balance < value) {
+      return res.status(400).json({ message: 'Insufficient balance' });
+    }
+
+    // Update balances
+    senderWallet.balance -= value;
+    recipientWallet.balance += value;
+
+    // Save changes
+    await senderWallet.save();
+    await recipientWallet.save();
+
+    // Optionally, create transaction records here
+
+    res.status(200).json({ message: 'Transfer successful', senderBalance: senderWallet.balance });
+  } catch (err) {
+    res.status(500).json({ message: 'Transfer failed', error: err.message });
+  }
+};
 // Verify account number for internal wallet transfer
 exports.verifyAccount = async (req, res) => {
   const { accountNumber } = req.body;
