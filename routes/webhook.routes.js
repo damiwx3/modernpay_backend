@@ -4,14 +4,14 @@ const controller = require('../controllers/webhook.controller');
 
 /**
  * @swagger
- * /api/webhooks/flutterwave:
+ * /api/webhooks/moniepoint:
  *   post:
- *     summary: Flutterwave webhook handler
+ *     summary: Moniepoint webhook handler
  *     tags: [Webhooks]
  *     responses:
  *       200:
  *         description: Webhook received
  */
-router.post('/flutterwave', controller.flutterwaveWebhook);
+router.post('/moniepoint', controller.moniepointWebhook);
 
 module.exports = router;
