@@ -1,34 +1,32 @@
 const db = require('../models');
 
-exports.flutterwaveWebhook = async (req, res) => {
-  const secretHash = process.env.FLW_SECRET_HASH;
-  const signature = req.headers['verif-hash'];
+exports.moniepointWebhook = async (req, res) => {
+  const webhookSecret = process.env.MONIEPOINT_WEBHOOK_SECRET;
+  const signature = req.headers['x-moniepoint-signature'] || req.headers['x-webhook-signature'];
   const payload = req.body;
 
-  // 0️⃣ Verify Signature
-  if (!signature || signature !== secretHash) {
-    return res.status(401).json({ message: 'Invalid or missing webhook signature' });
+  // 0️⃣ Verify Signature (adjust as per Moniepoint docs)
+  if (webhookSecret && signature && signature !== webhookSecret) {
+    return res.status(401).json({ message: 'Invalid or missing Moniepoint webhook signature' });
   }
 
   try {
-    const event = payload.event;
-    const reference = payload.data?.tx_ref || payload.data?.flw_ref || payload.data?.reference;
-
     // 1️⃣ Log Webhook
     await db.WebhookLog.create({
-      event,
-      reference,
-      status: payload.data?.status || 'received',
+      event: payload.event || payload.type || 'moniepoint',
+      reference: payload.reference || payload.data?.reference,
+      status: payload.status || payload.data?.status || 'received',
       payload,
     });
 
-    // 2️⃣ Virtual Account Wallet Funding (supports both charge.completed and virtualaccount.credit)
+    // 2️⃣ Wallet Funding
     if (
-      (event === 'charge.completed' && payload.data?.payment_type === 'bank_transfer') ||
-      event === 'virtualaccount.credit'
+      payload.status === 'SUCCESS' &&
+      payload.amount &&
+      payload.accountNumber
     ) {
-      const account_number = payload.data.account_number || payload.data.accountnumber;
-      const amount = payload.data.amount;
+      const account_number = payload.accountNumber;
+      const amount = payload.amount;
 
       // Validate amount
       if (isNaN(amount) || Number(amount) <= 0) {
@@ -36,40 +34,35 @@ exports.flutterwaveWebhook = async (req, res) => {
         return res.status(400).json({ message: 'Invalid amount in webhook' });
       }
 
-      if (!account_number) {
-        return res.status(400).json({ message: 'Missing account number in webhook' });
-      }
-
       const wallet = await db.Wallet.findOne({ where: { accountNumber: account_number } });
       if (!wallet) return res.status(404).json({ message: 'Wallet not found' });
 
       // Prevent duplicate credit
-      const exists = await db.Transaction.findOne({ where: { reference } });
+      const exists = await db.Transaction.findOne({ where: { reference: payload.reference } });
       if (exists) return res.status(200).send('Already processed');
 
       await db.Transaction.create({
         userId: wallet.userId,
         type: 'credit',
         amount: parseFloat(amount),
-        reference,
-        description: 'Virtual account funding',
+        reference: payload.reference,
+        description: 'Moniepoint wallet funding',
         status: 'success',
       });
 
       wallet.balance += parseFloat(amount);
       await wallet.save();
 
-      console.log(`✅ Wallet funded: ₦${amount} for ${account_number}`);
+      console.log(`✅ Moniepoint wallet funded: ₦${amount} for ${account_number}`);
     }
 
     // 3️⃣ Bank Transfer Confirmation
     else if (
-      event === 'transfer.completed' &&
-      payload.data &&
-      typeof payload.data.reference !== 'undefined' &&
-      typeof payload.data.status !== 'undefined'
+      payload.type === 'transfer.completed' &&
+      typeof payload.reference !== 'undefined' &&
+      typeof payload.status !== 'undefined'
     ) {
-      const { reference, status, amount } = payload.data;
+      const { reference, status, amount } = payload;
 
       // Validate amount
       if (isNaN(amount) || Number(amount) < 0) {
@@ -98,7 +91,6 @@ exports.flutterwaveWebhook = async (req, res) => {
     res.status(200).send('Webhook received');
   } catch (err) {
     console.error('❌ Webhook error:', err.message);
-    // Do not leak stack traces or sensitive info
     res.status(500).json({ message: 'Internal webhook error' });
   }
 };
