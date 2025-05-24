@@ -31,8 +31,8 @@ exports.verifyAccount = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Return the user's name (customize as needed)
-    return res.status(200).json({ name: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() });
+    // Return the user's full name (since your model uses fullName)
+    return res.status(200).json({ name: user.fullName });
   } catch (err) {
     res.status(500).json({ message: 'Failed to verify account' });
   }
