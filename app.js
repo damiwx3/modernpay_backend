@@ -50,7 +50,7 @@ app.use('/api/kyc', kycRoutes);
 app.use('/api/wallets', walletRoutes);
 app.use('/api/contribution-cycles', contributionCycleRoutes);
 app.use('/api/audit', auditRoutes);
-
+app.use('/api/users', require('./routes/user.routes'));
 // Other modular routes
 app.use('/api/webhooks', require('./routes/webhook.routes'));
 app.use('/api/virtual-cards', require('./routes/virtual_card.routes'));
