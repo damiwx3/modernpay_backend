@@ -3,11 +3,11 @@ const axios = require('axios');
 
 const FLW_BASE = 'https://api.flutterwave.com/v3';
 const HEADERS = {
-  Authorization: `Bearer ${process.env.FLW_SECRET_KEY}`,
+  Authorization: `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}`,
   'Content-Type': 'application/json'
 };
 
-// List available bill categories from Flutterwave
+// List all bill categories from Flutterwave
 exports.getCategories = async (req, res) => {
   try {
     const flutterRes = await axios.get(`${FLW_BASE}/bill-categories`, { headers: HEADERS });
@@ -87,8 +87,6 @@ exports.getOtherBills = async (req, res) => {
   }
 };
 
-// ... (keep your other existing functions: validateCustomer, payBill, getHistory, getBundles)
-
 // Validate customer (smartcard, phone, meter, etc.)
 exports.validateCustomer = async (req, res) => {
   const { serviceType, customer } = req.body;
@@ -158,7 +156,8 @@ exports.payBill = async (req, res) => {
     res.status(201).json({
       message: response.message,
       status,
-      data: response.data
+      data: response.data,
+      reference
     });
 
   } catch (err) {
