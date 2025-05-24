@@ -151,7 +151,7 @@ exports.transferToBank = async (req, res) => {
 
     // Call Flutterwave util to initiate transfer
     const transferResult = await flutterwave.transferToBank({
-      bankCode,
+      bankCode, // <-- Make sure this is the code, e.g. "999992" for Opay
       accountNumber,
       amount: value,
       narration: narration || 'Wallet withdrawal',
