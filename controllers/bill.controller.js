@@ -39,6 +39,9 @@ exports.getAirtimeCategories = async (req, res) => {
 exports.getDataCategories = async (req, res) => {
   try {
     const flutterRes = await axios.get(`${FLW_BASE}/bill-categories`, { headers: HEADERS });
+    // DEBUG: Log all categories returned by Flutterwave
+    console.log('FLW bill-categories:', flutterRes.data.data);
+
     const allowed = ['MTN', 'GLO', 'AIRTEL', '9MOBILE'];
     const data = flutterRes.data.data.filter(
       cat =>
@@ -47,6 +50,9 @@ exports.getDataCategories = async (req, res) => {
         cat.biller_code.toUpperCase().includes('DATA') &&
         allowed.some(net => cat.name.toUpperCase().includes(net))
     );
+    // DEBUG: Log filtered data categories
+    console.log('Filtered data categories:', data);
+
     res.status(200).json({ categories: data });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch data categories', error: err.message });
