@@ -187,7 +187,8 @@ exports.getHistory = async (req, res) => {
 
 // Get bundles (for data, TV, etc.)
 exports.getBundles = async (req, res) => {
-  const billerCode = req.params.billerCode;
+  // Accept billerCode as query parameter for compatibility with frontend
+  const billerCode = req.query.biller_code;
 
   if (!billerCode) {
     return res.status(400).json({ message: 'Biller code is required' });
