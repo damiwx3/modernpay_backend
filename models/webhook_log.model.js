@@ -1,4 +1,3 @@
-// models/webhook_log.model.js
 module.exports = (sequelize, DataTypes) => {
   const WebhookLog = sequelize.define('WebhookLog', {
     id: {
@@ -25,7 +24,14 @@ module.exports = (sequelize, DataTypes) => {
     receivedAt: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW
+    },
+    userId: { // <-- Add this
+      type: DataTypes.INTEGER,
+      allowNull: true
     }
+  }, {
+    tableName: 'WebhookLogs',
+    timestamps: true // <-- Add this
   });
 
   return WebhookLog;
