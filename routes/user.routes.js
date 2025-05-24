@@ -65,4 +65,6 @@ router.put('/profile', authMiddleware, userController.updateProfile);
  */
 router.get('/:id', authMiddleware, userController.getUserById);
 
+router.post('/verify-account', auth, userController.verifyAccount);
+
 module.exports = router;
