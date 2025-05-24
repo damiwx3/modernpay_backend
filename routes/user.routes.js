@@ -65,6 +65,7 @@ router.put('/profile', authMiddleware, userController.updateProfile);
  */
 router.get('/:id', authMiddleware, userController.getUserById);
 
-router.post('/verify-account', auth, userController.verifyAccount);
+// FIX: Use authMiddleware instead of undefined 'auth'
+router.post('/verify-account', authMiddleware, userController.verifyAccount);
 
 module.exports = router;
