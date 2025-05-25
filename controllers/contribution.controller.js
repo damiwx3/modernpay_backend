@@ -1,6 +1,6 @@
 const db = require('../models');
 const { Op } = require('sequelize');
-const sendEmail = require('../utils/sendEmail'); // <-- Make sure this is here
+const sendEmail = require('../utils/sendEmail');
 
 // Create a new contribution group
 exports.createGroup = async (req, res) => {
@@ -13,7 +13,7 @@ exports.createGroup = async (req, res) => {
 
     let imageUrl = null;
     if (req.file) {
-      imageUrl = req.file.path; // Or use Cloudinary URL if you're uploading there
+      imageUrl = req.file.path;
     }
 
     const group = await db.ContributionGroup.create({
@@ -44,7 +44,7 @@ exports.createGroup = async (req, res) => {
 // Send group invite by user ID or email, and send email if email is provided
 exports.sendGroupInvite = async (req, res) => {
   try {
-    const groupId = req.params.groupId; // Get groupId from URL params
+    const groupId = req.params.groupId;
     const { invitedUserId, email } = req.body;
 
     // Invite by user ID
@@ -60,7 +60,6 @@ exports.sendGroupInvite = async (req, res) => {
 
     // Invite by email
     if (email) {
-      // Find user by email
       const user = await db.User.findOne({ where: { email } });
       if (!user) {
         return res.status(404).json({ message: 'No user found with that email' });
@@ -77,11 +76,11 @@ exports.sendGroupInvite = async (req, res) => {
 
       // Send email
       await sendEmail({
-  to: email,
-  subject: 'You have been invited to join a group!',
-  text: `You have been invited to join a group. Click this link to accept the invite: ${inviteLink}`,
-  html: `<p>You have been invited to join a group. Click <a href="${inviteLink}">here</a> to accept the invite.</p>`
-});
+        to: email,
+        subject: 'You have been invited to join a group!',
+        text: `You have been invited to join a group. Click this link to accept the invite: ${inviteLink}`,
+        html: `<p>You have been invited to join a group. Click <a href="${inviteLink}">here</a> to accept the invite.</p>`
+      });
 
       return res.status(201).json({ message: 'Invitation sent by email', invite });
     }
