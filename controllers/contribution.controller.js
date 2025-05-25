@@ -1,5 +1,6 @@
 const db = require('../models');
 const { Op } = require('sequelize');
+const sendEmail = require('../utils/sendEmail'); // <-- Make sure this is here
 
 // Create a new contribution group
 exports.createGroup = async (req, res) => {
@@ -40,17 +41,52 @@ exports.createGroup = async (req, res) => {
   }
 };
 
-// In contribution.controller.js
+// Send group invite by user ID or email, and send email if email is provided
 exports.sendGroupInvite = async (req, res) => {
   try {
-    const { groupId, invitedUserId } = req.body;
-    const invite = await db.ContributionInvite.create({
-      groupId,
-      invitedBy: req.user.id,
-      invitedUserId,
-      status: 'pending'
-    });
-    res.status(201).json({ message: 'Invitation sent', invite });
+    const groupId = req.params.groupId; // Get groupId from URL params
+    const { invitedUserId, email } = req.body;
+
+    // Invite by user ID
+    if (invitedUserId) {
+      const invite = await db.ContributionInvite.create({
+        groupId,
+        invitedBy: req.user.id,
+        invitedUserId,
+        status: 'pending'
+      });
+      return res.status(201).json({ message: 'Invitation sent by user ID', invite });
+    }
+
+    // Invite by email
+    if (email) {
+      // Find user by email
+      const user = await db.User.findOne({ where: { email } });
+      if (!user) {
+        return res.status(404).json({ message: 'No user found with that email' });
+      }
+      const invite = await db.ContributionInvite.create({
+        groupId,
+        invitedBy: req.user.id,
+        invitedUserId: user.id,
+        status: 'pending'
+      });
+
+      // Generate invite link (customize as needed)
+      const inviteLink = `https://modernpay-backend.onrender.com/invite/${invite.id}`;
+
+      // Send email
+      await sendEmail({
+        to: email,
+        subject: 'You have been invited to join a group!',
+        html: `<p>You have been invited to join a group. Click <a href="${inviteLink}">here</a> to accept the invite.</p>`
+      });
+
+      return res.status(201).json({ message: 'Invitation sent by email', invite });
+    }
+
+    // If neither provided
+    return res.status(400).json({ message: 'Provide invitedUserId or email' });
   } catch (err) {
     res.status(500).json({ message: 'Failed to send invite', error: err.message });
   }
@@ -100,8 +136,6 @@ exports.updateGroup = async (req, res) => {
     res.status(400).json({ message: 'Update failed', error: err.message });
   }
 };
-
-// ...existing code...
 
 // Join a contribution group
 exports.joinGroup = async (req, res) => {
@@ -272,54 +306,5 @@ exports.getGroupSummary = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch summary', error: err.message });
-  }
-};
-// Send group invite by user ID or email, and send email if email is provided
-exports.sendGroupInvite = async (req, res) => {
-  try {
-    const { groupId, invitedUserId, email } = req.body;
-
-    // Invite by user ID
-    if (invitedUserId) {
-      const invite = await db.ContributionInvite.create({
-        groupId,
-        invitedBy: req.user.id,
-        invitedUserId,
-        status: 'pending'
-      });
-      return res.status(201).json({ message: 'Invitation sent by user ID', invite });
-    }
-
-    // Invite by email
-    if (email) {
-      // Find user by email
-      const user = await db.User.findOne({ where: { email } });
-      if (!user) {
-        return res.status(404).json({ message: 'No user found with that email' });
-      }
-      const invite = await db.ContributionInvite.create({
-        groupId,
-        invitedBy: req.user.id,
-        invitedUserId: user.id,
-        status: 'pending'
-      });
-
-      // Generate invite link (customize as needed)
-      const inviteLink = `https://modernpay-backend.onrender.com/invite/${invite.id}`;
-
-      // Send email
-      await sendEmail({
-        to: email,
-        subject: 'You have been invited to join a group!',
-        html: `<p>You have been invited to join a group. Click <a href="${inviteLink}">here</a> to accept the invite.</p>`
-      });
-
-      return res.status(201).json({ message: 'Invitation sent by email', invite });
-    }
-
-    // If neither provided
-    return res.status(400).json({ message: 'Provide invitedUserId or email' });
-  } catch (err) {
-    res.status(500).json({ message: 'Failed to send invite', error: err.message });
   }
 };
