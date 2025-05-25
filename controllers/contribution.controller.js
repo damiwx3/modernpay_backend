@@ -77,10 +77,11 @@ exports.sendGroupInvite = async (req, res) => {
 
       // Send email
       await sendEmail({
-        to: email,
-        subject: 'You have been invited to join a group!',
-        html: `<p>You have been invited to join a group. Click <a href="${inviteLink}">here</a> to accept the invite.</p>`
-      });
+  to: email,
+  subject: 'You have been invited to join a group!',
+  text: `You have been invited to join a group. Click this link to accept the invite: ${inviteLink}`,
+  html: `<p>You have been invited to join a group. Click <a href="${inviteLink}">here</a> to accept the invite.</p>`
+});
 
       return res.status(201).json({ message: 'Invitation sent by email', invite });
     }
