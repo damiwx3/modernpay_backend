@@ -4,7 +4,6 @@ const app = express();
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const cors = require('cors');
-const bodyParser = require('body-parser');
 const routes = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
 const maintenanceCheck = require('./middleware/maintenance.middleware');
@@ -20,30 +19,25 @@ const contributionCycleRoutes = require('./routes/contribution_cycle.routes');
 const auditRoutes = require('./routes/audit.routes');
 const billRoutes = require('./routes/bill.routes');
 const campaignRoutes = require('./routes/campaign.routes');
-// ...existing code...
 const contributionRoutes = require('./routes/contribution.routes');
 const userContactRoutes = require('./routes/user_contact.routes');
 const disputeRoutes = require('./routes/dispute.routes');
 
+// --- MIDDLEWARE: Place these at the very top, before any routes ---
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use('/api/disputes', disputeRoutes);
 
-app.use('/api/contacts', userContactRoutes);
-app.use('/api/contributions', contributionRoutes);
-// ...existing code...
-
-// Middleware
-app.use(cors());
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-
-
+// --- Maintenance and other middleware ---
 app.use(maintenanceCheck);
 app.use(maintenance);
 app.use(checkMaintenance);
+
+// --- ROUTES ---
+app.use('/api/disputes', disputeRoutes);
+app.use('/api/contacts', userContactRoutes);
+app.use('/api/contributions', contributionRoutes);
 app.use('/api/campaigns', campaignRoutes);
-// Routes
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/savings', savingsRoutes);
 app.use('/api/users', userRoutes);
@@ -52,9 +46,6 @@ app.use('/api/kyc', kycRoutes);
 app.use('/api/wallets', walletRoutes);
 app.use('/api/contribution-cycles', contributionCycleRoutes);
 app.use('/api/audit', auditRoutes);
-app.use('/api/users', require('./routes/user.routes'));
-
-// Other modular routes
 app.use('/api/webhooks', require('./routes/webhook.routes'));
 app.use('/api/virtual-cards', require('./routes/virtual_card.routes'));
 app.use('/api/system', require('./routes/system.routes'));
