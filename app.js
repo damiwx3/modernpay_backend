@@ -41,6 +41,8 @@ app.use(maintenanceCheck);
 app.use(maintenance);
 app.use(checkMaintenance);
 app.use('/api/campaigns', campaignRoutes);
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/savings', savingsRoutes);
