@@ -25,8 +25,9 @@ const contributionRoutes = require('./routes/contribution.routes');
 const userContactRoutes = require('./routes/user_contact.routes');
 const disputeRoutes = require('./routes/dispute.routes');
 
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use('/api/disputes', disputeRoutes);
-
 
 app.use('/api/contacts', userContactRoutes);
 app.use('/api/contributions', contributionRoutes);
@@ -37,12 +38,11 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+
 app.use(maintenanceCheck);
 app.use(maintenance);
 app.use(checkMaintenance);
 app.use('/api/campaigns', campaignRoutes);
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/savings', savingsRoutes);
@@ -53,6 +53,7 @@ app.use('/api/wallets', walletRoutes);
 app.use('/api/contribution-cycles', contributionCycleRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/users', require('./routes/user.routes'));
+
 // Other modular routes
 app.use('/api/webhooks', require('./routes/webhook.routes'));
 app.use('/api/virtual-cards', require('./routes/virtual_card.routes'));
