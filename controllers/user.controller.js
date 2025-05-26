@@ -1,4 +1,5 @@
 const db = require('../models');
+const { v4: uuidv4 } = require('uuid');
 
 // Get current user's profile (excluding password)
 exports.getProfile = async (req, res) => {
@@ -12,8 +13,8 @@ exports.getProfile = async (req, res) => {
     res.status(500).json({ message: 'Unable to retrieve profile' });
   }
 };
-// Transfer funds between wallets
 
+// Transfer funds between wallets
 exports.transferFunds = async (req, res) => {
   if (!req.user || !req.user.id) {
     return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
@@ -45,7 +46,25 @@ exports.transferFunds = async (req, res) => {
     await senderWallet.save({ transaction: t });
     await recipientWallet.save({ transaction: t });
 
-    // Optionally, create transaction records here (recommended)
+    // Create transaction records for both users
+    await db.Transaction.bulkCreate([
+      {
+        userId: req.user.id,
+        type: 'debit',
+        amount: value,
+        reference: uuidv4(),
+        description: `Transfer to ${recipientAccountNumber}`,
+        status: 'success',
+      },
+      {
+        userId: recipientWallet.userId,
+        type: 'credit',
+        amount: value,
+        reference: uuidv4(),
+        description: `Received from ${senderWallet.accountNumber}`,
+        status: 'success',
+      },
+    ], { transaction: t });
 
     await t.commit();
 
@@ -55,6 +74,7 @@ exports.transferFunds = async (req, res) => {
     res.status(500).json({ message: 'Transfer failed', error: err.message });
   }
 };
+
 // Verify account number for internal wallet transfer
 exports.verifyAccount = async (req, res) => {
   const { accountNumber } = req.body;
