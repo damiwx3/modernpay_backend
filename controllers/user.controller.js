@@ -12,6 +12,7 @@ exports.getProfile = async (req, res) => {
     res.status(500).json({ message: 'Unable to retrieve profile' });
   }
 };
+// Transfer funds between wallets
 
 exports.transferFunds = async (req, res) => {
   if (!req.user || !req.user.id) {
@@ -24,10 +25,11 @@ exports.transferFunds = async (req, res) => {
     return res.status(400).json({ message: 'Invalid transfer input' });
   }
 
+  const t = await db.sequelize.transaction();
   try {
-    // Find sender and recipient wallets
-    const senderWallet = await db.Wallet.findOne({ where: { userId: req.user.id } });
-    const recipientWallet = await db.Wallet.findOne({ where: { accountNumber: recipientAccountNumber } });
+    // Find sender and recipient wallets inside the transaction
+    const senderWallet = await db.Wallet.findOne({ where: { userId: req.user.id }, transaction: t });
+    const recipientWallet = await db.Wallet.findOne({ where: { accountNumber: recipientAccountNumber }, transaction: t });
 
     if (!recipientWallet) return res.status(404).json({ message: 'Recipient not found' });
     if (recipientWallet.userId === req.user.id) return res.status(400).json({ message: 'Cannot transfer to yourself' });
@@ -37,16 +39,19 @@ exports.transferFunds = async (req, res) => {
 
     // Update balances
     senderWallet.balance -= value;
-    recipientWallet.balance += value;
+    recipientWallet.balance = parseFloat(recipientWallet.balance) + value;
 
-    // Save changes
-    await senderWallet.save();
-    await recipientWallet.save();
+    // Save changes inside the transaction
+    await senderWallet.save({ transaction: t });
+    await recipientWallet.save({ transaction: t });
 
-    // Optionally, create transaction records here
+    // Optionally, create transaction records here (recommended)
+
+    await t.commit();
 
     res.status(200).json({ message: 'Transfer successful', senderBalance: senderWallet.balance });
   } catch (err) {
+    await t.rollback();
     res.status(500).json({ message: 'Transfer failed', error: err.message });
   }
 };
