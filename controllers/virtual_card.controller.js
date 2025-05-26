@@ -76,20 +76,50 @@ exports.getCardTransactions = async (req, res) => {
 };
 
 exports.topUpCard = async (req, res) => {
+  const { amount } = req.body;
+  const value = parseFloat(amount);
+
+  if (!value || isNaN(value) || value <= 0) {
+    return res.status(400).json({ message: 'Invalid top up amount' });
+  }
+
+  const t = await db.sequelize.transaction();
   try {
-    const { amount } = req.body;
-    if (!amount || isNaN(amount) || amount <= 0) {
-      return res.status(400).json({ message: 'Invalid top up amount' });
+    // Find wallet and card inside the transaction
+    const wallet = await db.Wallet.findOne({ where: { userId: req.user.id }, transaction: t });
+    const card = await db.VirtualCard.findOne({ where: { userId: req.user.id }, transaction: t });
+
+    if (!wallet || parseFloat(wallet.balance) < value) {
+      await t.rollback();
+      return res.status(400).json({ message: 'Insufficient wallet balance' });
+    }
+    if (!card) {
+      await t.rollback();
+      return res.status(404).json({ message: 'No virtual card found' });
     }
 
-    const card = await db.VirtualCard.findOne({ where: { userId: req.user.id } });
-    if (!card) return res.status(404).json({ message: 'No virtual card found' });
+    // Deduct from wallet, credit card
+    wallet.balance = parseFloat(wallet.balance) - value;
+    card.balance = parseFloat(card.balance) + value;
 
-    card.balance = (parseFloat(card.balance) || 0) + parseFloat(amount);
-    await card.save();
+    await wallet.save({ transaction: t });
+    await card.save({ transaction: t });
 
-    res.status(200).json({ message: 'Card topped up', balance: card.balance });
+    // Optionally, create transaction records for audit
+    await db.Transaction.create({
+      userId: req.user.id,
+      type: 'debit',
+      amount: value,
+      reference: uuidv4(),
+      description: 'Virtual Card Top Up',
+      status: 'success',
+    }, { transaction: t });
+
+    await t.commit();
+
+    res.status(200).json({ message: 'Card topped up', balance: card.balance, walletBalance: wallet.balance });
   } catch (err) {
+    await t.rollback();
     res.status(500).json({ message: 'Top up failed', error: err.message });
   }
 };
