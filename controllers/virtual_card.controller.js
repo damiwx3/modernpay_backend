@@ -1,4 +1,5 @@
 const db = require('../models');
+const { v4: uuidv4 } = require('uuid');
 const generateCardNumber = require('../utils/generateVirtualCardNumber');
 
 exports.createCard = async (req, res) => {
@@ -6,8 +7,7 @@ exports.createCard = async (req, res) => {
     const existing = await db.VirtualCard.findOne({ where: { userId: req.user.id } });
     if (existing) return res.status(400).json({ message: 'You already have a virtual card' });
 
-    const generateCard = require('../utils/generateVirtualCardNumber');
-    const { cardNumber, expiryDate, cvv, provider } = generateCard(req.user.fullName);
+    const { cardNumber, expiryDate, cvv, provider } = generateCardNumber(req.user.fullName);
 
     const card = await db.VirtualCard.create({
       userId: req.user.id,
@@ -105,7 +105,7 @@ exports.topUpCard = async (req, res) => {
     await wallet.save({ transaction: t });
     await card.save({ transaction: t });
 
-    // Optionally, create transaction records for audit
+    // Create transaction record for audit
     await db.Transaction.create({
       userId: req.user.id,
       type: 'debit',
@@ -119,7 +119,7 @@ exports.topUpCard = async (req, res) => {
 
     res.status(200).json({ message: 'Card topped up', balance: card.balance, walletBalance: wallet.balance });
   } catch (err) {
-    await t.rollback();
+    if (t) await t.rollback();
     res.status(500).json({ message: 'Top up failed', error: err.message });
   }
 };
