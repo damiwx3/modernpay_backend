@@ -61,7 +61,8 @@ exports.exportTransactions = async (req, res) => {
       return res.status(400).json({ message: 'Month and year are required.' });
     }
 
-    const start = moment(`${year}-${month}-01`).startOf('month');
+    const paddedMonth = String(month).padStart(2, '0');
+    const start = moment(`${year}-${paddedMonth}-01`).startOf('month');
     const end = moment(start).endOf('month');
 
     const transactions = await db.Transaction.findAll({
@@ -72,6 +73,7 @@ exports.exportTransactions = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
+    // ...rest of your code...
     if (type === 'csv') {
       const fields = ['type', 'amount', 'description', 'status', 'createdAt'];
       const parser = new Parser({ fields });
