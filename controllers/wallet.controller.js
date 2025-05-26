@@ -88,10 +88,11 @@ exports.transferFunds = async (req, res) => {
     return res.status(400).json({ message: 'Invalid transfer input' });
   }
 
+  const t = await db.sequelize.transaction();
   try {
     await checkRateLimitOrFraud(req.user.id, 'transferFunds');
-    const senderWallet = await db.Wallet.findOne({ where: { userId: req.user.id } });
-    const recipientWallet = await db.Wallet.findOne({ where: { accountNumber: recipientAccountNumber } });
+    const senderWallet = await db.Wallet.findOne({ where: { userId: req.user.id }, transaction: t });
+    const recipientWallet = await db.Wallet.findOne({ where: { accountNumber: recipientAccountNumber }, transaction: t });
 
     if (!recipientWallet) return res.status(404).json({ message: 'Recipient not found' });
     if (recipientWallet.userId === req.user.id) return res.status(400).json({ message: 'Cannot transfer to yourself' });
@@ -101,8 +102,8 @@ exports.transferFunds = async (req, res) => {
 
     senderWallet.balance -= value;
     recipientWallet.balance += value;
-    await senderWallet.save();
-    await recipientWallet.save();
+    await senderWallet.save({ transaction: t });
+    await recipientWallet.save({ transaction: t });
 
     await db.Transaction.bulkCreate([
       {
@@ -121,11 +122,14 @@ exports.transferFunds = async (req, res) => {
         description: `Received from ${senderWallet.accountNumber}`,
         status: 'success',
       },
-    ]);
+    ], { transaction: t });
+
+    await t.commit();
 
     logWalletAction(req.user.id, 'transferFunds', { to: recipientAccountNumber, amount: value });
     res.status(200).json({ message: 'Transfer successful', senderBalance: senderWallet.balance });
   } catch (err) {
+    await t.rollback();
     res.status(500).json({ message: 'Transfer failed', error: err.message });
   }
 };
