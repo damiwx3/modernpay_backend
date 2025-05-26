@@ -57,7 +57,8 @@ exports.fundWallet = async (req, res) => {
       });
     }
 
-    wallet.balance += value;
+    // FIX: Always use parseFloat for DECIMAL fields!
+    wallet.balance = parseFloat(wallet.balance) + value;
     await wallet.save();
 
     await db.Transaction.create({
@@ -96,12 +97,13 @@ exports.transferFunds = async (req, res) => {
 
     if (!recipientWallet) return res.status(404).json({ message: 'Recipient not found' });
     if (recipientWallet.userId === req.user.id) return res.status(400).json({ message: 'Cannot transfer to yourself' });
-    if (!senderWallet || senderWallet.balance < value) {
+    if (!senderWallet || parseFloat(senderWallet.balance) < value) {
       return res.status(400).json({ message: 'Insufficient balance' });
     }
 
-    senderWallet.balance -= value;
-    recipientWallet.balance += value;
+    // FIX: Always use parseFloat for DECIMAL fields!
+    senderWallet.balance = parseFloat(senderWallet.balance) - value;
+    recipientWallet.balance = parseFloat(recipientWallet.balance) + value;
     await senderWallet.save({ transaction: t });
     await recipientWallet.save({ transaction: t });
 
@@ -149,7 +151,7 @@ exports.transferToBank = async (req, res) => {
   try {
     await checkRateLimitOrFraud(req.user.id, 'transferToBank');
     const wallet = await db.Wallet.findOne({ where: { userId: req.user.id } });
-    if (!wallet || wallet.balance < value) {
+    if (!wallet || parseFloat(wallet.balance) < value) {
       return res.status(400).json({ message: 'Insufficient balance' });
     }
 
@@ -164,7 +166,8 @@ exports.transferToBank = async (req, res) => {
 
     // Deduct from wallet if transfer is successful
     if (transferResult.status === 'SUCCESSFUL') {
-      wallet.balance -= value;
+      // FIX: Always use parseFloat for DECIMAL fields!
+      wallet.balance = parseFloat(wallet.balance) - value;
       await wallet.save();
 
       await db.Transaction.create({
