@@ -34,12 +34,12 @@ exports.transferFunds = async (req, res) => {
 
     if (!recipientWallet) return res.status(404).json({ message: 'Recipient not found' });
     if (recipientWallet.userId === req.user.id) return res.status(400).json({ message: 'Cannot transfer to yourself' });
-    if (!senderWallet || senderWallet.balance < value) {
+    if (!senderWallet || parseFloat(senderWallet.balance) < value) {
       return res.status(400).json({ message: 'Insufficient balance' });
     }
 
-    // Update balances
-    senderWallet.balance -= value;
+    // Update balances (ALWAYS use parseFloat for DECIMAL fields)
+    senderWallet.balance = parseFloat(senderWallet.balance) - value;
     recipientWallet.balance = parseFloat(recipientWallet.balance) + value;
 
     // Save changes inside the transaction
