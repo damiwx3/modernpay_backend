@@ -59,6 +59,10 @@ exports.getCardTransactions = async (req, res) => {
     const card = await db.VirtualCard.findOne({ where: { userId: req.user.id } });
     if (!card) return res.status(404).json({ message: 'No virtual card found' });
 
+    // Pagination support
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = parseInt(req.query.offset) || 0;
+
     const txns = await db.Transaction.findAll({
       where: {
         userId: req.user.id,
@@ -66,10 +70,12 @@ exports.getCardTransactions = async (req, res) => {
           [db.Sequelize.Op.like]: `%${card.cardNumber.slice(-4)}%`
         }
       },
-      order: [['createdAt', 'DESC']]
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset
     });
 
-    res.status(200).json(txns); // <-- Return as a list, not an object
+    res.status(200).json(txns); // Return as a list for frontend
   } catch (err) {
     res.status(500).json({ message: 'Could not fetch transactions', error: err.message });
   }
