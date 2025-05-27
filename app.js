@@ -33,25 +33,6 @@ app.use(maintenanceCheck);
 app.use(maintenance);
 app.use(checkMaintenance);
 
-// --- ROUTES ---
-app.use('/api/disputes', disputeRoutes);
-app.use('/api/contacts', userContactRoutes);
-app.use('/api/contributions', contributionRoutes);
-app.use('/api/campaigns', campaignRoutes);
-app.use('/api/tickets', ticketRoutes);
-app.use('/api/savings', savingsRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/bank', bankRoutes);
-app.use('/api/kyc', kycRoutes);
-app.use('/api/wallets', walletRoutes);
-app.use('/api/contribution-cycles', contributionCycleRoutes);
-app.use('/api/audit', auditRoutes);
-app.use('/api/webhooks', require('./routes/webhook.routes'));
-app.use('/api/virtual-cards', require('./routes/virtual_card.routes'));
-app.use('/api/system', require('./routes/system.routes'));
-app.use('/api/wallets', require('./routes/transaction.routes'));
-//app.use('/api/transactions', require('./routes/transaction.routes'));
-app.use('/api/bills', require('./routes/bill.routes'));
 
 // Swagger
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
