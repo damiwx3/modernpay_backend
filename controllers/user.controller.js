@@ -46,6 +46,10 @@ exports.transferFunds = async (req, res) => {
     await senderWallet.save({ transaction: t });
     await recipientWallet.save({ transaction: t });
 
+    // Fetch sender and recipient user details for fullName
+    const senderUser = await db.User.findByPk(senderWallet.userId);
+    const recipientUser = await db.User.findByPk(recipientWallet.userId);
+
     // Create transaction records for both users
     await db.Transaction.bulkCreate([
       {
@@ -55,6 +59,10 @@ exports.transferFunds = async (req, res) => {
         reference: uuidv4(),
         description: `Transfer to ${recipientAccountNumber}`,
         status: 'success',
+        category: 'Wallet Transfer',
+        senderName: senderUser ? senderUser.fullName : null,
+        recipientName: recipientUser ? recipientUser.fullName : null,
+        recipientAccount: recipientAccountNumber,
       },
       {
         userId: recipientWallet.userId,
@@ -63,6 +71,10 @@ exports.transferFunds = async (req, res) => {
         reference: uuidv4(),
         description: `Received from ${senderWallet.accountNumber}`,
         status: 'success',
+        category: 'Wallet Transfer',
+        senderName: senderUser ? senderUser.fullName : null,
+        recipientName: recipientUser ? recipientUser.fullName : null,
+        recipientAccount: recipientAccountNumber,
       },
     ], { transaction: t });
 
