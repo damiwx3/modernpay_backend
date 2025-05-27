@@ -170,13 +170,17 @@ exports.transferToBank = async (req, res) => {
       wallet.balance = parseFloat(wallet.balance) - value;
       await wallet.save();
 
-      await db.Transaction.create({
+     await db.Transaction.create({
         userId: req.user.id,
         type: 'debit',
         amount: value,
         reference: transferResult.reference || transferResult.id || uuidv4(),
         description: `Transfer to bank (${accountNumber})`,
         status: 'success',
+        category: 'Bank Transfer',
+        senderName: req.user.name || null,
+        recipientName: transferResult.recipientName || null, // if Moniepoint returns this
+        recipientAccount: accountNumber,
       });
 
       logWalletAction(req.user.id, 'transferToBank', { bankCode, accountNumber, amount: value });
