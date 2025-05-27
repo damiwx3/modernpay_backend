@@ -1,229 +1,137 @@
 const db = require('../models');
-const { v4: uuidv4 } = require('uuid');
-const logger = require('../utils/logger');
-const moniepoint = require('../utils/moniepoint');
+const PDFDocument = require('pdfkit');
+const { Parser } = require('json2csv');
+const moment = require('moment');
 
-function logWalletAction(userId, action, details) {
-  logger.info({ userId, action, ...details });
-}
-
-// Placeholder for rate limiting/fraud check (implement as needed)
-async function checkRateLimitOrFraud(userId, action) {
-  // Example: throw new Error('Too many requests');
-}
-
-// 📘 Get Wallet Balance & Account Info
-exports.getBalance = async (req, res) => {
-  if (!req.user || !req.user.id) {
-    return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
-  }
+// Get user transactions
+exports.getUserTransactions = async (req, res) => {
   try {
-    await checkRateLimitOrFraud(req.user.id, 'getBalance');
-    const wallet = await db.Wallet.findOne({ where: { userId: req.user.id } });
-    if (!wallet) return res.status(404).json({ message: 'Wallet not found' });
+    const { month, year } = req.query;
+    const where = { userId: req.user.id };
 
-    logWalletAction(req.user.id, 'getBalance', { balance: wallet.balance });
-    res.status(200).json({
-      balance: wallet.balance,
-      accountNumber: wallet.accountNumber,
-      bankName: wallet.bankName,
+    if (month && year) {
+      const start = new Date(`${year}-${month}-01`);
+      const end = new Date(start);
+      end.setMonth(start.getMonth() + 1);
+      where.createdAt = { [db.Sequelize.Op.between]: [start, end] };
+    }
+
+    const transactions = await db.Transaction.findAll({
+      where,
+      order: [['createdAt', 'DESC']]
     });
+
+    res.status(200).json({ data: transactions });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to retrieve balance', error: err.message });
+    res.status(500).json({ message: 'Failed to fetch transactions', error: err.message });
   }
 };
 
-// 💰 Manual Wallet Funding (for admin/testing only)
-exports.fundWallet = async (req, res) => {
-  if (!req.user || !req.user.id) {
-    return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
-  }
-  const { amount } = req.body;
-  const value = parseFloat(amount);
-
-  if (isNaN(value) || value <= 0) {
-    return res.status(400).json({ message: 'Invalid amount' });
-  }
-
+// Create a manual transaction (for admin/testing/demo)
+exports.createTransaction = async (req, res) => {
   try {
-    await checkRateLimitOrFraud(req.user.id, 'fundWallet');
-    let wallet = await db.Wallet.findOne({ where: { userId: req.user.id } });
+    const {
+      amount,
+      type,
+      description,
+      status,
+      category,
+      senderName,
+      recipientName,
+      recipientAccount
+    } = req.body;
 
-    if (!wallet) {
-      wallet = await db.Wallet.create({
-        userId: req.user.id,
-        balance: 0,
-        accountNumber: null,
-      });
+    if (!amount || !type || isNaN(amount)) {
+      return res.status(400).json({ message: 'Amount (numeric) and type are required.' });
     }
 
-    // FIX: Always use parseFloat for DECIMAL fields!
-    wallet.balance = parseFloat(wallet.balance) + value;
-    await wallet.save();
+    // Use senderName from body, or fallback to user's name, or "You"
+    const resolvedSenderName = senderName || req.user.name || 'You';
 
-    await db.Transaction.create({
+    const txn = await db.Transaction.create({
       userId: req.user.id,
-      type: 'credit',
-      amount: value,
-      reference: uuidv4(),
-      description: 'Manual Wallet Top-up',
-      status: 'success',
+      amount: parseFloat(amount),
+      type: type.toLowerCase(),
+      description: description || 'Manual transaction',
+      status: status || 'pending',
+      category: category || null,
+      senderName: resolvedSenderName,
+      recipientName: recipientName || null,
+      recipientAccount: recipientAccount || null,
     });
 
-    logWalletAction(req.user.id, 'fundWallet', { amount: value, newBalance: wallet.balance });
-    res.status(200).json({ message: 'Wallet funded successfully', newBalance: wallet.balance });
+    res.status(201).json({ message: 'Transaction created successfully', txn });
   } catch (err) {
-    res.status(500).json({ message: 'Funding failed', error: err.message });
+    res.status(500).json({ message: 'Failed to create transaction', error: err.message });
   }
 };
 
-// 🔁 Transfer to another user via account number
-exports.transferFunds = async (req, res) => {
-  if (!req.user || !req.user.id) {
-    return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
-  }
-  const { recipientAccountNumber, amount } = req.body;
-  const value = parseFloat(amount);
 
-  if (!recipientAccountNumber || isNaN(value) || value <= 0) {
-    return res.status(400).json({ message: 'Invalid transfer input' });
-  }
-
-  const t = await db.sequelize.transaction();
+// Export transactions as PDF or CSV
+exports.exportTransactions = async (req, res) => {
   try {
-    await checkRateLimitOrFraud(req.user.id, 'transferFunds');
-    const senderWallet = await db.Wallet.findOne({ where: { userId: req.user.id }, transaction: t });
-    const recipientWallet = await db.Wallet.findOne({ where: { accountNumber: recipientAccountNumber }, transaction: t });
+    const { type = 'pdf', month, year } = req.query;
+    const userId = req.user.id;
 
-    if (!recipientWallet) return res.status(404).json({ message: 'Recipient not found' });
-    if (recipientWallet.userId === req.user.id) return res.status(400).json({ message: 'Cannot transfer to yourself' });
-    if (!senderWallet || parseFloat(senderWallet.balance) < value) {
-      return res.status(400).json({ message: 'Insufficient balance' });
+    if (!month || !year) {
+      return res.status(400).json({ message: 'Month and year are required.' });
     }
 
-    // FIX: Always use parseFloat for DECIMAL fields!
-    senderWallet.balance = parseFloat(senderWallet.balance) - value;
-    recipientWallet.balance = parseFloat(recipientWallet.balance) + value;
-    await senderWallet.save({ transaction: t });
-    await recipientWallet.save({ transaction: t });
+    const paddedMonth = String(month).padStart(2, '0');
+    const start = moment(`${year}-${paddedMonth}-01`).startOf('month');
+    const end = moment(start).endOf('month');
 
-    await db.Transaction.bulkCreate([
-      {
-        userId: req.user.id,
-        type: 'debit',
-        amount: value,
-        reference: uuidv4(),
-        description: `Transfer to ${recipientAccountNumber}`,
-        status: 'success',
+    const transactions = await db.Transaction.findAll({
+      where: {
+        userId,
+        createdAt: { [db.Sequelize.Op.between]: [start.toDate(), end.toDate()] },
       },
-      {
-        userId: recipientWallet.userId,
-        type: 'credit',
-        amount: value,
-        reference: uuidv4(),
-        description: `Received from ${senderWallet.accountNumber}`,
-        status: 'success',
-      },
-    ], { transaction: t });
-
-    await t.commit();
-
-    logWalletAction(req.user.id, 'transferFunds', { to: recipientAccountNumber, amount: value });
-    res.status(200).json({ message: 'Transfer successful', senderBalance: senderWallet.balance });
-  } catch (err) {
-    await t.rollback();
-    res.status(500).json({ message: 'Transfer failed', error: err.message });
-  }
-};
-
-// 🏦 Transfer to Bank using Moniepoint
-exports.transferToBank = async (req, res) => {
-  if (!req.user || !req.user.id) {
-    return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
-  }
-  const { bankCode, accountNumber, amount, narration } = req.body;
-  const value = parseFloat(amount);
-
-  if (!bankCode || !accountNumber || isNaN(value) || value <= 0) {
-    return res.status(400).json({ message: 'Invalid transfer input' });
-  }
-
-  try {
-    await checkRateLimitOrFraud(req.user.id, 'transferToBank');
-    const wallet = await db.Wallet.findOne({ where: { userId: req.user.id } });
-    if (!wallet || parseFloat(wallet.balance) < value) {
-      return res.status(400).json({ message: 'Insufficient balance' });
-    }
-
-    // Call Moniepoint util to initiate transfer
-    const transferResult = await moniepoint.transferToBank({
-      bankCode,
-      accountNumber,
-      amount: value,
-      narration: narration || 'Wallet withdrawal',
-      user: req.user,
+      order: [['createdAt', 'DESC']]
     });
 
-    // Deduct from wallet if transfer is successful
-    if (transferResult.status === 'SUCCESSFUL') {
-      // FIX: Always use parseFloat for DECIMAL fields!
-      wallet.balance = parseFloat(wallet.balance) - value;
-      await wallet.save();
-
-      await db.Transaction.create({
-        userId: req.user.id,
-        type: 'debit',
-        amount: value,
-        reference: transferResult.reference || transferResult.id || uuidv4(),
-        description: `Transfer to bank (${accountNumber})`,
-        status: 'success',
-      });
-
-      logWalletAction(req.user.id, 'transferToBank', { bankCode, accountNumber, amount: value });
-      return res.status(200).json({ message: 'Bank transfer successful', transfer: transferResult });
-    } else {
-      return res.status(400).json({ message: 'Bank transfer failed', transfer: transferResult });
+    // CSV Export
+    if (type === 'csv') {
+      const fields = [
+        'type',
+        'amount',
+        'description',
+        'category',
+        'status',
+        'createdAt',
+        'senderName',
+        'recipientName',
+        'recipientAccount'
+      ];
+      const parser = new Parser({ fields });
+      const csv = parser.parse(transactions.map(t => t.toJSON()));
+      res.header('Content-Type', 'text/csv');
+      res.attachment(`transactions_${month}_${year}.csv`);
+      return res.send(csv);
     }
-  } catch (err) {
-    res.status(500).json({ message: 'Bank transfer failed', error: err.message });
-  }
-};
 
-// 🧾 Create Virtual Account using Moniepoint
-exports.createVirtualAccount = async (req, res) => {
-  if (!req.user || !req.user.id) {
-    return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
-  }
-  const user = await db.User.findByPk(req.user.id);
-  if (!user) return res.status(404).json({ message: 'User not found' });
+    // PDF Export
+    const doc = new PDFDocument();
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=transactions_${month}_${year}.pdf`);
+    doc.pipe(res);
+    doc.fontSize(18).text('ModernPay Transactions', { align: 'center' });
+    doc.moveDown();
 
-  // Get BVN or NIN from request body
-  const { bvnOrNin } = req.body;
-  if (!bvnOrNin) {
-    return res.status(400).json({ message: 'BVN or NIN is required to create a virtual account.' });
-  }
-
-  try {
-    // Call Moniepoint util to create a virtual account
-    const reservedAccount = await moniepoint.createVirtualAccount(user, bvnOrNin);
-
-    await db.Wallet.update(
-      {
-        accountNumber: reservedAccount.accountNumber,
-        bankName: reservedAccount.bankName,
-      },
-      { where: { userId: req.user.id } }
-    );
-
-    logWalletAction(req.user.id, 'createVirtualAccount', { accountNumber: reservedAccount.accountNumber, bank: reservedAccount.bankName });
-    return res.status(201).json({
-      message: 'Virtual account created',
-      accountNumber: reservedAccount.accountNumber,
-      bank: reservedAccount.bankName,
+    transactions.forEach(txn => {
+      doc.fontSize(12).text(
+        `${txn.createdAt.toISOString().slice(0, 10)} - ${txn.type.toUpperCase()} - ₦${txn.amount} - ${txn.description}`
+      );
+      doc.fontSize(11).text(
+        `Sender: ${txn.senderName || 'You'} (ModernPay)`
+      );
+      doc.fontSize(11).text(
+        `Recipient: ${txn.recipientName || ''} (${txn.recipientAccount || ''})`
+      );
+      doc.moveDown();
     });
+
+    doc.end();
   } catch (err) {
-    console.error('Moniepoint VA error:', err.response?.data || err.message);
-    logWalletAction(req.user.id, 'createVirtualAccountError', { error: err.message });
-    return res.status(500).json({ message: 'Failed to create virtual account', error: err.message });
+    res.status(500).json({ message: 'Failed to export transactions', error: err.message });
   }
 };
