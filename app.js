@@ -57,7 +57,7 @@ app.use('/api/bills', require('./routes/bill.routes'));
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Register modular routes (if you have grouped routes)
-app.use('/api', routes);
+//app.use('/api', routes);
 
 // Default
 app.get('/', (req, res) => res.send('🌍 API Running'));
