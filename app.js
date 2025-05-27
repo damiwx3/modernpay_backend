@@ -9,19 +9,6 @@ const errorHandler = require('./middleware/errorHandler');
 const maintenanceCheck = require('./middleware/maintenance.middleware');
 const checkMaintenance = require('./middleware/checkMaintenance.middleware');
 const maintenance = require('./middleware/maintenance.middleware');
-const bankRoutes = require('./routes/bank.routes');
-const kycRoutes = require('./routes/kyc.routes');
-const userRoutes = require('./routes/user.routes');
-const savingsRoutes = require('./routes/savings.routes');
-const ticketRoutes = require('./routes/ticket.routes');
-const walletRoutes = require('./routes/wallet.routes');
-const contributionCycleRoutes = require('./routes/contribution_cycle.routes');
-const auditRoutes = require('./routes/audit.routes');
-const billRoutes = require('./routes/bill.routes');
-const campaignRoutes = require('./routes/campaign.routes');
-const contributionRoutes = require('./routes/contribution.routes');
-const userContactRoutes = require('./routes/user_contact.routes');
-const disputeRoutes = require('./routes/dispute.routes');
 
 // --- MIDDLEWARE: Place these at the very top, before any routes ---
 app.use(cors());
