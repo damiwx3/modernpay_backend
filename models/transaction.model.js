@@ -6,7 +6,8 @@ module.exports = (sequelize, DataTypes) => {
     amount: { type: DataTypes.DECIMAL(12, 2), allowNull: false },
     description: { type: DataTypes.STRING },
     reference: { type: DataTypes.STRING, unique: true },
-    status: { type: DataTypes.STRING, defaultValue: 'success' }
+    status: { type: DataTypes.STRING, defaultValue: 'success' },
+    category: { type: DataTypes.STRING }, // <-- Add this line
   });
   return Transaction;
 };
