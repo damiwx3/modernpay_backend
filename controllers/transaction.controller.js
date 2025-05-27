@@ -43,6 +43,7 @@ exports.createTransaction = async (req, res) => {
       type: type.toLowerCase(), // debit or credit
       description: description || 'Manual transaction',
       status: status || 'pending', // Optional: pending, success, failed
+      category: category || null, // <-- set category
     });
 
     res.status(201).json({ message: 'Transaction created successfully', txn });
@@ -75,7 +76,7 @@ exports.exportTransactions = async (req, res) => {
 
     // ...rest of your code...
     if (type === 'csv') {
-      const fields = ['type', 'amount', 'description', 'status', 'createdAt'];
+      const fields = ['type', 'amount', 'description', 'category','status', 'createdAt'];
       const parser = new Parser({ fields });
       const csv = parser.parse(transactions.map(t => t.toJSON()));
       res.header('Content-Type', 'text/csv');
