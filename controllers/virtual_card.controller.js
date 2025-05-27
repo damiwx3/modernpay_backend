@@ -69,7 +69,7 @@ exports.getCardTransactions = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
-    res.status(200).json({ transactions: txns });
+    res.status(200).json(txns); // <-- Return as a list, not an object
   } catch (err) {
     res.status(500).json({ message: 'Could not fetch transactions', error: err.message });
   }
