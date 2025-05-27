@@ -327,11 +327,29 @@ exports.getGroupSummary = async (req, res) => {
       where: { cycleId: { [Op.in]: cycles.map(c => c.id) } }
     });
 
+    // Calculate summary fields
+    const totalContributions = payments
+      .filter(p => p.status === 'paid')
+      .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+    const cyclesCompleted = cycles.filter(c => c.status === 'closed').length;
+
+    // Build history list
+    const history = cycles.map(cycle => {
+      const cyclePayments = payments.filter(p => p.cycleId === cycle.id && p.status === 'paid');
+      return {
+        cycle: cycle.cycleNumber,
+        amount: cyclePayments.reduce((sum, p) => sum + parseFloat(p.amount), 0),
+        date: cycle.updatedAt ? cycle.updatedAt.toISOString().split('T')[0] : null
+      };
+    });
+
     res.status(200).json({
-      group,
-      members,
-      cycles,
-      payments
+      totalContributions,
+      totalMembers: members.length,
+      cyclesCompleted,
+      history,
+      group // Optionally include full group info
     });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch summary', error: err.message });
