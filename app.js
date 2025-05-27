@@ -37,7 +37,7 @@ app.use(checkMaintenance);
 app.use('/api/disputes', disputeRoutes);
 app.use('/api/contacts', userContactRoutes);
 app.use('/api/contributions', contributionRoutes);
-//app.use('/api/campaigns', campaignRoutes);
+app.use('/api/campaigns', campaignRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/savings', savingsRoutes);
 app.use('/api/users', userRoutes);
