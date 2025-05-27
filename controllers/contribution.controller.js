@@ -167,32 +167,58 @@ exports.joinGroup = async (req, res) => {
 
 // Make a contribution
 exports.makeContribution = async (req, res) => {
+  const t = await db.sequelize.transaction();
   try {
     const { cycleId, amount } = req.body;
     const member = await db.ContributionMember.findOne({
-      where: { userId: req.user.id }
+      where: { userId: req.user.id },
+      transaction: t
     });
-    if (!member) return res.status(404).json({ message: 'Not a group member' });
+    if (!member) {
+      await t.rollback();
+      return res.status(404).json({ message: 'Not a group member' });
+    }
 
-    const cycle = await db.ContributionCycle.findByPk(cycleId);
-    if (!cycle) return res.status(404).json({ message: 'Cycle not found' });
+    const cycle = await db.ContributionCycle.findByPk(cycleId, { transaction: t });
+    if (!cycle) {
+      await t.rollback();
+      return res.status(404).json({ message: 'Cycle not found' });
+    }
 
     // Optionally: check if already contributed
     const existing = await db.ContributionPayment.findOne({
-      where: { memberId: member.id, cycleId }
+      where: { memberId: member.id, cycleId },
+      transaction: t
     });
-    if (existing) return res.status(400).json({ message: 'Already contributed for this cycle' });
+    if (existing) {
+      await t.rollback();
+      return res.status(400).json({ message: 'Already contributed for this cycle' });
+    }
 
+    // Check wallet balance
+    const wallet = await db.Wallet.findOne({ where: { userId: req.user.id }, transaction: t });
+    if (!wallet || parseFloat(wallet.balance) < parseFloat(amount)) {
+      await t.rollback();
+      return res.status(400).json({ message: 'Insufficient wallet balance' });
+    }
+
+    // Deduct from wallet
+    wallet.balance = parseFloat(wallet.balance) - parseFloat(amount);
+    await wallet.save({ transaction: t });
+
+    // Create payment record
     const payment = await db.ContributionPayment.create({
       memberId: member.id,
       cycleId,
       amount,
       status: 'paid',
       paidAt: new Date()
-    });
+    }, { transaction: t });
 
-    res.status(201).json({ message: 'Contribution made', payment });
+    await t.commit();
+    res.status(201).json({ message: 'Contribution made', payment, newWalletBalance: wallet.balance });
   } catch (err) {
+    if (t) await t.rollback();
     res.status(500).json({ message: 'Contribution failed', error: err.message });
   }
 };
