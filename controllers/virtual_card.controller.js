@@ -2,6 +2,7 @@ const db = require('../models');
 const { v4: uuidv4 } = require('uuid');
 const generateCardNumber = require('../utils/generateVirtualCardNumber');
 
+// Create a new virtual card
 exports.createCard = async (req, res) => {
   try {
     const existing = await db.VirtualCard.findOne({ where: { userId: req.user.id } });
@@ -26,6 +27,7 @@ exports.createCard = async (req, res) => {
   }
 };
 
+// Get the user's virtual card
 exports.getCard = async (req, res) => {
   try {
     const card = await db.VirtualCard.findOne({ where: { userId: req.user.id } });
@@ -37,6 +39,7 @@ exports.getCard = async (req, res) => {
   }
 };
 
+// Freeze or unfreeze the card
 exports.toggleFreeze = async (req, res) => {
   try {
     const { action } = req.body;
@@ -54,12 +57,12 @@ exports.toggleFreeze = async (req, res) => {
   }
 };
 
+// Get card transactions (with pagination)
 exports.getCardTransactions = async (req, res) => {
   try {
     const card = await db.VirtualCard.findOne({ where: { userId: req.user.id } });
     if (!card) return res.status(404).json({ message: 'No virtual card found' });
 
-    // Pagination support
     const limit = parseInt(req.query.limit) || 50;
     const offset = parseInt(req.query.offset) || 0;
 
@@ -75,12 +78,13 @@ exports.getCardTransactions = async (req, res) => {
       offset
     });
 
-    res.status(200).json(txns); // Return as a list for frontend
+    res.status(200).json(txns);
   } catch (err) {
     res.status(500).json({ message: 'Could not fetch transactions', error: err.message });
   }
 };
 
+// Top up the virtual card
 exports.topUpCard = async (req, res) => {
   const { amount } = req.body;
   const value = parseFloat(amount);
@@ -91,7 +95,6 @@ exports.topUpCard = async (req, res) => {
 
   const t = await db.sequelize.transaction();
   try {
-    // Find wallet and card inside the transaction
     const wallet = await db.Wallet.findOne({ where: { userId: req.user.id }, transaction: t });
     const card = await db.VirtualCard.findOne({ where: { userId: req.user.id }, transaction: t });
 
@@ -104,14 +107,12 @@ exports.topUpCard = async (req, res) => {
       return res.status(404).json({ message: 'No virtual card found' });
     }
 
-    // Deduct from wallet, credit card
     wallet.balance = parseFloat(wallet.balance) - value;
     card.balance = parseFloat(card.balance) + value;
 
     await wallet.save({ transaction: t });
     await card.save({ transaction: t });
 
-    // Create transaction record for audit
     await db.Transaction.create({
       userId: req.user.id,
       type: 'debit',
@@ -130,6 +131,7 @@ exports.topUpCard = async (req, res) => {
   }
 };
 
+// Set spending limit for the card
 exports.setSpendingLimit = async (req, res) => {
   try {
     const { limit } = req.body;
@@ -149,6 +151,7 @@ exports.setSpendingLimit = async (req, res) => {
   }
 };
 
+// Delete the virtual card
 exports.deleteCard = async (req, res) => {
   try {
     const card = await db.VirtualCard.findOne({ where: { userId: req.user.id } });
