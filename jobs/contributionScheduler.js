@@ -28,7 +28,7 @@ const scheduleContributions = () => {
 
       for (const cycle of dueCycles) {
         const group = cycle.ContributionGroup;
-        const amount = group.amountPerMember || 1000;
+        const amount = parseFloat(group.amountPerMember) || 1000;
 
         console.log(`🔄 Group: ${group.name} (Cycle #${cycle.cycleNumber})`);
 
@@ -47,9 +47,9 @@ const scheduleContributions = () => {
 
             let status = 'pending';
 
-            if (wallet && wallet.balance >= amount) {
+            if (wallet && parseFloat(wallet.balance) >= amount) {
               // Deduct from wallet
-              wallet.balance -= amount;
+              wallet.balance = parseFloat(wallet.balance) - amount;
               await wallet.save();
 
               // Log transaction
@@ -93,6 +93,38 @@ const scheduleContributions = () => {
             console.log(`✅ Payment recorded: ${user.email} - ${status}`);
           }
         }
+
+        // --- Payout Logic ---
+        // After all members processed, check if all have paid
+        const paidMembers = await db.ContributionPayment.count({
+          where: { cycleId: cycle.id, status: 'paid' }
+        });
+
+        if (paidMembers === members.length) {
+          // Determine winner (e.g., by cycle number order)
+          const winnerIndex = (cycle.cycleNumber - 1) % members.length;
+          const winner = members[winnerIndex];
+
+          const winnerWallet = await db.Wallet.findOne({ where: { userId: winner.userId } });
+          const payoutAmount = amount * members.length;
+          winnerWallet.balance = parseFloat(winnerWallet.balance) + payoutAmount;
+          await winnerWallet.save();
+
+          // Log payout transaction
+          await db.Transaction.create({
+            userId: winner.userId,
+            amount: payoutAmount,
+            type: 'credit',
+            description: `Payout for "${group.name}" (Cycle #${cycle.cycleNumber})`
+          });
+
+          // Mark cycle as closed
+          cycle.status = 'closed';
+          await cycle.save();
+
+          console.log(`🏆 Payout of ₦${payoutAmount} credited to user ${winner.userId}`);
+        }
+        // --- End Payout Logic ---
       }
 
       console.log('✅ Contribution Scheduler completed.\n');
