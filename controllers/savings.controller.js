@@ -113,14 +113,14 @@ exports.depositToGoal = async (req, res) => {
       return res.status(404).json({ message: 'Savings goal not found' });
     }
 
-    if (wallet.balance < amount) {
+    if (parseFloat(wallet.balance) < parseFloat(amount)) {
       return res.status(400).json({ message: 'Insufficient wallet balance' });
     }
 
-    wallet.balance -= parseFloat(amount);
+    wallet.balance = parseFloat(wallet.balance) - parseFloat(amount);
     await wallet.save();
 
-    goal.savedAmount += parseFloat(amount);
+    goal.savedAmount = parseFloat(goal.savedAmount) + parseFloat(amount);
     await goal.save();
 
     // Optional: Log transaction
@@ -147,14 +147,14 @@ exports.withdrawFromGoal = async (req, res) => {
       return res.status(404).json({ message: 'Savings goal not found' });
     }
 
-    if (goal.savedAmount < amount) {
+    if (parseFloat(goal.savedAmount) < parseFloat(amount)) {
       return res.status(400).json({ message: 'Insufficient savings' });
     }
 
-    goal.savedAmount -= parseFloat(amount);
+    goal.savedAmount = parseFloat(goal.savedAmount) - parseFloat(amount);
     await goal.save();
 
-    wallet.balance += parseFloat(amount);
+    wallet.balance = parseFloat(wallet.balance) + parseFloat(amount);
     await wallet.save();
 
     // Optional: Log transaction
