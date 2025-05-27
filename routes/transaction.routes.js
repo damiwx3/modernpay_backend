@@ -47,11 +47,20 @@ router.get('/transactions', auth, transactionController.getUserTransactions);
  *                 type: string
  *               status:
  *                 type: string
+ *               category:
+ *                 type: string
+ *               senderName:
+ *                 type: string
+ *               recipientName:
+ *                 type: string
+ *               recipientAccount:
+ *                 type: string
  *     responses:
  *       201:
  *         description: Transaction created
  */
 router.post('/transactions', auth, transactionController.createTransaction);
+
 router.get('/export', auth, transactionController.exportTransactions);
 
 module.exports = router;
