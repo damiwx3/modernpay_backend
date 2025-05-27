@@ -202,8 +202,11 @@ exports.makeContribution = async (req, res) => {
       return res.status(400).json({ message: 'Insufficient wallet balance' });
     }
 
-    // Deduct from wallet
+    // Debug logs to check balance update
+    console.log('Before:', wallet.balance, amount);
     wallet.balance = parseFloat(wallet.balance) - parseFloat(amount);
+    console.log('After:', wallet.balance);
+
     await wallet.save({ transaction: t });
 
     // Create payment record
