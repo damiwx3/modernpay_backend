@@ -53,7 +53,8 @@ exports.createTransaction = async (req, res) => {
 };
 
 // ✅ Export transactions as PDF or CSV
-exports.exportTransactions = async (req, res) => {
+
+  exports.exportTransactions = async (req, res) => {
   try {
     const { type = 'pdf', month, year } = req.query;
     const userId = req.user.id;
@@ -74,9 +75,19 @@ exports.exportTransactions = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
-    // ...rest of your code...
+    // CSV Export
     if (type === 'csv') {
-      const fields = ['type', 'amount', 'description', 'category','status', 'createdAt'];
+      const fields = [
+        'type',
+        'amount',
+        'description',
+        'category',
+        'status',
+        'createdAt',
+        'senderName',        // <-- Add sender name
+        'recipientName',     // <-- Add recipient name
+        'recipientAccount'   // <-- Add recipient account
+      ];
       const parser = new Parser({ fields });
       const csv = parser.parse(transactions.map(t => t.toJSON()));
       res.header('Content-Type', 'text/csv');
@@ -96,6 +107,13 @@ exports.exportTransactions = async (req, res) => {
       doc.fontSize(12).text(
         `${txn.createdAt.toISOString().slice(0, 10)} - ${txn.type.toUpperCase()} - ₦${txn.amount} - ${txn.description}`
       );
+      doc.fontSize(11).text(
+        `Sender: ${txn.senderName || 'You'} (ModernPay)`
+      );
+      doc.fontSize(11).text(
+        `Recipient: ${txn.recipientName || ''} (${txn.recipientAccount || ''})`
+      );
+      doc.moveDown();
     });
 
     doc.end();
