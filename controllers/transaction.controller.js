@@ -3,7 +3,7 @@ const PDFDocument = require('pdfkit');
 const { Parser } = require('json2csv');
 const moment = require('moment');
 
-// In transaction.controller.js
+// Get user transactions
 exports.getUserTransactions = async (req, res) => {
   try {
     const { month, year } = req.query;
@@ -21,17 +21,25 @@ exports.getUserTransactions = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
-    // Return as { data: [...] }
     res.status(200).json({ data: transactions });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch transactions', error: err.message });
   }
 };
 
-// ✅ Create a manual transaction (for admin/testing/demo)
+// Create a manual transaction (for admin/testing/demo)
 exports.createTransaction = async (req, res) => {
   try {
-    const { amount, type, description, status } = req.body;
+    const {
+      amount,
+      type,
+      description,
+      status,
+      category,
+      senderName,
+      recipientName,
+      recipientAccount
+    } = req.body;
 
     if (!amount || !type || isNaN(amount)) {
       return res.status(400).json({ message: 'Amount (numeric) and type are required.' });
@@ -40,10 +48,13 @@ exports.createTransaction = async (req, res) => {
     const txn = await db.Transaction.create({
       userId: req.user.id,
       amount: parseFloat(amount),
-      type: type.toLowerCase(), // debit or credit
+      type: type.toLowerCase(),
       description: description || 'Manual transaction',
-      status: status || 'pending', // Optional: pending, success, failed
-      category: category || null, // <-- set category
+      status: status || 'pending',
+      category: category || null,
+      senderName: senderName || null,
+      recipientName: recipientName || null,
+      recipientAccount: recipientAccount || null,
     });
 
     res.status(201).json({ message: 'Transaction created successfully', txn });
@@ -52,9 +63,8 @@ exports.createTransaction = async (req, res) => {
   }
 };
 
-// ✅ Export transactions as PDF or CSV
-
-  exports.exportTransactions = async (req, res) => {
+// Export transactions as PDF or CSV
+exports.exportTransactions = async (req, res) => {
   try {
     const { type = 'pdf', month, year } = req.query;
     const userId = req.user.id;
@@ -84,9 +94,9 @@ exports.createTransaction = async (req, res) => {
         'category',
         'status',
         'createdAt',
-        'senderName',        // <-- Add sender name
-        'recipientName',     // <-- Add recipient name
-        'recipientAccount'   // <-- Add recipient account
+        'senderName',
+        'recipientName',
+        'recipientAccount'
       ];
       const parser = new Parser({ fields });
       const csv = parser.parse(transactions.map(t => t.toJSON()));
