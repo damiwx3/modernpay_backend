@@ -18,7 +18,10 @@ module.exports = (sequelize, DataTypes) => {
     bvn: { type: DataTypes.STRING },                        // For BVN storage
     address: { type: DataTypes.STRING },                    // For address
     selfieUrl: { type: DataTypes.STRING },                  // For selfie
-    isActive: { type: DataTypes.BOOLEAN, defaultValue: true }
+    isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
+    // --- Add these two fields below ---
+    pin: { type: DataTypes.STRING, allowNull: true },
+    twoFactorEnabled: { type: DataTypes.BOOLEAN, defaultValue: false }
   });
   return User;
 };
