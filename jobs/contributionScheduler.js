@@ -138,7 +138,7 @@ const scheduleContributions = () => {
 📨 Reminders Sent: ${totalReminders}
       `;
 
-      const adminEmails = ['admin1@modernpay.com', 'admin2@modernpay.com'];
+      const adminEmails = ['admin@modernstarfilms.com', 'babaalawda@gmail.com'];
       for (const email of adminEmails) {
         await sendEmail(email, 'Daily Contribution Summary', summary);
       }
