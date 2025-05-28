@@ -28,6 +28,7 @@ router.use('/settings', require('./setting.routes'));
 router.use('/contacts', require('./user_contact.routes'));
 router.use('/contribution-cycles', require('./contribution_cycle.routes'));
 router.use('/admin-kyc', require('./admin_kyc.routes'));
+router.use('/security', require('./security.routes'));
 
 
 
