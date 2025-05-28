@@ -23,6 +23,7 @@ const contributionRoutes = require('./routes/contribution.routes');
 const userContactRoutes = require('./routes/user_contact.routes');
 const disputeRoutes = require('./routes/dispute.routes');
 const securityRoutes = require('./routes/security.routes');
+const notificationRoutes = require('./routes/notification.routes');
 
 // --- MIDDLEWARE: Place these at the very top, before any routes ---
 app.use(cors());
@@ -52,6 +53,7 @@ app.use('/api/virtual-cards', require('./routes/virtual_card.routes'));
 app.use('/api/system', require('./routes/system.routes'));
 app.use('/api/wallets', require('./routes/transaction.routes'));
 app.use('/api/security', securityRoutes);
+app.use('/api/notifications', notificationRoutes);
 //app.use('/api/transactions', require('./routes/transaction.routes'));
 app.use('/api/bills', require('./routes/bill.routes'));
 
