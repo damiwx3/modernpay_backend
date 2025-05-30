@@ -28,6 +28,36 @@ exports.getAirtimeCategories = async (req, res) => {
   res.json({ categories: airtimeNetworks }); // <-- wrap in object
 };
 
+exports.getDataBillersWithBundles = async (req, res) => {
+  try {
+    const flutterRes = await axios.get(`${FLW_BASE}/bill-categories`, { headers: HEADERS });
+    const dataBillers = flutterRes.data.data.filter(
+      cat =>
+        cat.country === 'NG' &&
+        cat.is_airtime === false &&
+        (
+          (cat.name && cat.name.toLowerCase().includes('data')) ||
+          (cat.biller_name && cat.biller_name.toLowerCase().includes('data'))
+        )
+    );
+    // Check which billers have bundles
+    const billersWithBundles = [];
+    for (const biller of dataBillers) {
+      try {
+        const bundlesRes = await axios.get(`${FLW_BASE}/bill-items?biller_code=${biller.biller_code}`, { headers: HEADERS });
+        if (Array.isArray(bundlesRes.data.data) && bundlesRes.data.data.length > 0) {
+          billersWithBundles.push(biller);
+        }
+      } catch (e) {
+        // Ignore billers with 404 or errors
+      }
+    }
+    res.status(200).json({ categories: billersWithBundles });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch data billers', error: err.message });
+  }
+};
+
 // Data for Nigeria only (MTN, GLO, Airtel, 9mobile)
 exports.getDataCategories = async (req, res) => {
   try {
