@@ -22,14 +22,22 @@ exports.getAirtimeCategories = async (req, res) => {
   try {
     const flutterRes = await axios.get(`${FLW_BASE}/bill-categories`, { headers: HEADERS });
     const allowed = ['MTN', 'GLO', 'AIRTEL', '9MOBILE'];
-    const airtime = flutterRes.data.data.filter(
-      cat =>
-        cat.country === 'NG' &&
-        cat.biller_code &&
-        cat.biller_code.toUpperCase().includes('AIRTIME') &&
-        allowed.some(net => cat.name.toUpperCase().includes(net))
-    );
-    res.status(200).json({ categories: airtime });
+    // Only include unique biller_code per network
+    const seen = {};
+    const airtime = flutterRes.data.data.filter(cat =>
+      cat.country === 'NG' &&
+      cat.biller_code &&
+      cat.biller_code.toUpperCase().includes('AIRTIME') &&
+      allowed.some(net => cat.name.toUpperCase().includes(net))
+    ).filter(cat => {
+      if (seen[cat.biller_code]) return false;
+      seen[cat.biller_code] = true;
+      return true;
+    }).map(cat => ({
+      biller_code: cat.biller_code,
+      name: allowed.find(net => cat.name.toUpperCase().includes(net)) || cat.name
+    }));
+    res.json(airtime);
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch airtime categories', error: err.message });
   }
