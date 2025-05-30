@@ -187,7 +187,6 @@ exports.getHistory = async (req, res) => {
 
 // Get bundles (for data, TV, etc.)
 exports.getBundles = async (req, res) => {
-  // Accept billerCode as path param or query param for compatibility
   const billerCode = req.params.billerCode || req.query.biller_code;
 
   if (!billerCode) {
@@ -195,12 +194,16 @@ exports.getBundles = async (req, res) => {
   }
 
   try {
+    console.log('Fetching bundles for billerCode:', billerCode); // <-- Add this
+    console.log('Using FLW key:', process.env.FLUTTERWAVE_SECRET_KEY); // <-- Add this
     const response = await axios.get(`${FLW_BASE}/bill-items?biller_code=${billerCode}`, {
       headers: HEADERS,
     });
+    console.log('Flutterwave response:', response.data); // <-- And this
 
     res.status(200).json({ bundles: response.data.data });
   } catch (err) {
+    console.error('Error loading bundles:', err.message); // <-- And this
     res.status(500).json({ message: 'Failed to load bundles', error: err.message });
   }
 };
