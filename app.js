@@ -25,6 +25,7 @@ const disputeRoutes = require('./routes/dispute.routes');
 const securityRoutes = require('./routes/security.routes');
 const notificationRoutes = require('./routes/notification.routes');
 
+
 // --- MIDDLEWARE: Place these at the very top, before any routes ---
 app.use(cors());
 app.use(express.json());
@@ -56,6 +57,7 @@ app.use('/api/security', securityRoutes);
 app.use('/api/notifications', notificationRoutes);
 //app.use('/api/transactions', require('./routes/transaction.routes'));
 app.use('/api/bills', require('./routes/bill.routes'));
+app.use('/uploads', express.static('uploads'));
 
 // Swagger
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
