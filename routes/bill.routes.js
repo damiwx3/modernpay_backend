@@ -173,5 +173,8 @@ router.get('/history', auth, controller.getHistory);
  *         description: Returns list of available bundles
  */
 router.get('/bundles/:billerCode', auth, controller.getBundles);
+router.get('/categories/data-with-bundles', auth, controller.getDataBillersWithBundles);
+
+
 
 module.exports = router;
