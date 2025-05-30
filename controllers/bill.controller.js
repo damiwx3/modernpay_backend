@@ -19,28 +19,14 @@ exports.getCategories = async (req, res) => {
 
 // Airtime for Nigeria only (MTN, GLO, Airtel, 9mobile)
 exports.getAirtimeCategories = async (req, res) => {
-  try {
-    const flutterRes = await axios.get(`${FLW_BASE}/bill-categories`, { headers: HEADERS });
-    const allowed = ['MTN', 'GLO', 'AIRTEL', '9MOBILE'];
-    // Only include unique biller_code per network
-    const seen = {};
-    const airtime = flutterRes.data.data.filter(cat =>
-      cat.country === 'NG' &&
-      cat.biller_code &&
-      cat.biller_code.toUpperCase().includes('AIRTIME') &&
-      allowed.some(net => cat.name.toUpperCase().includes(net))
-    ).filter(cat => {
-      if (seen[cat.biller_code]) return false;
-      seen[cat.biller_code] = true;
-      return true;
-    }).map(cat => ({
-      biller_code: cat.biller_code,
-      name: allowed.find(net => cat.name.toUpperCase().includes(net)) || cat.name
-    }));
-    res.json(airtime);
-  } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch airtime categories', error: err.message });
-  }
+  // Hardcoded for Nigeria
+  const airtimeNetworks = [
+    { biller_code: 'BIL101', name: 'MTN' },
+    { biller_code: 'BIL102', name: 'GLO' },
+    { biller_code: 'BIL103', name: 'AIRTEL' },
+    { biller_code: 'BIL104', name: '9MOBILE' },
+  ];
+  res.json(airtimeNetworks);
 };
 
 // Data for Nigeria only (MTN, GLO, Airtel, 9mobile)
