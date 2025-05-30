@@ -115,7 +115,7 @@ exports.verifyAccount = async (req, res) => {
 // Update current user's profile
 exports.updateProfile = async (req, res) => {
   try {
-    const { fullName, phoneNumber, address, selfieUrl } = req.body;
+    const { fullName, phoneNumber, address } = req.body;
     const user = await db.User.findByPk(req.user.id);
 
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -123,7 +123,15 @@ exports.updateProfile = async (req, res) => {
     if (fullName) user.fullName = fullName;
     if (phoneNumber) user.phoneNumber = phoneNumber;
     if (address) user.address = address;
-    if (selfieUrl) user.selfieUrl = selfieUrl;
+
+    // Handle selfie upload
+    if (req.file) {
+      // Save the file path or URL to the user record
+      user.selfieUrl = `/uploads/${req.file.filename}`;
+    } else if (req.body.selfieUrl) {
+      // Optionally allow updating selfieUrl directly (for remote URLs)
+      user.selfieUrl = req.body.selfieUrl;
+    }
 
     await user.save();
 
@@ -136,6 +144,7 @@ exports.updateProfile = async (req, res) => {
     res.status(500).json({ message: 'Failed to update profile' });
   }
 };
+
 
 // Get any user by ID (admin or internal use)
 exports.getUserById = async (req, res) => {
