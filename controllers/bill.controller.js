@@ -118,6 +118,9 @@ exports.validateCustomer = async (req, res) => {
 };
 
 // Pay a bill (Airtime, Data, Electricity, TV, etc.)
+// ...existing code...
+
+// Pay a bill (Airtime, Data, Electricity, TV, etc.)
 exports.payBill = async (req, res) => {
   const { serviceType, amount, customer } = req.body;
 
@@ -160,10 +163,12 @@ exports.payBill = async (req, res) => {
     });
 
   } catch (err) {
-    res.status(500).json({ message: 'Bill payment failed', error: err.message });
+    console.error('Bill payment failed:', err.response?.data || err.message);
+    res.status(500).json({ message: 'Bill payment failed', error: err.response?.data || err.message });
   }
 };
 
+// ...existing code...
 // Fetch user bill history
 exports.getHistory = async (req, res) => {
   try {
