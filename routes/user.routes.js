@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/user.controller');
 const authMiddleware = require('../middleware/auth.middleware');
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' }); // You can customize storage as needed
 
 /**
  * @swagger
@@ -40,7 +42,7 @@ router.get('/profile', authMiddleware, userController.getProfile);
  *       401:
  *         description: Unauthorized
  */
-router.put('/profile', authMiddleware, userController.updateProfile);
+router.put('/profile', authMiddleware, upload.single('selfie'), userController.updateProfile);
 
 /**
  * @swagger
