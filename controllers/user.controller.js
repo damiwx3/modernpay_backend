@@ -141,10 +141,10 @@ exports.updateProfile = async (req, res) => {
 
     res.status(200).json({ message: 'Profile updated successfully', user: userData });
   } catch (err) {
+    console.log('Update profile error:', err); // <-- Add this line
     res.status(500).json({ message: 'Failed to update profile' });
   }
 };
-
 
 // Get any user by ID (admin or internal use)
 exports.getUserById = async (req, res) => {
