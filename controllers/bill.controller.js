@@ -19,14 +19,13 @@ exports.getCategories = async (req, res) => {
 
 // Airtime for Nigeria only (MTN, GLO, Airtel, 9mobile)
 exports.getAirtimeCategories = async (req, res) => {
-  // Hardcoded for Nigeria
   const airtimeNetworks = [
     { biller_code: 'BIL101', name: 'MTN' },
     { biller_code: 'BIL102', name: 'GLO' },
     { biller_code: 'BIL103', name: 'AIRTEL' },
     { biller_code: 'BIL104', name: '9MOBILE' },
   ];
-  res.json(airtimeNetworks);
+  res.json({ categories: airtimeNetworks }); // <-- wrap in object
 };
 
 // Data for Nigeria only (MTN, GLO, Airtel, 9mobile)
