@@ -276,7 +276,10 @@ exports.createVirtualAccount = async (req, res) => {
   bankName: accountData.bank.name,
   bankId: accountData.bank.id,
   accountName: accountData.account_name,
-  paystackCustomerCode: accountData.customer?.customer_code || accountData.customer || user.paystackCustomerCode,
+  paystackCustomerCode:
+    typeof accountData.customer === 'string'
+      ? accountData.customer
+      : accountData.customer?.customer_code || user.paystackCustomerCode,
   paystackAccountId: accountData.id,
   raw: accountData,
 });
