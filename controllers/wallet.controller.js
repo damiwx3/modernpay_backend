@@ -1,7 +1,7 @@
 const db = require('../models');
 const { v4: uuidv4 } = require('uuid');
 const logger = require('../utils/logger');
-const moniepoint = require('../utils/moniepoint');
+const axios = require('axios');
 
 function logWalletAction(userId, action, details) {
   logger.info({ userId, action, ...details });
@@ -136,7 +136,7 @@ exports.transferFunds = async (req, res) => {
   }
 };
 
-// 🏦 Transfer to Bank using Moniepoint
+// 🏦 Transfer to Bank using Paystack
 exports.transferToBank = async (req, res) => {
   if (!req.user || !req.user.id) {
     return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
@@ -155,79 +155,102 @@ exports.transferToBank = async (req, res) => {
       return res.status(400).json({ message: 'Insufficient balance' });
     }
 
-    // Call Moniepoint util to initiate transfer
-    const transferResult = await moniepoint.transferToBank({
-      bankCode,
-      accountNumber,
-      amount: value,
-      narration: narration || 'Wallet withdrawal',
-      user: req.user,
+    // 1. Create transfer recipient
+    const recipientRes = await axios.post('https://api.paystack.co/transferrecipient', {
+      type: "nuban",
+      name: req.user.fullName || req.user.name || "User",
+      account_number: accountNumber,
+      bank_code: bankCode,
+      currency: "NGN"
+    }, {
+      headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` }
+    });
+
+    const recipientCode = recipientRes.data.data.recipient_code;
+
+    // 2. Initiate transfer
+    const transferRes = await axios.post('https://api.paystack.co/transfer', {
+      source: "balance",
+      amount: Math.round(value * 100), // Paystack expects kobo
+      recipient: recipientCode,
+      reason: narration || "Wallet withdrawal"
+    }, {
+      headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` }
     });
 
     // Deduct from wallet if transfer is successful
-    if (transferResult.status === 'SUCCESSFUL') {
-      // FIX: Always use parseFloat for DECIMAL fields!
+    if (transferRes.data.data.status === 'success' || transferRes.data.data.status === 'pending') {
       wallet.balance = parseFloat(wallet.balance) - value;
       await wallet.save();
 
-     await db.Transaction.create({
+      await db.Transaction.create({
         userId: req.user.id,
         type: 'debit',
         amount: value,
-        reference: transferResult.reference || transferResult.id || uuidv4(),
+        reference: transferRes.data.data.reference,
         description: `Transfer to bank (${accountNumber})`,
-        status: 'success',
+        status: transferRes.data.data.status,
         category: 'Bank Transfer',
         senderName: req.user.name || null,
-        recipientName: transferResult.recipientName || null, // if Moniepoint returns this
+        recipientName: recipientRes.data.data.details?.account_name || null,
         recipientAccount: accountNumber,
       });
 
       logWalletAction(req.user.id, 'transferToBank', { bankCode, accountNumber, amount: value });
-      return res.status(200).json({ message: 'Bank transfer successful', transfer: transferResult });
+      return res.status(200).json({ message: 'Bank transfer initiated', transfer: transferRes.data.data });
     } else {
-      return res.status(400).json({ message: 'Bank transfer failed', transfer: transferResult });
+      return res.status(400).json({ message: 'Bank transfer failed', transfer: transferRes.data.data });
     }
   } catch (err) {
-    res.status(500).json({ message: 'Bank transfer failed', error: err.message });
+    res.status(500).json({ message: 'Bank transfer failed', error: err.response?.data || err.message });
   }
 };
 
-// 🧾 Create Virtual Account using Moniepoint
+
 exports.createVirtualAccount = async (req, res) => {
-  if (!req.user || !req.user.id) {
-    return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
-  }
-  const user = await db.User.findByPk(req.user.id);
-  if (!user) return res.status(404).json({ message: 'User not found' });
-
-  // Get BVN or NIN from request body
-  const { bvnOrNin } = req.body;
-  if (!bvnOrNin) {
-    return res.status(400).json({ message: 'BVN or NIN is required to create a virtual account.' });
-  }
-
+  const { email, firstName, lastName, preferred_bank } = req.body;
   try {
-    // Call Moniepoint util to create a virtual account
-    const reservedAccount = await moniepoint.createVirtualAccount(user, bvnOrNin);
+    // 1. Check if user already has a virtual account
+    const user = await db.User.findOne({ where: { email } });
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
-    await db.Wallet.update(
+    const existingAccount = await db.VirtualAccount.findOne({ where: { userId: user.id } });
+    if (existingAccount) {
+      return res.status(200).json({ message: 'Virtual account already exists', account: existingAccount });
+    }
+
+    // 2. Create virtual account via Paystack
+    const response = await axios.post(
+      'https://api.paystack.co/dedicated_account',
       {
-        accountNumber: reservedAccount.accountNumber,
-        bankName: reservedAccount.bankName,
+        customer: email, // or Paystack customer code if you have it
+        preferred_bank: preferred_bank, // optional
+        first_name: firstName,
+        last_name: lastName,
       },
-      { where: { userId: req.user.id } }
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
     );
 
-    logWalletAction(req.user.id, 'createVirtualAccount', { accountNumber: reservedAccount.accountNumber, bank: reservedAccount.bankName });
-    return res.status(201).json({
-      message: 'Virtual account created',
-      accountNumber: reservedAccount.accountNumber,
-      bank: reservedAccount.bankName,
+    // 3. Store returned account details in your DB
+    const accountData = response.data.data;
+    const savedAccount = await db.VirtualAccount.create({
+      userId: user.id,
+      accountNumber: accountData.account_number,
+      bankName: accountData.bank.name,
+      bankId: accountData.bank.id,
+      accountName: accountData.account_name,
+      paystackCustomerCode: accountData.customer,
+      paystackAccountId: accountData.id,
+      raw: accountData, // Optionally store the full response for reference
     });
+
+    res.status(200).json({ message: 'Virtual account created', account: savedAccount });
   } catch (err) {
-    console.error('Moniepoint VA error:', err.response?.data || err.message);
-    logWalletAction(req.user.id, 'createVirtualAccountError', { error: err.message });
-    return res.status(500).json({ message: 'Failed to create virtual account', error: err.message });
+    res.status(500).json({ message: 'Failed to create virtual account', error: err.response?.data || err.message });
   }
 };
