@@ -1,96 +1,72 @@
 const db = require('../models');
+const crypto = require('crypto'); // Add this for signature verification
 
-exports.moniepointWebhook = async (req, res) => {
-  const webhookSecret = process.env.MONIEPOINT_WEBHOOK_SECRET;
-  const signature = req.headers['x-moniepoint-signature'] || req.headers['x-webhook-signature'];
-  const payload = req.body;
+// Paystack webhook handler
+exports.paystackWebhook = async (req, res) => {
+  // 1️⃣ Verify Paystack signature for security
+  const secret = process.env.PAYSTACK_SECRET_KEY;
+  const hash = crypto.createHmac('sha512', secret)
+    .update(JSON.stringify(req.body))
+    .digest('hex');
 
-  // 0️⃣ Verify Signature (adjust as per Moniepoint docs)
-  if (webhookSecret && signature && signature !== webhookSecret) {
-    return res.status(401).json({ message: 'Invalid or missing Moniepoint webhook signature' });
+  if (req.headers['x-paystack-signature'] !== hash) {
+    return res.status(401).send('Invalid signature');
   }
 
+  const event = req.body;
+
   try {
-    // 1️⃣ Log Webhook
+    // 2️⃣ Log Webhook
     await db.WebhookLog.create({
-      event: payload.event || payload.type || 'moniepoint',
-      reference: payload.reference || payload.data?.reference,
-      status: payload.status || payload.data?.status || 'received',
-      payload,
+      event: event.event || 'paystack',
+      reference: event.data?.reference,
+      status: event.data?.status || 'received',
+      payload: event,
     });
 
-    // 2️⃣ Wallet Funding
+    // 3️⃣ Wallet Funding (charge.success)
     if (
-      payload.status === 'SUCCESS' &&
-      payload.amount &&
-      payload.accountNumber
+      event.event === 'charge.success' &&
+      event.data.status === 'success' &&
+      event.data.amount &&
+      event.data.reference
     ) {
-      const account_number = payload.accountNumber;
-      const amount = payload.amount;
+      const reference = event.data.reference;
+      const amount = event.data.amount / 100; // Paystack sends amount in kobo
+      const email = event.data.customer.email;
 
-      // Validate amount
-      if (isNaN(amount) || Number(amount) <= 0) {
-        console.warn('⚠️ Invalid amount in webhook:', amount);
-        return res.status(400).json({ message: 'Invalid amount in webhook' });
-      }
+      // Find user by email (or use metadata for userId if you set it)
+      const user = await db.User.findOne({ where: { email } });
+      if (!user) return res.status(404).json({ message: 'User not found' });
 
-      const wallet = await db.Wallet.findOne({ where: { accountNumber: account_number } });
+      const wallet = await db.Wallet.findOne({ where: { userId: user.id } });
       if (!wallet) return res.status(404).json({ message: 'Wallet not found' });
 
       // Prevent duplicate credit
-      const exists = await db.Transaction.findOne({ where: { reference: payload.reference } });
+      const exists = await db.Transaction.findOne({ where: { reference } });
       if (exists) return res.status(200).send('Already processed');
 
       await db.Transaction.create({
         userId: wallet.userId,
         type: 'credit',
         amount: parseFloat(amount),
-        reference: payload.reference,
-        description: 'Moniepoint wallet funding',
+        reference: reference,
+        description: 'Paystack wallet funding',
         status: 'success',
       });
 
       wallet.balance += parseFloat(amount);
       await wallet.save();
 
-      console.log(`✅ Moniepoint wallet funded: ₦${amount} for ${account_number}`);
+      console.log(`✅ Paystack wallet funded: ₦${amount} for ${email}`);
     }
 
-    // 3️⃣ Bank Transfer Confirmation
-    else if (
-      payload.type === 'transfer.completed' &&
-      typeof payload.reference !== 'undefined' &&
-      typeof payload.status !== 'undefined'
-    ) {
-      const { reference, status, amount } = payload;
-
-      // Validate amount
-      if (isNaN(amount) || Number(amount) < 0) {
-        console.warn('⚠️ Invalid amount in transfer webhook:', amount);
-        return res.status(400).json({ message: 'Invalid amount in webhook' });
-      }
-
-      const txn = await db.Transaction.findOne({ where: { reference } });
-      if (!txn) return res.status(404).json({ message: 'Transaction not found' });
-
-      if (status === 'SUCCESSFUL') {
-        await txn.update({ status: 'success' });
-        console.log(`✅ Bank transfer confirmed: ${reference}`);
-      } else if (status === 'FAILED') {
-        const wallet = await db.Wallet.findOne({ where: { userId: txn.userId } });
-        if (wallet) {
-          wallet.balance += parseFloat(amount);
-          await wallet.save();
-        }
-        await txn.update({ status: 'failed' });
-        console.log(`❌ Transfer failed. Refunded: ${reference}`);
-      }
-    }
+    // 4️⃣ (Optional) Handle transfer/webhook events from Paystack if needed
 
     // Always respond 200 OK to prevent repeated webhook calls
     res.status(200).send('Webhook received');
   } catch (err) {
-    console.error('❌ Webhook error:', err.message);
+    console.error('❌ Paystack Webhook error:', err.message);
     res.status(500).json({ message: 'Internal webhook error' });
   }
 };
