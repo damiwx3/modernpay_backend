@@ -69,9 +69,16 @@ router.post('/fund', auth, walletController.fundWallet);
  *                 type: string
  *               amount:
  *                 type: number
+ *               remark:
+ *                 type: string
+ *                 description: Optional remark for the transfer
  *     responses:
  *       200:
  *         description: Transfer successful
+ *       400:
+ *         description: Invalid transfer input or insufficient balance
+ *       404:
+ *         description: Recipient not found
  */
 router.post('/transfer', auth, walletController.transferFunds);
 
@@ -79,7 +86,7 @@ router.post('/transfer', auth, walletController.transferFunds);
  * @swagger
  * /api/wallets/transfer-to-bank:
  *   post:
- *     summary: Transfer funds to external bank using Moniepoint
+ *     summary: Transfer funds to external bank using Paystack
  *     tags: [Wallet]
  *     security:
  *       - bearerAuth: []
@@ -112,13 +119,35 @@ router.post('/transfer-to-bank', auth, walletController.transferToBank);
  * @swagger
  * /api/wallets/create-virtual-account:
  *   post:
- *     summary: Create a virtual account using Moniepoint
+ *     summary: Create a virtual account for a user (Paystack Dedicated NUBAN)
  *     tags: [Wallet]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - firstName
+ *               - lastName
+ *             properties:
+ *               email:
+ *                 type: string
+ *               firstName:
+ *                 type: string
+ *               lastName:
+ *                 type: string
+ *               preferred_bank:
+ *                 type: string
+ *                 description: Optional. e.g. wema-bank, providus-bank, etc.
  *     responses:
- *       201:
- *         description: Virtual account created successfully
+ *       200:
+ *         description: Virtual account created
+ *       500:
+ *         description: Failed to create virtual account
  */
 router.post('/create-virtual-account', auth, walletController.createVirtualAccount);
 
