@@ -1,17 +1,49 @@
 const express = require('express');
 const router = express.Router();
-const controller = require('../controllers/webhook.controller');
+const webhookController = require('../controllers/webhook.controller');
 
 /**
  * @swagger
- * /api/webhooks/moniepoint:
+ * /webhook/paystack:
  *   post:
- *     summary: Moniepoint webhook handler
- *     tags: [Webhooks]
+ *     summary: Paystack webhook endpoint for wallet funding
+ *     description: Receives Paystack payment notifications and credits user wallet on charge.success.
+ *     tags:
+ *       - Webhooks
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               event:
+ *                 type: string
+ *                 example: charge.success
+ *               data:
+ *                 type: object
+ *                 properties:
+ *                   status:
+ *                     type: string
+ *                     example: success
+ *                   amount:
+ *                     type: integer
+ *                     example: 500000
+ *                   reference:
+ *                     type: string
+ *                     example: "PSK_123456789"
+ *                   customer:
+ *                     type: object
+ *                     properties:
+ *                       email:
+ *                         type: string
+ *                         example: "user@email.com"
  *     responses:
  *       200:
- *         description: Webhook received
+ *         description: Webhook received and processed
+ *       500:
+ *         description: Internal webhook error
  */
-router.post('/moniepoint', controller.moniepointWebhook);
+router.post('/webhook/paystack', webhookController.paystackWebhook);
 
 module.exports = router;
