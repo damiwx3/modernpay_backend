@@ -237,6 +237,7 @@ exports.createVirtualAccount = async (req, res) => {
           email,
           first_name: firstName,
           last_name: lastName,
+          phone, // <-- Add this line
         },
         {
           headers: {
