@@ -124,25 +124,33 @@ router.post('/transfer-to-bank', auth, walletController.transferToBank);
  *     security:
  *       - bearerAuth: []
  *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - firstName
- *               - lastName
- *             properties:
- *               email:
- *                 type: string
- *               firstName:
- *                 type: string
- *               lastName:
- *                 type: string
- *               preferred_bank:
- *                 type: string
- *                 description: Optional. e.g. wema-bank, providus-bank, etc.
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        required:
+          - email
+          - firstName
+          - lastName
+          - phone
+          - preferred_bank
+        properties:
+          email:
+            type: string
+            example: modernstar@gmail.com
+          firstName:
+            type: string
+            example: damilare
+          lastName:
+            type: string
+            example: adebayo
+          phone:
+            type: string
+            example: "07042421141"
+          preferred_bank:
+            type: string
+            example: wema-bank
  *     responses:
  *       200:
  *         description: Virtual account created
