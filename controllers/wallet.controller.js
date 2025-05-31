@@ -3,6 +3,8 @@ const { v4: uuidv4 } = require('uuid');
 const logger = require('../utils/logger');
 const axios = require('axios');
 
+const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+
 function logWalletAction(userId, action, details) {
   logger.info({ userId, action, ...details });
 }
@@ -57,7 +59,6 @@ exports.fundWallet = async (req, res) => {
       });
     }
 
-    // FIX: Always use parseFloat for DECIMAL fields!
     wallet.balance = parseFloat(wallet.balance) + value;
     await wallet.save();
 
@@ -101,7 +102,6 @@ exports.transferFunds = async (req, res) => {
       return res.status(400).json({ message: 'Insufficient balance' });
     }
 
-    // FIX: Always use parseFloat for DECIMAL fields!
     senderWallet.balance = parseFloat(senderWallet.balance) - value;
     recipientWallet.balance = parseFloat(recipientWallet.balance) + value;
     await senderWallet.save({ transaction: t });
@@ -165,6 +165,7 @@ exports.transferToBank = async (req, res) => {
     }, {
       headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` }
     });
+    console.log('Paystack recipient response:', recipientRes.data);
 
     const recipientCode = recipientRes.data.data.recipient_code;
 
@@ -203,11 +204,15 @@ exports.transferToBank = async (req, res) => {
       return res.status(400).json({ message: 'Bank transfer failed', transfer: transferRes.data.data });
     }
   } catch (err) {
-    res.status(500).json({ message: 'Bank transfer failed', error: err.response?.data || err.message });
+    console.error('Bank transfer error:', err.response?.data || err.message);
+    res.status(500).json({
+      message: 'Bank transfer failed',
+      error: err.response?.data?.message || err.message
+    });
   }
 };
 
-
+// 🏦 Create Virtual Account using Paystack
 exports.createVirtualAccount = async (req, res) => {
   const { email, firstName, lastName, preferred_bank } = req.body;
   try {
@@ -231,7 +236,7 @@ exports.createVirtualAccount = async (req, res) => {
       },
       {
         headers: {
-          Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
           'Content-Type': 'application/json',
         },
       }
