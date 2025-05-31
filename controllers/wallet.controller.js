@@ -177,6 +177,7 @@ exports.transferToBank = async (req, res) => {
     }, {
       headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` }
     });
+    console.log('Paystack transfer response:', transferRes.data);
 
     // Deduct from wallet if transfer is successful
     if (transferRes.data.data.status === 'success' || transferRes.data.data.status === 'pending') {
