@@ -214,7 +214,7 @@ exports.transferToBank = async (req, res) => {
 
 // 🏦 Create Virtual Account using Paystack
 exports.createVirtualAccount = async (req, res) => {
-  console.log('createVirtualAccount called');
+  console.log('createVirtualAccount called', req.body);
   const { email, firstName, lastName, preferred_bank } = req.body;
   try {
     // 1. Check if user exists in your DB
