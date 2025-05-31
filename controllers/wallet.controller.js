@@ -271,15 +271,15 @@ exports.createVirtualAccount = async (req, res) => {
     // 5. Store returned account details in your DB
     const accountData = response.data.data;
     const savedAccount = await db.VirtualAccount.create({
-      userId: user.id,
-      accountNumber: accountData.account_number,
-      bankName: accountData.bank.name,
-      bankId: accountData.bank.id,
-      accountName: accountData.account_name,
-      paystackCustomerCode: accountData.customer,
-      paystackAccountId: accountData.id,
-      raw: accountData,
-    });
+  userId: user.id,
+  accountNumber: accountData.account_number,
+  bankName: accountData.bank.name,
+  bankId: accountData.bank.id,
+  accountName: accountData.account_name,
+  paystackCustomerCode: accountData.customer?.customer_code || accountData.customer || user.paystackCustomerCode,
+  paystackAccountId: accountData.id,
+  raw: accountData,
+});
 
     res.status(200).json({ message: 'Virtual account created', account: savedAccount });
   } catch (err) {
