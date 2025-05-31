@@ -38,14 +38,15 @@ exports.verifyAccountNumber = async (req, res) => {
         }
       }
     );
+    console.log('Paystack response:', response.data); // <-- Add this
 
     if (response.data.status) {
       return res.status(200).json({ accountName: response.data.data.account_name });
     } else {
-      return res.status(400).json({ error: 'Verification failed' });
+      return res.status(400).json({ error: 'Verification failed', details: response.data.message });
     }
   } catch (err) {
     console.error('Paystack verification error:', err.response?.data || err.message);
-    return res.status(500).json({ error: 'Verification error', details: err.message });
+    return res.status(500).json({ error: 'Verification error', details: err.response?.data || err.message });
   }
 };
