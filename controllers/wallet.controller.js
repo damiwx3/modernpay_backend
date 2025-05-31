@@ -216,20 +216,45 @@ exports.transferToBank = async (req, res) => {
 exports.createVirtualAccount = async (req, res) => {
   const { email, firstName, lastName, preferred_bank } = req.body;
   try {
-    // 1. Check if user already has a virtual account
+    // 1. Check if user exists in your DB
     const user = await db.User.findOne({ where: { email } });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    // 2. Check if user already has a virtual account
     const existingAccount = await db.VirtualAccount.findOne({ where: { userId: user.id } });
     if (existingAccount) {
       return res.status(200).json({ message: 'Virtual account already exists', account: existingAccount });
     }
 
-    // 2. Create virtual account via Paystack
+    // 3. Create or fetch Paystack customer
+    let customerCode = user.paystackCustomerCode;
+    if (!customerCode) {
+      // Create customer on Paystack
+      const customerRes = await axios.post(
+        'https://api.paystack.co/customer',
+        {
+          email,
+          first_name: firstName,
+          last_name: lastName,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      customerCode = customerRes.data.data.customer_code;
+      // Optionally save to your user model for future use
+      user.paystackCustomerCode = customerCode;
+      await user.save();
+    }
+
+    // 4. Create virtual account via Paystack
     const response = await axios.post(
       'https://api.paystack.co/dedicated_account',
       {
-        customer: email, // or Paystack customer code if you have it
+        customer: customerCode,
         preferred_bank: preferred_bank, // optional
         first_name: firstName,
         last_name: lastName,
@@ -242,7 +267,7 @@ exports.createVirtualAccount = async (req, res) => {
       }
     );
 
-    // 3. Store returned account details in your DB
+    // 5. Store returned account details in your DB
     const accountData = response.data.data;
     const savedAccount = await db.VirtualAccount.create({
       userId: user.id,
@@ -252,11 +277,12 @@ exports.createVirtualAccount = async (req, res) => {
       accountName: accountData.account_name,
       paystackCustomerCode: accountData.customer,
       paystackAccountId: accountData.id,
-      raw: accountData, // Optionally store the full response for reference
+      raw: accountData,
     });
 
     res.status(200).json({ message: 'Virtual account created', account: savedAccount });
   } catch (err) {
+    console.error('Create virtual account error:', err.response?.data || err.message);
     res.status(500).json({ message: 'Failed to create virtual account', error: err.response?.data || err.message });
   }
 };
