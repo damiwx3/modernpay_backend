@@ -260,6 +260,7 @@ exports.createVirtualAccount = async (req, res) => {
         preferred_bank: preferred_bank, // optional
         first_name: firstName,
         last_name: lastName,
+        phone, // <-- Add this line
       },
       {
         headers: {
