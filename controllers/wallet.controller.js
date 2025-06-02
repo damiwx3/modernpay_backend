@@ -48,36 +48,42 @@ exports.fundWallet = async (req, res) => {
   }
 
   try {
-    await checkRateLimitOrFraud(req.user.id, 'fundWallet');
-    let wallet = await db.Wallet.findOne({ where: { userId: req.user.id } });
+    // 1. Get user email
+    const user = await db.User.findOne({ where: { id: req.user.id } });
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
-    if (!wallet) {
-      wallet = await db.Wallet.create({
-        userId: req.user.id,
-        balance: 0,
-        accountNumber: null,
-      });
-    }
+    // 2. Initialize Paystack transaction
+    const paystackRes = await axios.post(
+      'https://api.paystack.co/transaction/initialize',
+      {
+        email: user.email,
+        amount: Math.round(value * 100), // Paystack expects amount in kobo
+        metadata: {
+          userId: user.id,
+          purpose: 'wallet_funding'
+        }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
 
-    wallet.balance = parseFloat(wallet.balance) + value;
-    await wallet.save();
-
-    await db.Transaction.create({
-      userId: req.user.id,
-      type: 'credit',
-      amount: value,
-      reference: uuidv4(),
-      description: 'Manual Wallet Top-up',
-      status: 'success',
+    // 3. Return authorization URL to frontend
+    const { authorization_url, access_code, reference } = paystackRes.data.data;
+    res.status(200).json({
+      message: 'Payment initialized',
+      authorization_url,
+      access_code,
+      reference
     });
-
-    logWalletAction(req.user.id, 'fundWallet', { amount: value, newBalance: wallet.balance });
-    res.status(200).json({ message: 'Wallet funded successfully', newBalance: wallet.balance });
   } catch (err) {
-    res.status(500).json({ message: 'Funding failed', error: err.message });
+    console.error('Fund wallet error:', err.response?.data || err.message);
+    res.status(500).json({ message: 'Failed to initialize payment', error: err.response?.data || err.message });
   }
 };
-
 // 🔁 Transfer to another user via account number
 exports.transferFunds = async (req, res) => {
   if (!req.user || !req.user.id) {
@@ -261,6 +267,7 @@ exports.createVirtualAccount = async (req, res) => {
         first_name: firstName,
         last_name: lastName,
         phone, // <-- Add this line
+        
       },
       {
         headers: {
