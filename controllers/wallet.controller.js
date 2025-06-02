@@ -70,6 +70,7 @@ exports.fundWallet = async (req, res) => {
         },
       }
     );
+    console.log('Paystack initialize response:', paystackRes.data); // <-- Add this line
 
     // 3. Return authorization URL to frontend
     const { authorization_url, access_code, reference } = paystackRes.data.data;
