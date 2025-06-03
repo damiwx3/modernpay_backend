@@ -5,6 +5,15 @@ const generateOTP = require('../utils/generateOTP');
 const sendEmail = require('../utils/sendEmail');
 const sendSms = require('../utils/sendSms');
 
+// Helper to convert local phone numbers to international format (Nigeria)
+function toInternational(phone) {
+  if (!phone) return phone;
+  phone = phone.trim();
+  if (phone.startsWith('+')) return phone;
+  if (phone.startsWith('0')) return '+234' + phone.slice(1);
+  return phone;
+}
+
 // Register
 exports.register = async (req, res) => {
   try {
@@ -49,8 +58,9 @@ exports.register = async (req, res) => {
     });
 
     if (phoneNumber) {
+      const intlPhone = toInternational(phoneNumber);
       await sendSms(
-        phoneNumber,
+        intlPhone,
         `Hi ${fullName}, your ModernPay OTP is ${otp}. It expires in 10 minutes.`
       );
     }
@@ -196,8 +206,9 @@ exports.resendOtp = async (req, res) => {
     });
 
     if (user.phoneNumber) {
+      const intlPhone = toInternational(user.phoneNumber);
       await sendSms(
-        user.phoneNumber,
+        intlPhone,
         `Your new ModernPay OTP is: ${otp}. Expires in 10 minutes.`
       );
     }
@@ -240,7 +251,8 @@ exports.forgotPassword = async (req, res) => {
     });
 
     if (user.phoneNumber) {
-      await sendSms(user.phoneNumber, `ModernPay reset OTP: ${otp}`);
+      const intlPhone = toInternational(user.phoneNumber);
+      await sendSms(intlPhone, `ModernPay reset OTP: ${otp}`);
     }
 
     res.status(200).json({ message: 'OTP sent to email and phone' });
