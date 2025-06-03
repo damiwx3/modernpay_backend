@@ -300,3 +300,25 @@ exports.createVirtualAccount = async (req, res) => {
     res.status(500).json({ message: 'Failed to create virtual account', error: err.response?.data || err.message });
   }
 };
+
+const bcrypt = require('bcryptjs'); // At the top if not already
+
+exports.setTransactionPin = async (req, res) => {
+  if (!req.user || !req.user.id) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+  const { pin } = req.body;
+  if (!pin || pin.length < 4) {
+    return res.status(400).json({ message: 'PIN must be at least 4 digits' });
+  }
+  try {
+    const hashedPin = await bcrypt.hash(pin, 10);
+    await db.User.update(
+      { transactionPin: hashedPin },
+      { where: { id: req.user.id } }
+    );
+    res.status(200).json({ message: 'Transaction PIN set successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to set PIN', error: err.message });
+  }
+};
