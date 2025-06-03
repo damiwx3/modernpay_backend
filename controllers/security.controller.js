@@ -60,9 +60,18 @@ exports.changePassword = async (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body;
     const user = await db.User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
     const valid = await bcrypt.compare(oldPassword, user.password);
     if (!valid) {
       return res.status(400).json({ message: 'Old password is incorrect.' });
+    }
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{6,}$/;
+    if (!passwordRegex.test(newPassword)) {
+      return res.status(400).json({
+        message: 'Password must be at least 6 characters and include lowercase, uppercase, number, and special character.'
+      });
     }
     const hashed = await bcrypt.hash(newPassword, 10);
     user.password = hashed;
