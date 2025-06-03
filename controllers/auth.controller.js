@@ -8,7 +8,7 @@ const sendSms = require('../utils/sendSms');
 // Register
 exports.register = async (req, res) => {
   try {
-    const { fullName, email, password, phone } = req.body;
+    const { fullName, email, password, phoneNumber } = req.body;
 
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{6,}$/;
     if (!passwordRegex.test(password)) {
@@ -24,15 +24,15 @@ exports.register = async (req, res) => {
     }
 
     // Check for duplicate phone number (if provided)
-    if (phone) {
-      const existingPhone = await db.User.findOne({ where: { phone } });
+    if (phoneNumber) {
+      const existingPhone = await db.User.findOne({ where: { phoneNumber } });
       if (existingPhone) {
         return res.status(400).json({ message: 'Phone number already registered' });
       }
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await db.User.create({ fullName, email, phone, password: hashedPassword });
+    const user = await db.User.create({ fullName, email, phoneNumber, password: hashedPassword });
 
     const otp = generateOTP();
     await db.OTPCode.create({
@@ -48,9 +48,9 @@ exports.register = async (req, res) => {
       text: `Hi ${fullName},\n\nYour OTP is: ${otp}\nIt will expire in 10 minutes.\n\n- ModernPay`
     });
 
-    if (phone) {
+    if (phoneNumber) {
       await sendSms(
-        phone,
+        phoneNumber,
         `Hi ${fullName}, your ModernPay OTP is ${otp}. It expires in 10 minutes.`
       );
     }
@@ -195,9 +195,9 @@ exports.resendOtp = async (req, res) => {
       text: `Hi ${user.fullName},\n\nYour new OTP is: ${otp}\nIt expires in 10 minutes.`
     });
 
-    if (user.phone) {
+    if (user.phoneNumber) {
       await sendSms(
-        user.phone,
+        user.phoneNumber,
         `Your new ModernPay OTP is: ${otp}. Expires in 10 minutes.`
       );
     }
@@ -239,8 +239,8 @@ exports.forgotPassword = async (req, res) => {
       text: `Hi ${user.fullName},\n\nYour password reset OTP is: ${otp}\nIt expires in 10 minutes.`
     });
 
-    if (user.phone) {
-      await sendSms(user.phone, `ModernPay reset OTP: ${otp}`);
+    if (user.phoneNumber) {
+      await sendSms(user.phoneNumber, `ModernPay reset OTP: ${otp}`);
     }
 
     res.status(200).json({ message: 'OTP sent to email and phone' });
