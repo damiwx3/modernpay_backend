@@ -33,11 +33,11 @@ exports.register = async (req, res) => {
       expiresAt: new Date(Date.now() + 10 * 60 * 1000)
     });
 
-    await sendEmail(
-      email,
-      'Your ModernPay OTP Code',
-      `Hi ${fullName},\n\nYour OTP is: ${otp}\nIt will expire in 10 minutes.\n\n- ModernPay`
-    );
+    await sendEmail({
+      to: email,
+      subject: 'Your ModernPay OTP Code',
+      text: `Hi ${fullName},\n\nYour OTP is: ${otp}\nIt will expire in 10 minutes.\n\n- ModernPay`
+    });
 
     if (phone) {
       await sendSms(
@@ -180,11 +180,11 @@ exports.resendOtp = async (req, res) => {
       expiresAt: new Date(Date.now() + 10 * 60 * 1000)
     });
 
-    await sendEmail(
-      user.email,
-      'Your New OTP Code',
-      `Hi ${user.fullName},\n\nYour new OTP is: ${otp}\nIt expires in 10 minutes.`
-    );
+    await sendEmail({
+      to: user.email,
+      subject: 'Your New OTP Code',
+      text: `Hi ${user.fullName},\n\nYour new OTP is: ${otp}\nIt expires in 10 minutes.`
+    });
 
     if (user.phone) {
       await sendSms(
@@ -224,11 +224,11 @@ exports.forgotPassword = async (req, res) => {
       expiresAt: new Date(Date.now() + 10 * 60 * 1000)
     });
 
-    await sendEmail(
-      user.email,
-      'Reset Your ModernPay Password',
-      `Hi ${user.fullName},\n\nYour password reset OTP is: ${otp}\nIt expires in 10 minutes.`
-    );
+    await sendEmail({
+      to: user.email,
+      subject: 'Reset Your ModernPay Password',
+      text: `Hi ${user.fullName},\n\nYour password reset OTP is: ${otp}\nIt expires in 10 minutes.`
+    });
 
     if (user.phone) {
       await sendSms(user.phone, `ModernPay reset OTP: ${otp}`);
