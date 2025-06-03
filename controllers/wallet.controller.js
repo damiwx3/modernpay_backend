@@ -2,6 +2,7 @@ const db = require('../models');
 const { v4: uuidv4 } = require('uuid');
 const logger = require('../utils/logger');
 const axios = require('axios');
+const bcrypt = require('bcryptjs');
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
@@ -70,7 +71,7 @@ exports.fundWallet = async (req, res) => {
         },
       }
     );
-    console.log('Paystack initialize response:', paystackRes.data); // <-- Add this line
+    console.log('Paystack initialize response:', paystackRes.data);
 
     // 3. Return authorization URL to frontend
     const { authorization_url, access_code, reference } = paystackRes.data.data;
@@ -85,6 +86,7 @@ exports.fundWallet = async (req, res) => {
     res.status(500).json({ message: 'Failed to initialize payment', error: err.response?.data || err.message });
   }
 };
+
 // 🔁 Transfer to another user via account number
 exports.transferFunds = async (req, res) => {
   if (!req.user || !req.user.id) {
@@ -143,19 +145,29 @@ exports.transferFunds = async (req, res) => {
   }
 };
 
-// 🏦 Transfer to Bank using Paystack
+// 🏦 Transfer to Bank using Paystack (with PIN validation)
 exports.transferToBank = async (req, res) => {
   if (!req.user || !req.user.id) {
     return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
   }
-  const { bankCode, accountNumber, amount, narration } = req.body;
+  const { bankCode, accountNumber, amount, narration, pin } = req.body;
   const value = parseFloat(amount);
 
-  if (!bankCode || !accountNumber || isNaN(value) || value <= 0) {
-    return res.status(400).json({ message: 'Invalid transfer input' });
+  if (!bankCode || !accountNumber || isNaN(value) || value <= 0 || !pin) {
+    return res.status(400).json({ message: 'Invalid transfer input. PIN is required.' });
   }
 
   try {
+    // 1. Validate PIN
+    const user = await db.User.findOne({ where: { id: req.user.id } });
+    if (!user || !user.transactionPin) {
+      return res.status(400).json({ message: 'Transaction PIN not set.' });
+    }
+    const pinMatch = await bcrypt.compare(pin, user.transactionPin);
+    if (!pinMatch) {
+      return res.status(401).json({ message: 'Incorrect transaction PIN.' });
+    }
+
     await checkRateLimitOrFraud(req.user.id, 'transferToBank');
     const wallet = await db.Wallet.findOne({ where: { userId: req.user.id } });
     if (!wallet || parseFloat(wallet.balance) < value) {
@@ -222,7 +234,7 @@ exports.transferToBank = async (req, res) => {
 // 🏦 Create Virtual Account using Paystack
 exports.createVirtualAccount = async (req, res) => {
   console.log('createVirtualAccount called', req.body);
-  const { email, firstName, lastName, preferred_bank, phone } = req.body; // <-- FIXED
+  const { email, firstName, lastName, preferred_bank, phone } = req.body;
   try {
     // 1. Check if user exists in your DB
     const user = await db.User.findOne({ where: { email } });
@@ -244,7 +256,7 @@ exports.createVirtualAccount = async (req, res) => {
           email,
           first_name: firstName,
           last_name: lastName,
-          phone, // <-- Add this line
+          phone,
         },
         {
           headers: {
@@ -264,11 +276,10 @@ exports.createVirtualAccount = async (req, res) => {
       'https://api.paystack.co/dedicated_account',
       {
         customer: customerCode,
-        preferred_bank: preferred_bank, // optional
+        preferred_bank: preferred_bank,
         first_name: firstName,
         last_name: lastName,
-        phone, // <-- Add this line
-        
+        phone,
       },
       {
         headers: {
@@ -281,18 +292,18 @@ exports.createVirtualAccount = async (req, res) => {
     // 5. Store returned account details in your DB
     const accountData = response.data.data;
     const savedAccount = await db.VirtualAccount.create({
-  userId: user.id,
-  accountNumber: accountData.account_number,
-  bankName: accountData.bank.name,
-  bankId: accountData.bank.id,
-  accountName: accountData.account_name,
-  paystackCustomerCode:
-    typeof accountData.customer === 'string'
-      ? accountData.customer
-      : accountData.customer?.customer_code || user.paystackCustomerCode,
-  paystackAccountId: accountData.id,
-  raw: accountData,
-});
+      userId: user.id,
+      accountNumber: accountData.account_number,
+      bankName: accountData.bank.name,
+      bankId: accountData.bank.id,
+      accountName: accountData.account_name,
+      paystackCustomerCode:
+        typeof accountData.customer === 'string'
+          ? accountData.customer
+          : accountData.customer?.customer_code || user.paystackCustomerCode,
+      paystackAccountId: accountData.id,
+      raw: accountData,
+    });
 
     res.status(200).json({ message: 'Virtual account created', account: savedAccount });
   } catch (err) {
@@ -301,8 +312,7 @@ exports.createVirtualAccount = async (req, res) => {
   }
 };
 
-const bcrypt = require('bcryptjs'); // At the top if not already
-
+// 🔒 Set Transaction PIN
 exports.setTransactionPin = async (req, res) => {
   if (!req.user || !req.user.id) {
     return res.status(401).json({ message: 'Unauthorized' });
