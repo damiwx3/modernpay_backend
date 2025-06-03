@@ -17,9 +17,18 @@ exports.register = async (req, res) => {
       });
     }
 
+    // Check for duplicate email
     const existing = await db.User.findOne({ where: { email } });
     if (existing) {
       return res.status(400).json({ message: 'Email already registered' });
+    }
+
+    // Check for duplicate phone number (if provided)
+    if (phone) {
+      const existingPhone = await db.User.findOne({ where: { phone } });
+      if (existingPhone) {
+        return res.status(400).json({ message: 'Phone number already registered' });
+      }
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
