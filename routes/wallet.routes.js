@@ -156,5 +156,6 @@ router.post('/transfer-to-bank', auth, walletController.transferToBank);
  *         description: Failed to create virtual account
  */
 router.post('/create-virtual-account', auth, walletController.createVirtualAccount);
+router.post('/set-pin', auth, walletController.setTransactionPin);
 
 module.exports = router;
