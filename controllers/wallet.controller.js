@@ -190,11 +190,13 @@ exports.transferToBank = async (req, res) => {
     const recipientCode = recipientRes.data.data.recipient_code;
 
     // 2. Initiate transfer
+    const displayName = (user.fullName || user.name || 'User').toUpperCase();
+    const formattedReason = 'ModernPay/${displayName}:${accountNumber}';
     const transferRes = await axios.post('https://api.paystack.co/transfer', {
       source: "balance",
       amount: Math.round(value * 100), // Paystack expects kobo
       recipient: recipientCode,
-      reason: narration || "Wallet withdrawal"
+      reason: formattedReason
     }, {
       headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` }
     });
@@ -214,7 +216,7 @@ if (
     type: 'debit',
     amount: value,
     reference: transferRes.data.data.reference,
-    description: `Transfer to bank (${accountNumber})`,
+    description: formattedReason,
     status: transferRes.data.data.status,
     category: 'Bank Transfer',
     senderName: req.user.name || null,
