@@ -156,6 +156,69 @@ router.post('/transfer-to-bank', auth, walletController.transferToBank);
  *         description: Failed to create virtual account
  */
 router.post('/create-virtual-account', auth, walletController.createVirtualAccount);
+/**
+ * @swagger
+ * /api/wallets/set-pin:
+ *   post:
+ *     summary: Set or update the user's transaction PIN
+ *     tags: [Wallet]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - pin
+ *             properties:
+ *               pin:
+ *                 type: string
+ *                 description: The new transaction PIN (minimum 4 digits)
+ *                 example: "1234"
+ *     responses:
+ *       200:
+ *         description: Transaction PIN set successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Transaction PIN set successfully
+ *       400:
+ *         description: Invalid PIN or missing PIN
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: PIN must be at least 4 digits
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Unauthorized
+ *       500:
+ *         description: Failed to set PIN
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Failed to set PIN
+ */
 router.post('/set-pin', auth, walletController.setTransactionPin);
 
 module.exports = router;
