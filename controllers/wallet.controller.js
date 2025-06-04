@@ -201,28 +201,32 @@ exports.transferToBank = async (req, res) => {
     console.log('Paystack transfer response:', transferRes.data);
 
     // Deduct from wallet if transfer is successful
-    if (transferRes.data.data.status === 'success' || transferRes.data.data.status === 'pending') {
-      wallet.balance = parseFloat(wallet.balance) - value;
-      await wallet.save();
+if (
+  transferRes.data.data.status === 'success' ||
+  transferRes.data.data.status === 'pending' ||
+  transferRes.data.data.status === 'received' // <-- add this
+) {
+  wallet.balance = parseFloat(wallet.balance) - value;
+  await wallet.save();
 
-      await db.Transaction.create({
-        userId: req.user.id,
-        type: 'debit',
-        amount: value,
-        reference: transferRes.data.data.reference,
-        description: `Transfer to bank (${accountNumber})`,
-        status: transferRes.data.data.status,
-        category: 'Bank Transfer',
-        senderName: req.user.name || null,
-        recipientName: recipientRes.data.data.details?.account_name || null,
-        recipientAccount: accountNumber,
-      });
+  await db.Transaction.create({
+    userId: req.user.id,
+    type: 'debit',
+    amount: value,
+    reference: transferRes.data.data.reference,
+    description: `Transfer to bank (${accountNumber})`,
+    status: transferRes.data.data.status,
+    category: 'Bank Transfer',
+    senderName: req.user.name || null,
+    recipientName: recipientRes.data.data.details?.account_name || null,
+    recipientAccount: accountNumber,
+  });
 
-      logWalletAction(req.user.id, 'transferToBank', { bankCode, accountNumber, amount: value });
-      return res.status(200).json({ message: 'Bank transfer initiated', transfer: transferRes.data.data });
-    } else {
-      return res.status(400).json({ message: 'Bank transfer failed', transfer: transferRes.data.data });
-    }
+  logWalletAction(req.user.id, 'transferToBank', { bankCode, accountNumber, amount: value });
+  return res.status(200).json({ message: 'Bank transfer initiated', transfer: transferRes.data.data });
+} else {
+  return res.status(400).json({ message: 'Bank transfer failed', transfer: transferRes.data.data });
+}
   } catch (err) {
     console.error('Bank transfer error:', err.response?.data || err.message);
     res.status(500).json({
