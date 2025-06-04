@@ -19,7 +19,7 @@ module.exports = (sequelize, DataTypes) => {
     address: { type: DataTypes.STRING },                    // For address
     selfieUrl: { type: DataTypes.STRING },                  // For selfie
     isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
-    pin: { type: DataTypes.STRING, allowNull: true },
+    transactionPin: { type: DataTypes.STRING, allowNull: true },
     twoFactorEnabled: { type: DataTypes.BOOLEAN, defaultValue: false },
     faceIdEnabled: { type: DataTypes.BOOLEAN, defaultValue: false } // <-- Add this line
   });
