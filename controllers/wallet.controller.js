@@ -41,7 +41,6 @@ exports.fundWallet = async (req, res) => {
   if (!req.user || !req.user.id) {
     return res.status(401).json({ message: 'Unauthorized: User not found in request.' });
   }
-
   const { amount } = req.body;
   const value = parseFloat(amount);
 
@@ -50,31 +49,21 @@ exports.fundWallet = async (req, res) => {
   }
 
   try {
-    // Get user
+    // 1. Get user email
     const user = await db.User.findOne({ where: { id: req.user.id } });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Log what's being sent to Paystack
-    const paystackAmount = Math.round(value * 100); // Kobo
-    console.log('Preparing Paystack transaction with:');
-    console.log({
-      email: user.email,
-      amount: paystackAmount,
-      callback_url: "https://modernpay-backend.onrender.com/approve-transfer",
-      secretKeyExists: !!PAYSTACK_SECRET_KEY,
-    });
-
-    // Initialize Paystack transaction
+    // 2. Initialize Paystack transaction
     const paystackRes = await axios.post(
       'https://api.paystack.co/transaction/initialize',
       {
         email: user.email,
-        amount: paystackAmount,
+        amount: Math.round(value * 100), // Paystack expects amount in kobo
         callback_url: "https://modernpay-backend.onrender.com/approve-transfer",
         metadata: {
           userId: user.id,
-          purpose: 'wallet_funding',
-        },
+          purpose: 'wallet_funding'
+        }
       },
       {
         headers: {
@@ -83,35 +72,22 @@ exports.fundWallet = async (req, res) => {
         },
       }
     );
-
     console.log('Paystack initialize response:', paystackRes.data);
 
-    // Return to frontend
+    // 3. Return authorization URL to frontend
     const { authorization_url, access_code, reference } = paystackRes.data.data;
     res.status(200).json({
-      status: true,
-      message: 'Payment initialized',
-      data: {
-        authorization_url,
-        access_code,
-        reference,
-      },
+      status: 'Payment initialized',
+      authorization_url,
+      access_code,
+      reference
     });
   } catch (err) {
-    console.error('Fund wallet error:', {
-      status: err.response?.status,
-      data: err.response?.data,
-      headers: err.response?.headers,
-      message: err.message,
-    });
-
-    res.status(500).json({
-      status: false,
-      message: 'Failed to initialize payment',
-      error: err.response?.data?.message || err.message,
-    });
+    console.error('Fund wallet error:', err.response?.data || err.message);
+    res.status(500).json({ message: 'Failed to initialize payment', error: err.response?.data || err.message });
   }
 };
+
 // 🔁 Transfer to another user via account number
 exports.transferFunds = async (req, res) => {
   if (!req.user || !req.user.id) {
