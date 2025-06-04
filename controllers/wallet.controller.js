@@ -77,7 +77,7 @@ exports.fundWallet = async (req, res) => {
     // 3. Return authorization URL to frontend
     const { authorization_url, access_code, reference } = paystackRes.data.data;
     res.status(200).json({
-      message: 'Payment initialized',
+      status: true,
       authorization_url,
       access_code,
       reference
