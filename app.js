@@ -25,7 +25,6 @@ const disputeRoutes = require('./routes/dispute.routes');
 const securityRoutes = require('./routes/security.routes');
 const notificationRoutes = require('./routes/notification.routes');
 
-
 // --- MIDDLEWARE: Place these at the very top, before any routes ---
 app.use(cors());
 app.use(express.json());
@@ -50,6 +49,7 @@ app.use('/api/wallets', walletRoutes);
 app.use('/api/contribution-cycles', contributionCycleRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/webhooks', require('./routes/webhook.routes'));
+//app.use('/', require('./routes/webhook.routes'));
 app.use('/api/virtual-cards', require('./routes/virtual_card.routes'));
 app.use('/api/system', require('./routes/system.routes'));
 app.use('/api/wallets', require('./routes/transaction.routes'));
@@ -64,6 +64,11 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Register modular routes (if you have grouped routes)
 app.use('/api', routes);
+
+// --- PAYSTACK APPROVAL ENDPOINT ---
+app.post('/approve-transfer', async (req, res) => {
+  res.status(200).json({ status: 'approved' });
+});
 
 // Default
 app.get('/', (req, res) => res.send('🌍 API Running'));
