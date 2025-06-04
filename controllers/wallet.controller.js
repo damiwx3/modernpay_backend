@@ -59,6 +59,7 @@ exports.fundWallet = async (req, res) => {
       {
         email: user.email,
         amount: Math.round(value * 100), // Paystack expects amount in kobo
+        callback_url: "https://modernpay-backend.onrender.com/approve-transfer",
         metadata: {
           userId: user.id,
           purpose: 'wallet_funding'
