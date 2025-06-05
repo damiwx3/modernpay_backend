@@ -117,7 +117,8 @@ exports.transferFunds = async (req, res) => {
     await senderWallet.save({ transaction: t });
     await recipientWallet.save({ transaction: t });
 
-   await db.Transaction.bulkCreate([
+   // ...existing code...
+await db.Transaction.bulkCreate([
   {
     userId: req.user.id,
     type: 'debit',
@@ -125,11 +126,12 @@ exports.transferFunds = async (req, res) => {
     reference: uuidv4(),
     description: `Transfer to ${recipientAccountNumber}`,
     status: 'success',
-    senderName: senderWallet.accountName || null,
+    category: 'Wallet Transfer',
+    senderName: senderWallet.accountName || req.user.name || null,
     senderAccountNumber: senderWallet.accountNumber || null,
     recipientName: recipientWallet.accountName || null,
     recipientAccount: recipientWallet.accountNumber || null,
-    category: 'Wallet Transfer',
+    bankName: null, // Not needed for wallet transfer
   },
   {
     userId: recipientWallet.userId,
@@ -138,13 +140,15 @@ exports.transferFunds = async (req, res) => {
     reference: uuidv4(),
     description: `Received from ${senderWallet.accountNumber}`,
     status: 'success',
+    category: 'Wallet Transfer',
     senderName: senderWallet.accountName || null,
     senderAccountNumber: senderWallet.accountNumber || null,
     recipientName: recipientWallet.accountName || null,
     recipientAccount: recipientWallet.accountNumber || null,
-    category: 'Wallet Transfer',
+    bankName: null,
   },
 ], { transaction: t });
+// ...existing code...
 
     await t.commit();
 
@@ -221,7 +225,8 @@ if (
   wallet.balance = parseFloat(wallet.balance) - value;
   await wallet.save();
 
-  await db.Transaction.create({
+  // ...existing code...
+await db.Transaction.create({
   userId: req.user.id,
   type: 'debit',
   amount: value,
@@ -233,8 +238,9 @@ if (
   senderAccountNumber: wallet.accountNumber || null,
   recipientName: recipientRes.data.data.details?.account_name || null,
   recipientAccount: accountNumber,
-  bankName: recipientRes.data.data.details?.bank_name || null, // optional, if you want to show bank
+  bankName: recipientRes.data.data.details?.bank_name || null,
 });
+// ...existing code...
 
   logWalletAction(req.user.id, 'transferToBank', { bankCode, accountNumber, amount: value });
   return res.status(200).json({ message: 'Bank transfer initiated', transfer: transferRes.data.data });
