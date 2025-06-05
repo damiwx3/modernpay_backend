@@ -357,11 +357,11 @@ exports.getTransactionByReference = async (req, res) => {
     return res.status(400).json({ message: 'Reference is required' });
   }
   try {
-    const transaction = await db.Transaction.findOne({ where: { reference } });
+    const transaction = await db.Transaction.findOne({ where: { reference }, raw: true }); // <-- Add raw: true
     if (!transaction) {
       return res.status(404).json({ message: 'Transaction not found' });
     }
-    res.status(200).json({ transaction });
+    res.status(200).json(transaction); // <-- Return plain object, not { transaction }
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch transaction', error: err.message });
   }
