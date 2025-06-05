@@ -220,5 +220,64 @@ router.post('/create-virtual-account', auth, walletController.createVirtualAccou
  *                   example: Failed to set PIN
  */
 router.post('/set-pin', auth, walletController.setTransactionPin);
+/**
+ * @swagger
+ * /api/wallets/transaction/{reference}:
+ *   get:
+ *     summary: Get a transaction by reference
+ *     tags: [Wallet]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: reference
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: The transaction reference
+ *     responses:
+ *       200:
+ *         description: Transaction found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 transaction:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     userId:
+ *                       type: integer
+ *                     type:
+ *                       type: string
+ *                     amount:
+ *                       type: number
+ *                     reference:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                     category:
+ *                       type: string
+ *                     senderName:
+ *                       type: string
+ *                     recipientName:
+ *                       type: string
+ *                     recipientAccount:
+ *                       type: string
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *       400:
+ *         description: Reference is required
+ *       404:
+ *         description: Transaction not found
+ *       500:
+ *         description: Failed to fetch transaction
+ */
+router.get('/transaction/:reference', auth, walletController.getTransactionByReference);
 
 module.exports = router;
