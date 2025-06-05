@@ -222,17 +222,19 @@ if (
   await wallet.save();
 
   await db.Transaction.create({
-    userId: req.user.id,
-    type: 'debit',
-    amount: value,
-    reference: transferRes.data.data.reference,
-    description: formattedReason,
-    status: transferRes.data.data.status,
-    category: 'Bank Transfer',
-    senderName: req.user.name || null,
-    recipientName: recipientRes.data.data.details?.account_name || null,
-    recipientAccount: accountNumber,
-  });
+  userId: req.user.id,
+  type: 'debit',
+  amount: value,
+  reference: transferRes.data.data.reference,
+  description: formattedReason,
+  status: transferRes.data.data.status,
+  category: 'Bank Transfer',
+  senderName: wallet.accountName || req.user.name || null,
+  senderAccountNumber: wallet.accountNumber || null,
+  recipientName: recipientRes.data.data.details?.account_name || null,
+  recipientAccount: accountNumber,
+  bankName: recipientRes.data.data.details?.bank_name || null, // optional, if you want to show bank
+});
 
   logWalletAction(req.user.id, 'transferToBank', { bankCode, accountNumber, amount: value });
   return res.status(200).json({ message: 'Bank transfer initiated', transfer: transferRes.data.data });
