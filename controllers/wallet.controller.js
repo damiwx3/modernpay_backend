@@ -339,3 +339,20 @@ exports.setTransactionPin = async (req, res) => {
     res.status(500).json({ message: 'Failed to set PIN', error: err.message });
   }
 };
+
+// 📄 Get Transaction by Reference
+exports.getTransactionByReference = async (req, res) => {
+  const { reference } = req.params;
+  if (!reference) {
+    return res.status(400).json({ message: 'Reference is required' });
+  }
+  try {
+    const transaction = await db.Transaction.findOne({ where: { reference } });
+    if (!transaction) {
+      return res.status(404).json({ message: 'Transaction not found' });
+    }
+    res.status(200).json({ transaction });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch transaction', error: err.message });
+  }
+};
