@@ -117,24 +117,34 @@ exports.transferFunds = async (req, res) => {
     await senderWallet.save({ transaction: t });
     await recipientWallet.save({ transaction: t });
 
-    await db.Transaction.bulkCreate([
-      {
-        userId: req.user.id,
-        type: 'debit',
-        amount: value,
-        reference: uuidv4(),
-        description: `Transfer to ${recipientAccountNumber}`,
-        status: 'success',
-      },
-      {
-        userId: recipientWallet.userId,
-        type: 'credit',
-        amount: value,
-        reference: uuidv4(),
-        description: `Received from ${senderWallet.accountNumber}`,
-        status: 'success',
-      },
-    ], { transaction: t });
+   await db.Transaction.bulkCreate([
+  {
+    userId: req.user.id,
+    type: 'debit',
+    amount: value,
+    reference: uuidv4(),
+    description: `Transfer to ${recipientAccountNumber}`,
+    status: 'success',
+    senderName: senderWallet.accountName || null,
+    senderAccountNumber: senderWallet.accountNumber || null,
+    recipientName: recipientWallet.accountName || null,
+    recipientAccount: recipientWallet.accountNumber || null,
+    category: 'Wallet Transfer',
+  },
+  {
+    userId: recipientWallet.userId,
+    type: 'credit',
+    amount: value,
+    reference: uuidv4(),
+    description: `Received from ${senderWallet.accountNumber}`,
+    status: 'success',
+    senderName: senderWallet.accountName || null,
+    senderAccountNumber: senderWallet.accountNumber || null,
+    recipientName: recipientWallet.accountName || null,
+    recipientAccount: recipientWallet.accountNumber || null,
+    category: 'Wallet Transfer',
+  },
+], { transaction: t });
 
     await t.commit();
 
