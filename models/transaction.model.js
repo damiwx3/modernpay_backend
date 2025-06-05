@@ -7,7 +7,12 @@ module.exports = (sequelize, DataTypes) => {
     description: { type: DataTypes.STRING },
     reference: { type: DataTypes.STRING, unique: true },
     status: { type: DataTypes.STRING, defaultValue: 'success' },
-    category: { type: DataTypes.STRING }, // <-- Add this line
+    category: { type: DataTypes.STRING },
+    senderName: { type: DataTypes.STRING },           // <-- Add
+    senderAccountNumber: { type: DataTypes.STRING },  // <-- Add
+    recipientName: { type: DataTypes.STRING },        // <-- Add
+    recipientAccount: { type: DataTypes.STRING },     // <-- Add
+    bankName: { type: DataTypes.STRING },             // <-- Optional, for bank transfers
   });
   return Transaction;
 };
