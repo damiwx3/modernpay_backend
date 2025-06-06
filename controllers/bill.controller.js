@@ -1,212 +1,357 @@
 const db = require('../models');
-const vtpassAxios = require('../utils/vtpass');
+const { Op } = require('sequelize');
+const sendEmail = require('../utils/sendEmail');
 
-// 1. List all VTPass services
-let cachedServices = null;
-let lastFetchTime = 0;
-
-exports.getCategories = async (req, res) => {
+// Create a new contribution group
+exports.createGroup = async (req, res) => {
   try {
-    const now = Date.now();
-    // Refresh cache every 10 minutes
-    if (!cachedServices || now - lastFetchTime > 10 * 60 * 1000) {
-      const vtpassRes = await vtpassAxios.get('/service-categories');
-      cachedServices = vtpassRes.data.content;
-      lastFetchTime = now;
-    }
-    res.status(200).json({ categories: cachedServices });
-  } catch (err) {
-    console.error('VTPass error (getCategories):', err.response?.data || err.message);
-    if (cachedServices) {
-      res.status(200).json({ categories: cachedServices, warning: 'Serving cached data' });
-    } else {
-      res.status(500).json({ message: 'Failed to fetch categories', error: err.message });
-    }
-  }
-};
+    const { name, amountPerMember, frequency, payoutSchedule, description, maxMembers } = req.body;
 
-// 2. Get Airtime categories (filter from /services)
-exports.getAirtimeCategories = async (req, res) => {
-  try {
-    const vtpassRes = await vtpassAxios.get('/services?identifier=airtime');
-    if (!Array.isArray(vtpassRes.data.content)) {
-      return res.status(500).json({ message: 'VTPass /services error', error: vtpassRes.data });
+    if (!name || !amountPerMember) {
+      return res.status(400).json({ message: 'Name and amountPerMember are required' });
     }
-    const mapped = vtpassRes.data.content.map(item => ({
-      code: item.serviceID,
-      name: item.name,
-      minAmount: item.minimium_amount,
-      maxAmount: item.maximum_amount,
-      fee: item.convinience_fee,
-      type: item.product_type,
-      image: item.image,
-    }));
-    res.json({ categories: mapped });
-  } catch (err) {
-    console.error('VTPass error (getAirtimeCategories):', err.response?.data || err.message);
-    res.status(500).json({ message: 'Failed to fetch airtime categories', error: err.message });
-  }
-};
 
-// 3. Get Data categories (filter from /services)
-exports.getDataCategories = async (req, res) => {
-  try {
-    const vtpassRes = await vtpassAxios.get('/services?identifier=data');
-    if (!Array.isArray(vtpassRes.data.content)) {
-      return res.status(500).json({ message: 'VTPass /services error', error: vtpassRes.data });
+    let imageUrl = null;
+    if (req.file) {
+      imageUrl = req.file.path;
     }
-    const mapped = vtpassRes.data.content.map(item => ({
-      ...item,
-      biller_code: item.serviceID,
-    }));
-    res.json({ categories: mapped });
-  } catch (err) {
-    console.error('VTPass error (getDataCategories):', err.response?.data || err.message);
-    res.status(500).json({ message: 'Failed to fetch data categories', error: err.message });
-  }
-};
 
-// 4. Validate customer (e.g. smartcard, meter, etc.)
-exports.validateCustomer = async (req, res) => {
-  const { serviceID, billersCode, type } = req.body;
-  if (!serviceID || !billersCode) {
-    return res.status(400).json({ message: 'serviceID and billersCode are required' });
-  }
-  try {
-    const response = await vtpassAxios.post('/merchant-verify', {
-      serviceID,
-      billersCode,
-      type
+    const group = await db.ContributionGroup.create({
+      name,
+      description: description || null,
+      amountPerMember: parseFloat(amountPerMember),
+      frequency,
+      payoutSchedule,
+      imageUrl,
+      createdBy: req.user.id,
+      maxMembers: maxMembers ? parseInt(maxMembers) : 10,
+      status: 'active'
     });
-    res.json(response.data);
-  } catch (err) {
-    console.error('VTPass error (validateCustomer):', err.response?.data || err.message);
-    res.status(500).json({ message: 'VTPass validation failed', error: err.message });
-  }
-};
 
-// 5. Pay a bill (Airtime, Data, Electricity, TV, etc.)
-exports.payBill = async (req, res) => {
-  const { serviceID, billersCode, variation_code, amount, phone } = req.body;
-  if (!serviceID || !billersCode || !amount || !phone) {
-    return res.status(400).json({ message: 'Missing required fields' });
-  }
-  try {
-    const request_id = `BILL-${Date.now()}`;
-    const payload = {
-      request_id,
-      serviceID,
-      billersCode,
-      variation_code,
-      amount,
-      phone
-    };
-    const response = await vtpassAxios.post('/pay', payload);
-
-    await db.BillPayment.create({
+    // Automatically add the creator as a member
+    await db.ContributionMember.create({
       userId: req.user.id,
-      serviceType: serviceID,
-      amount,
-      reference: request_id,
-      status: response.data.code === '000' ? 'success' : 'failed',
-      customer: billersCode,
-      responseData: response.data,
-      paidAt: response.data.code === '000' ? new Date() : null
+      groupId: group.id
     });
 
-    res.status(201).json({
-      message: response.data.response_description,
-      status: response.data.code === '000' ? 'success' : 'failed',
-      data: response.data,
-      reference: request_id
-    });
+    res.status(201).json({ message: 'Group created successfully', group });
   } catch (err) {
-    console.error('VTPass error (payBill):', err.response?.data || err.message);
-    res.status(500).json({ message: 'VTPass payment failed', error: err.message });
+    console.error('Create group error:', err);
+    res.status(500).json({ message: 'Create group failed', error: err.message });
   }
 };
 
-// 6. Fetch user bill history
-exports.getHistory = async (req, res) => {
+// Send group invite by user ID or email, and send email if email is provided
+exports.sendGroupInvite = async (req, res) => {
   try {
-    const history = await db.BillPayment.findAll({
+    const groupId = req.params.groupId;
+    const { invitedUserId, email } = req.body;
+
+    // Invite by user ID
+    if (invitedUserId) {
+      const invite = await db.ContributionInvite.create({
+        groupId,
+        invitedBy: req.user.id,
+        invitedUserId,
+        status: 'pending'
+      });
+      return res.status(201).json({ message: 'Invitation sent by user ID', invite });
+    }
+
+    // Invite by email
+    if (email) {
+      const user = await db.User.findOne({ where: { email } });
+      if (!user) {
+        return res.status(404).json({ message: 'No user found with that email' });
+      }
+      const invite = await db.ContributionInvite.create({
+        groupId,
+        invitedBy: req.user.id,
+        invitedUserId: user.id,
+        status: 'pending'
+      });
+
+      // Generate invite link (customize as needed)
+      const inviteLink = `https://modernpay-backend.onrender.com/invite/${invite.id}`;
+
+      // Send email
+      await sendEmail({
+        to: email,
+        subject: 'You have been invited to join a group!',
+        text: `You have been invited to join a group. Click this link to accept the invite: ${inviteLink}`,
+        html: `<p>You have been invited to join a group. Click <a href="${inviteLink}">here</a> to accept the invite.</p>`
+      });
+
+      return res.status(201).json({ message: 'Invitation sent by email', invite });
+    }
+
+    // If neither provided
+    return res.status(400).json({ message: 'Provide invitedUserId or email' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to send invite', error: err.message });
+  }
+};
+
+exports.respondToInvite = async (req, res) => {
+  try {
+    const { inviteId } = req.params;
+    const { action } = req.body; // 'accepted' or 'declined'
+    const invite = await db.ContributionInvite.findByPk(inviteId);
+    if (!invite) return res.status(404).json({ message: 'Invite not found' });
+    invite.status = action;
+    await invite.save();
+    if (action === 'accepted') {
+      await db.ContributionMember.create({
+        userId: invite.invitedUserId,
+        groupId: invite.groupId
+      });
+    }
+    res.status(200).json({ message: `Invite ${action}` });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to respond to invite', error: err.message });
+  }
+};
+
+exports.addContact = async (req, res) => {
+  try {
+    const { contactUserId } = req.body;
+    const contact = await db.UserContact.create({
+      userId: req.user.id,
+      contactUserId
+    });
+    res.status(201).json({ message: 'Contact added', contact });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to add contact', error: err.message });
+  }
+};
+
+// Update a contribution group
+exports.updateGroup = async (req, res) => {
+  try {
+    const groupId = req.params.groupId;
+    const updateFields = req.body;
+    const updatedGroup = await db.ContributionGroup.updateGroup(groupId, updateFields);
+    res.status(200).json({ message: 'Group updated successfully', group: updatedGroup });
+  } catch (err) {
+    res.status(400).json({ message: 'Update failed', error: err.message });
+  }
+};
+
+// Join a contribution group
+exports.joinGroup = async (req, res) => {
+  try {
+    const groupId = req.params.groupId;
+    const group = await db.ContributionGroup.findByPk(groupId);
+    if (!group) return res.status(404).json({ message: 'Group not found' });
+
+    // Check if group is full
+    const memberCount = await db.ContributionMember.count({ where: { groupId } });
+    if (memberCount >= group.maxMembers) {
+      return res.status(400).json({ message: 'Group is full' });
+    }
+
+    const existing = await db.ContributionMember.findOne({
+      where: { userId: req.user.id, groupId }
+    });
+    if (existing) return res.status(400).json({ message: 'Already joined' });
+
+    const member = await db.ContributionMember.create({
+      userId: req.user.id,
+      groupId
+    });
+    res.status(200).json({ message: 'Joined group', member });
+  } catch (err) {
+    res.status(500).json({ message: 'Join failed', error: err.message });
+  }
+};
+
+// Make a contribution
+exports.makeContribution = async (req, res) => {
+  const t = await db.sequelize.transaction();
+  try {
+    const { cycleId, amount } = req.body;
+    const member = await db.ContributionMember.findOne({
       where: { userId: req.user.id },
-      order: [['createdAt', 'DESC']]
+      transaction: t
     });
-    res.status(200).json({ history });
-  } catch (err) {
-    console.error('VTPass error (getHistory):', err.response?.data || err.message);
-    res.status(500).json({ message: 'Failed to fetch history', error: err.message });
-  }
-};
+    if (!member) {
+      await t.rollback();
+      return res.status(404).json({ message: 'Not a group member' });
+    }
 
-// 7. Get bundles/variations for a service
-exports.getBundles = async (req, res) => {
-  const serviceID = req.params.serviceID || req.query.serviceID;
-  if (!serviceID) {
-    return res.status(400).json({ message: 'serviceID is required' });
-  }
-  try {
-    const response = await vtpassAxios.get(`/service-variations?serviceID=${serviceID}`);
-    res.status(200).json({ bundles: response.data.content.variations });
-  } catch (err) {
-    console.error('VTPass error (getBundles):', err.response?.data || err.message);
-    res.status(500).json({ message: 'Failed to load bundles', error: err.message });
-  }
-};
+    const cycle = await db.ContributionCycle.findByPk(cycleId, { transaction: t });
+    if (!cycle) {
+      await t.rollback();
+      return res.status(404).json({ message: 'Cycle not found' });
+    }
 
-// 8. Purchase MTN VTU Airtime
-exports.purchaseMtnVtu = async (req, res) => {
-  const { amount, phone } = req.body;
-  if (!amount || !phone) {
-    return res.status(400).json({ message: 'amount and phone are required' });
-  }
-  try {
-    const request_id = `MTNVTU-${Date.now()}`;
-    const payload = {
-      request_id,
-      serviceID: 'mtn',
+    // Optionally: check if already contributed
+    const existing = await db.ContributionPayment.findOne({
+      where: { memberId: member.id, cycleId },
+      transaction: t
+    });
+    if (existing) {
+      await t.rollback();
+      return res.status(400).json({ message: 'Already contributed for this cycle' });
+    }
+
+    // Check wallet balance
+    const wallet = await db.Wallet.findOne({ where: { userId: req.user.id }, transaction: t });
+    if (!wallet || parseFloat(wallet.balance) < parseFloat(amount)) {
+      await t.rollback();
+      return res.status(400).json({ message: 'Insufficient wallet balance' });
+    }
+
+    // Debug logs to check balance update
+    console.log('Before:', wallet.balance, amount);
+    wallet.balance = parseFloat(wallet.balance) - parseFloat(amount);
+    console.log('After:', wallet.balance);
+
+    await wallet.save({ transaction: t });
+
+    // Create payment record
+    const payment = await db.ContributionPayment.create({
+      memberId: member.id,
+      cycleId,
       amount,
-      phone,
-      billersCode: phone // <-- This is required by VTPass for airtime!
-    };
-    const response = await vtpassAxios.post('/pay', payload);
+      status: 'paid',
+      paidAt: new Date()
+    }, { transaction: t });
 
-    await db.BillPayment.create({
-      userId: req.user.id,
-      serviceType: 'mtn',
-      amount,
-      reference: request_id,
-      status: response.data.code === '000' ? 'success' : 'failed',
-      customer: phone,
-      responseData: response.data,
-      paidAt: response.data.code === '000' ? new Date() : null
-    });
-
-    res.status(201).json({
-      message: response.data.response_description,
-      status: response.data.code === '000' ? 'success' : 'failed',
-      data: response.data,
-      reference: request_id
-    });
+    await t.commit();
+    res.status(201).json({ message: 'Contribution made', payment, newWalletBalance: wallet.balance });
   } catch (err) {
-    console.error('VTPass error (purchaseMtnVtu):', err.response?.data || err.message);
-    res.status(500).json({ message: 'MTN VTU purchase failed', error: err.message });
+    if (t) await t.rollback();
+    res.status(500).json({ message: 'Contribution failed', error: err.message });
   }
 };
 
-// 9. Query VTU Transaction Status
-exports.queryVtuStatus = async (req, res) => {
-  const { request_id } = req.body;
-  if (!request_id) {
-    return res.status(400).json({ message: 'request_id is required' });
-  }
+// Leave a group
+exports.leaveGroup = async (req, res) => {
   try {
-    const payload = { request_id };
-    const response = await vtpassAxios.post('/requery', payload);
-    res.status(200).json(response.data);
+    const groupId = req.params.groupId;
+    const member = await db.ContributionMember.findOne({
+      where: { userId: req.user.id, groupId }
+    });
+    if (!member) return res.status(404).json({ message: 'Not a group member' });
+
+    await member.destroy();
+    res.status(200).json({ message: 'Left group successfully' });
   } catch (err) {
-    console.error('VTPass error (queryVtuStatus):', err.response?.data || err.message);
-    res.status(500).json({ message: 'Failed to query VTU status', error: err.message });
+    res.status(500).json({ message: 'Leave group failed', error: err.message });
+  }
+};
+
+// Get all groups
+exports.getGroups = async (req, res) => {
+  try {
+    const groups = await db.ContributionGroup.findAll();
+    res.status(200).json({ groups });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch groups', error: err.message });
+  }
+};
+
+// Get members of a group
+exports.getMembers = async (req, res) => {
+  try {
+    const members = await db.ContributionMember.findAll({
+      where: { groupId: req.params.groupId },
+      include: [{ model: db.User, attributes: ['fullName', 'email'] }]
+    });
+    res.status(200).json({ members });
+  } catch (err) {
+    res.status(500).json({ message: 'Fetch members failed', error: err.message });
+  }
+};
+
+// Run scheduler
+exports.runScheduler = async (req, res) => {
+  try {
+    const scheduler = require('../jobs/contributionScheduler');
+    scheduler(true); // trigger manually
+    res.status(200).json({ message: 'Scheduler triggered manually' });
+  } catch (err) {
+    res.status(500).json({ message: 'Scheduler failed', error: err.message });
+  }
+};
+
+// Process payout for a group
+exports.processPayout = async (req, res) => {
+  const groupId = req.params.groupId;
+
+  try {
+    const group = await db.ContributionGroup.findByPk(groupId);
+    if (!group) return res.status(404).json({ message: 'Group not found' });
+
+    // Custom logic: randomly pick or use cycleNumber to choose member
+    const cycle = await db.ContributionCycle.findOne({
+      where: { groupId, status: 'open' }
+    });
+
+    if (!cycle) return res.status(404).json({ message: 'No active cycle' });
+
+    const members = await db.ContributionMember.findAll({ where: { groupId } });
+
+    // For demo: Pick first member
+    const winner = members[0];
+
+    await db.ContributionPayment.create({
+      memberId: winner.id,
+      cycleId: cycle.id,
+      amount: group.amountPerMember,
+      status: 'paid',
+      paidAt: new Date()
+    });
+
+    cycle.status = 'closed';
+    await cycle.save();
+
+    res.status(200).json({ message: `Payout sent to member ${winner.id}` });
+  } catch (err) {
+    res.status(500).json({ message: 'Payout failed', error: err.message });
+  }
+};
+
+// Get group summary
+exports.getGroupSummary = async (req, res) => {
+  const groupId = req.params.groupId;
+
+  try {
+    const group = await db.ContributionGroup.findByPk(groupId);
+    if (!group) return res.status(404).json({ message: 'Group not found' });
+
+    const members = await db.ContributionMember.findAll({ where: { groupId } });
+    const cycles = await db.ContributionCycle.findAll({ where: { groupId } });
+    const payments = await db.ContributionPayment.findAll({
+      where: { cycleId: { [Op.in]: cycles.map(c => c.id) } }
+    });
+
+    // Calculate summary fields
+    const totalContributions = payments
+      .filter(p => p.status === 'paid')
+      .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+    const cyclesCompleted = cycles.filter(c => c.status === 'closed').length;
+
+    // Build history list
+    const history = cycles.map(cycle => {
+      const cyclePayments = payments.filter(p => p.cycleId === cycle.id && p.status === 'paid');
+      return {
+        cycle: cycle.cycleNumber,
+        amount: cyclePayments.reduce((sum, p) => sum + parseFloat(p.amount), 0),
+        date: cycle.updatedAt ? cycle.updatedAt.toISOString().split('T')[0] : null
+      };
+    });
+
+    res.status(200).json({
+      totalContributions,
+      totalMembers: members.length,
+      cyclesCompleted,
+      history,
+      group // Optionally include full group info
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch summary', error: err.message });
   }
 };
