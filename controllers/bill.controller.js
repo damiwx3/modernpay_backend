@@ -1,237 +1,117 @@
 const db = require('../models');
-const axios = require('axios');
+const vtpassAxios = require('../utils/vtpass');
 
-const FLW_BASE = 'https://api.flutterwave.com/v3';
-const HEADERS = {
-  Authorization: `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}`,
-  'Content-Type': 'application/json'
-};
-
-// List all bill categories from Flutterwave
+// 1. List all VTPass services
 exports.getCategories = async (req, res) => {
   try {
-    const flutterRes = await axios.get(`${FLW_BASE}/bill-categories`, { headers: HEADERS });
-    res.status(200).json({ categories: flutterRes.data.data });
+    const vtpassRes = await vtpassAxios.get('/services');
+    res.status(200).json({ categories: vtpassRes.data.content });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch categories', error: err.message });
   }
 };
 
-// Airtime for Nigeria only (MTN, GLO, Airtel, 9mobile)
+// 2. Get Airtime categories (filter from /services)
 exports.getAirtimeCategories = async (req, res) => {
-  const airtimeNetworks = [
-    { biller_code: 'BIL101', name: 'MTN' },
-    { biller_code: 'BIL102', name: 'GLO' },
-    { biller_code: 'BIL103', name: 'AIRTEL' },
-    { biller_code: 'BIL104', name: '9MOBILE' },
-  ];
-  res.json({ categories: airtimeNetworks }); // <-- wrap in object
-};
-
-exports.getDataBillersWithBundles = async (req, res) => {
   try {
-    const flutterRes = await axios.get(`${FLW_BASE}/bill-categories`, { headers: HEADERS });
-    const dataBillers = flutterRes.data.data.filter(
-      cat =>
-        cat.country === 'NG' &&
-        cat.is_airtime === false &&
-        (
-          (cat.name && cat.name.toLowerCase().includes('data')) ||
-          (cat.biller_name && cat.biller_name.toLowerCase().includes('data'))
-        )
-    );
-    // Check which billers have bundles
-    const billersWithBundles = [];
-    for (const biller of dataBillers) {
-      try {
-        const bundlesRes = await axios.get(`${FLW_BASE}/bill-items?biller_code=${biller.biller_code}`, { headers: HEADERS });
-        if (Array.isArray(bundlesRes.data.data) && bundlesRes.data.data.length > 0) {
-          billersWithBundles.push(biller);
-        }
-      } catch (e) {
-        // Ignore billers with 404 or errors
-      }
-    }
-    res.status(200).json({ categories: billersWithBundles });
+    const vtpassRes = await vtpassAxios.get('/services');
+    const airtime = vtpassRes.data.content.filter(s => s.service_type === 'airtime');
+    res.json({ categories: airtime });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch data billers', error: err.message });
+    res.status(500).json({ message: 'Failed to fetch airtime categories', error: err.message });
   }
 };
 
-// Data for Nigeria only (MTN, GLO, Airtel, 9mobile)
+// 3. Get Data categories (filter from /services)
 exports.getDataCategories = async (req, res) => {
   try {
-    const flutterRes = await axios.get(`${FLW_BASE}/bill-categories`, { headers: HEADERS });
-    console.log('FLW bill-categories:', flutterRes.data.data);
-
-    // Broader filter: Nigerian, not airtime, and name or biller_name contains 'data'
-    const data = flutterRes.data.data.filter(
-      cat =>
-        cat.country === 'NG' &&
-        cat.is_airtime === false &&
-        (
-          (cat.name && cat.name.toLowerCase().includes('data')) ||
-          (cat.biller_name && cat.biller_name.toLowerCase().includes('data'))
-        )
-    );
-    console.log('Filtered data categories:', data);
-
-    res.status(200).json({ categories: data });
+    const vtpassRes = await vtpassAxios.get('/services');
+    const data = vtpassRes.data.content.filter(s => s.service_type === 'data');
+    res.json({ categories: data });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch data categories', error: err.message });
   }
 };
 
-// Other Nigerian bills (excluding airtime/data)
-exports.getNigerianBills = async (req, res) => {
-  try {
-    const flutterRes = await axios.get(`${FLW_BASE}/bill-categories`, { headers: HEADERS });
-    const bills = flutterRes.data.data.filter(
-      cat =>
-        cat.country === 'NG' &&
-        !(cat.biller_code && (cat.biller_code.toUpperCase().includes('AIRTIME') || cat.biller_code.toUpperCase().includes('DATA')))
-    );
-    res.status(200).json({ categories: bills });
-  } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch Nigerian bills', error: err.message });
-  }
-};
-
-// All other bills (not Nigerian or not airtime/data)
-exports.getOtherBills = async (req, res) => {
-  try {
-    const flutterRes = await axios.get(`${FLW_BASE}/bill-categories`, { headers: HEADERS });
-    const bills = flutterRes.data.data.filter(
-      cat =>
-        cat.country !== 'NG' ||
-        (
-          cat.biller_code &&
-          !cat.biller_code.toUpperCase().includes('AIRTIME') &&
-          !cat.biller_code.toUpperCase().includes('DATA')
-        )
-    );
-    res.status(200).json({ categories: bills });
-  } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch other bills', error: err.message });
-  }
-};
-
-// Validate customer (smartcard, phone, meter, etc.)
+// 4. Validate customer (e.g. smartcard, meter, etc.)
 exports.validateCustomer = async (req, res) => {
-  const { serviceType, customer } = req.body;
-
-  if (!serviceType || !customer) {
-    return res.status(400).json({ message: 'Service type and customer number are required' });
+  const { serviceID, billersCode, type } = req.body;
+  if (!serviceID || !billersCode) {
+    return res.status(400).json({ message: 'serviceID and billersCode are required' });
   }
-
   try {
-    const response = await axios.post(
-      `${FLW_BASE}/bill-items/validate`,
-      {
-        item_code: serviceType,
-        code: customer,
-        customer: customer
-      },
-      { headers: HEADERS }
-    );
-
-    const result = response.data;
-
-    if (result.status === 'success') {
-      return res.status(200).json({ message: result.message, data: result.data });
-    } else {
-      return res.status(400).json({ message: result.message || 'Validation failed' });
-    }
+    const response = await vtpassAxios.post('/merchant-verify', {
+      serviceID,
+      billersCode,
+      type
+    });
+    res.json(response.data);
   } catch (err) {
-    return res.status(500).json({ message: 'Validation error', error: err.message });
+    res.status(500).json({ message: 'VTPass validation failed', error: err.message });
   }
 };
 
-// Pay a bill (Airtime, Data, Electricity, TV, etc.)
-// ...existing code...
-
-// Pay a bill (Airtime, Data, Electricity, TV, etc.)
+// 5. Pay a bill (Airtime, Data, Electricity, TV, etc.)
 exports.payBill = async (req, res) => {
-  const { serviceType, amount, customer } = req.body;
-
-  if (!serviceType || !amount || !customer) {
-    return res.status(400).json({ message: 'Service type, amount, and customer number are required' });
+  const { serviceID, billersCode, variation_code, amount, phone } = req.body;
+  if (!serviceID || !billersCode || !amount || !phone) {
+    return res.status(400).json({ message: 'Missing required fields' });
   }
-
   try {
-    const reference = `BILL-${Date.now()}`;
-
-    // Flutterwave request
+    const request_id = `BILL-${Date.now()}`;
     const payload = {
-      country: "NG",
-      customer,
+      request_id,
+      serviceID,
+      billersCode,
+      variation_code,
       amount,
-      recurrence: "ONCE",
-      type: serviceType,
-      reference
+      phone
     };
-
-    const flwRes = await axios.post(`${FLW_BASE}/bills`, payload, { headers: HEADERS });
-
-    const response = flwRes.data;
-    const status = response.status === 'success' ? 'success' : 'failed';
+    const response = await vtpassAxios.post('/pay', payload);
 
     // Save record
     await db.BillPayment.create({
       userId: req.user.id,
-      serviceType,
+      serviceType: serviceID,
       amount,
-      reference,
-      status
+      reference: request_id,
+      status: response.data.code === '000' ? 'success' : 'failed'
     });
 
     res.status(201).json({
-      message: response.message,
-      status,
+      message: response.data.response_description,
+      status: response.data.code === '000' ? 'success' : 'failed',
       data: response.data,
-      reference
+      reference: request_id
     });
-
   } catch (err) {
-    console.error('Bill payment failed:', err.response?.data || err.message);
-    res.status(500).json({ message: 'Bill payment failed', error: err.response?.data || err.message });
+    res.status(500).json({ message: 'VTPass payment failed', error: err.message });
   }
 };
 
-// ...existing code...
-// Fetch user bill history
+// 6. Fetch user bill history
 exports.getHistory = async (req, res) => {
   try {
     const history = await db.BillPayment.findAll({
       where: { userId: req.user.id },
       order: [['createdAt', 'DESC']]
     });
-
     res.status(200).json({ history });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch history', error: err.message });
   }
 };
 
-// Get bundles (for data, TV, etc.)
+// 7. Get bundles/variations for a service
 exports.getBundles = async (req, res) => {
-  const billerCode = req.params.billerCode || req.query.biller_code;
-
-  if (!billerCode) {
-    return res.status(400).json({ message: 'Biller code is required' });
+  const serviceID = req.params.serviceID || req.query.serviceID;
+  if (!serviceID) {
+    return res.status(400).json({ message: 'serviceID is required' });
   }
-
   try {
-    console.log('Fetching bundles for billerCode:', billerCode); // <-- Add this
-    console.log('Using FLW key:', process.env.FLUTTERWAVE_SECRET_KEY); // <-- Add this
-    const response = await axios.get(`${FLW_BASE}/bill-items?biller_code=${billerCode}`, {
-      headers: HEADERS,
-    });
-    console.log('Flutterwave response:', response.data); // <-- And this
-
-    res.status(200).json({ bundles: response.data.data });
+    const response = await vtpassAxios.get(`/service-variations?serviceID=${serviceID}`);
+    res.status(200).json({ bundles: response.data.content.variations });
   } catch (err) {
-    console.error('Error loading bundles:', err.message); // <-- And this
     res.status(500).json({ message: 'Failed to load bundles', error: err.message });
   }
 };
