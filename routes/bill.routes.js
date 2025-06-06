@@ -149,5 +149,6 @@ router.get('/bundles/:serviceID', auth, controller.getBundles);
 
 router.post('/mtn-vtu', billController.purchaseMtnVtu);
 router.post('/vtu-status', billController.queryVtuStatus);
+router.get('/services-by-category', billController.getServicesByCategory);
 
 module.exports = router;
