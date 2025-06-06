@@ -93,16 +93,19 @@ exports.payBill = async (req, res) => {
   }
   try {
     const request_id = `BILL-${Date.now()}`;
+    // For airtime, do not send variation_code if not needed
     const payload = {
       request_id,
       serviceID,
       billersCode,
-      variation_code,
       amount,
       phone
     };
+    if (variation_code) {
+      payload.variation_code = variation_code;
+    }
     const response = await vtpassAxios.post('/pay', payload);
-    console.log('VTPass response:', response.data); // <--- Add here
+    console.log('VTPass response:', response.data);
 
     await db.BillPayment.create({
       userId: req.user.id,
@@ -172,6 +175,7 @@ exports.purchaseMtnVtu = async (req, res) => {
       billersCode: phone // <-- This is required by VTPass for airtime!
     };
     const response = await vtpassAxios.post('/pay', payload);
+    console.log('VTPass response:', response.data);
 
     await db.BillPayment.create({
       userId: req.user.id,
