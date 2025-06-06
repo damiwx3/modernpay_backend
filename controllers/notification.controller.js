@@ -1,7 +1,8 @@
-const db = require('../models'); // Adjust if your Notification model is elsewhere
+const db = require('../models');
 
 // Example Notification model: { id, userId, message, read, createdAt }
 
+// 1. Get all notifications for the user
 exports.getNotifications = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -15,6 +16,21 @@ exports.getNotifications = async (req, res) => {
   }
 };
 
+// 2. Get unread notifications for the user
+exports.getUnreadNotifications = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const notifications = await db.Notification.findAll({
+      where: { userId, read: false },
+      order: [['createdAt', 'DESC']],
+    });
+    res.json({ notifications });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch unread notifications' });
+  }
+};
+
+// 3. Get unread notification count
 exports.getUnreadCount = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -27,6 +43,7 @@ exports.getUnreadCount = async (req, res) => {
   }
 };
 
+// 4. Mark all notifications as read
 exports.markAllRead = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -37,6 +54,7 @@ exports.markAllRead = async (req, res) => {
   }
 };
 
+// 5. Mark one notification as read
 exports.markOneRead = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -45,5 +63,45 @@ exports.markOneRead = async (req, res) => {
     res.json({ message: 'Notification marked as read' });
   } catch (err) {
     res.status(500).json({ message: 'Failed to mark notification as read' });
+  }
+};
+
+// 6. Delete one notification
+exports.deleteNotification = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id } = req.params;
+    await db.Notification.destroy({ where: { id, userId } });
+    res.json({ message: 'Notification deleted' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to delete notification' });
+  }
+};
+
+// 7. Delete all notifications
+exports.deleteAllNotifications = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    await db.Notification.destroy({ where: { userId } });
+    res.json({ message: 'All notifications deleted' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to delete all notifications' });
+  }
+};
+
+// 8. Create/send a notification (for system use)
+exports.createNotification = async (req, res) => {
+  try {
+    const userId = req.body.userId || req.user.id;
+    const { message } = req.body;
+    if (!message) return res.status(400).json({ message: 'Message is required' });
+    const notification = await db.Notification.create({
+      userId,
+      message,
+      read: false,
+    });
+    res.status(201).json({ notification });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to create notification' });
   }
 };
