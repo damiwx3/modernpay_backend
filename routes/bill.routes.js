@@ -54,34 +54,6 @@ router.get('/categories/data', auth, controller.getDataCategories);
 
 /**
  * @swagger
- * /api/bills/categories/nigeria:
- *   get:
- *     summary: List other Nigerian bills (excluding airtime/data)
- *     tags: [Bills]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of Nigerian bills (not airtime/data)
- */
-router.get('/categories/nigeria', auth, controller.getNigerianBills);
-
-/**
- * @swagger
- * /api/bills/categories/other:
- *   get:
- *     summary: List all other bills (not Nigerian or not airtime/data)
- *     tags: [Bills]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of other bills
- */
-router.get('/categories/other', auth, controller.getOtherBills);
-
-/**
- * @swagger
  * /api/bills/validate:
  *   post:
  *     summary: Validate a customer before bill payment (e.g., meter or smartcard)
@@ -112,7 +84,7 @@ router.post('/validate', auth, controller.validateCustomer);
  * @swagger
  * /api/bills/pay:
  *   post:
- *     summary: Pay for a bill via Flutterwave
+ *     summary: Pay for a bill via VTPass
  *     tags: [Bills]
  *     security:
  *       - bearerAuth: []
@@ -155,26 +127,23 @@ router.get('/history', auth, controller.getHistory);
 
 /**
  * @swagger
- * /api/bills/bundles/{billerCode}:
+ * /api/bills/bundles/{serviceID}:
  *   get:
  *     summary: Get available bundles for a biller (e.g., data or TV)
  *     tags: [Bills]
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - name: billerCode
+ *       - name: serviceID
  *         in: path
  *         required: true
  *         schema:
  *           type: string
- *         description: Biller code (e.g., MTN Data)
+ *         description: Service ID (e.g., mtn-data)
  *     responses:
  *       200:
  *         description: Returns list of available bundles
  */
-router.get('/bundles/:billerCode', auth, controller.getBundles);
-router.get('/categories/data-with-bundles', auth, controller.getDataBillersWithBundles);
-
-
+router.get('/bundles/:serviceID', auth, controller.getBundles);
 
 module.exports = router;
