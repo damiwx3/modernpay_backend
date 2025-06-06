@@ -170,11 +170,62 @@ exports.paystackWebhook = async (req, res) => {
 };
 
 exports.vtpassWebhook = async (req, res) => {
-  // VTPass will POST to this endpoint with payment status, etc.
-  // You can log, verify, and update your DB as needed.
-  console.log('VTPass Webhook received:', req.body);
+  try {
+    const payload = req.body;
+    console.log('VTPass Webhook received:', payload);
 
-  // TODO: Add your logic to update payment status, etc.
+    // 1️⃣ Log the webhook event
+    await db.WebhookLog.create({
+      event: 'vtpass',
+      reference: payload.request_id || payload.reference,
+      status: payload.status || payload.code || 'received',
+      payload: payload,
+    });
 
-  res.status(200).send('Webhook received');
+    // 2️⃣ Extract reference/request_id and status
+    const reference = payload.request_id || payload.reference;
+    const status = payload.status || payload.code; // e.g. 'delivered', 'failed', '000', etc.
+
+    if (!reference) {
+      console.warn('No reference/request_id in VTPass webhook');
+      return res.status(200).send('No reference');
+    }
+
+    // 3️⃣ Find the bill payment record
+    const bill = await db.BillPayment.findOne({ where: { reference } });
+    if (!bill) {
+      console.warn('No BillPayment found for reference:', reference);
+      return res.status(200).send('No matching bill');
+    }
+
+    // 4️⃣ Idempotency: Only update if not already final
+    if (bill.status === 'success' || bill.status === 'failed') {
+      return res.status(200).send('Already processed');
+    }
+
+    // 5️⃣ Determine new status
+    let newStatus = 'failed';
+    // VTPass may send 'delivered' or code '000' for success
+    if (
+      status === 'delivered' ||
+      status === 'DELIVERED' ||
+      status === '000' ||
+      (payload.data && (payload.data.code === '000' || payload.data.status === 'delivered'))
+    ) {
+      newStatus = 'success';
+    }
+
+    // 6️⃣ Update bill payment
+    bill.status = newStatus;
+    bill.responseData = payload;
+    bill.paidAt = newStatus === 'success' ? new Date() : null;
+    await bill.save();
+
+    console.log(`BillPayment ${reference} updated to ${newStatus}`);
+
+    res.status(200).send('Webhook received');
+  } catch (err) {
+    console.error('❌ VTPass Webhook error:', err.message);
+    res.status(500).json({ message: 'Internal webhook error' });
+  }
 };
