@@ -1,6 +1,5 @@
 const db = require('../models');
-const admin = require('../firebase');
-const { androidApp, iosApp } = require('../firebase'); // Import both app instances
+const { androidApp, iosApp } = require('../config/firebase');
 
 // Example Notification model: { id, userId, message, read, createdAt }
 
