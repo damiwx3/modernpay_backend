@@ -1,18 +1,20 @@
 const axios = require('axios');
 
 const VTPASS_BASE = process.env.VTPASS_BASE || 'https://sandbox.vtpass.com/api';
-const VTPASS_USERNAME = process.env.VTPASS_USERNAME;
-const VTPASS_PASSWORD = process.env.VTPASS_PASSWORD;
+const VTPASS_API_KEY = process.env.VTPASS_API_KEY;
+const VTPASS_PUBLIC_KEY = process.env.VTPASS_PUBLIC_KEY;
+const VTPASS_SECRET_KEY = process.env.VTPASS_SECRET_KEY;
 
-// Add these lines for debugging:
-console.log('VTPASS_USERNAME:', VTPASS_USERNAME);
-console.log('VTPASS_PASSWORD:', VTPASS_PASSWORD);
+console.log('VTPASS_API_KEY:', VTPASS_API_KEY);
+console.log('VTPASS_PUBLIC_KEY:', VTPASS_PUBLIC_KEY);
+console.log('VTPASS_SECRET_KEY:', VTPASS_SECRET_KEY);
 
 const vtpassAxios = axios.create({
   baseURL: VTPASS_BASE,
   headers: {
-    'api-key': VTPASS_USERNAME,
-    'secret-key': VTPASS_PASSWORD,
+    'api-key': VTPASS_API_KEY,
+    'public-key': VTPASS_PUBLIC_KEY,
+    'secret-key': VTPASS_SECRET_KEY,
     'Content-Type': 'application/json',
     'cache-control': 'no-cache'
   }
