@@ -10,7 +10,6 @@ exports.getCategories = async (req, res) => {
     const now = Date.now();
     // Refresh cache every 10 minutes
     if (!cachedServices || now - lastFetchTime > 10 * 60 * 1000) {
-      // Use the correct endpoint for categories
       const vtpassRes = await vtpassAxios.get('/service-categories');
       cachedServices = vtpassRes.data.content;
       lastFetchTime = now;
@@ -30,12 +29,9 @@ exports.getCategories = async (req, res) => {
 exports.getAirtimeCategories = async (req, res) => {
   try {
     const vtpassRes = await vtpassAxios.get('/services?identifier=airtime');
-    console.log('Airtime categories response:', vtpassRes.data.content);
     if (!Array.isArray(vtpassRes.data.content)) {
-      console.error('VTPass /services did not return an array:', vtpassRes.data);
       return res.status(500).json({ message: 'VTPass /services error', error: vtpassRes.data });
     }
-    // Improved mapping: only return relevant fields and use clear names
     const mapped = vtpassRes.data.content.map(item => ({
       code: item.serviceID,
       name: item.name,
@@ -51,16 +47,14 @@ exports.getAirtimeCategories = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch airtime categories', error: err.message });
   }
 };
+
 // 3. Get Data categories (filter from /services)
 exports.getDataCategories = async (req, res) => {
   try {
     const vtpassRes = await vtpassAxios.get('/services?identifier=data');
-    console.log('Data categories response:', vtpassRes.data.content);
     if (!Array.isArray(vtpassRes.data.content)) {
-      console.error('VTPass /services did not return an array:', vtpassRes.data);
       return res.status(500).json({ message: 'VTPass /services error', error: vtpassRes.data });
     }
-    // Map serviceID to biller_code for frontend compatibility
     const mapped = vtpassRes.data.content.map(item => ({
       ...item,
       biller_code: item.serviceID,
@@ -109,7 +103,6 @@ exports.payBill = async (req, res) => {
     };
     const response = await vtpassAxios.post('/pay', payload);
 
-    // Save record
     await db.BillPayment.create({
       userId: req.user.id,
       serviceType: serviceID,
@@ -174,11 +167,11 @@ exports.purchaseMtnVtu = async (req, res) => {
       request_id,
       serviceID: 'mtn',
       amount,
-      phone
+      phone,
+      billersCode: phone // <-- This is required by VTPass for airtime!
     };
     const response = await vtpassAxios.post('/pay', payload);
 
-    // Save record (optional, for your own tracking)
     await db.BillPayment.create({
       userId: req.user.id,
       serviceType: 'mtn',
