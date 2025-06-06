@@ -8,7 +8,6 @@ let lastFetchTime = 0;
 exports.getCategories = async (req, res) => {
   try {
     const now = Date.now();
-    // Refresh cache every 10 minutes
     if (!cachedServices || now - lastFetchTime > 10 * 60 * 1000) {
       const vtpassRes = await vtpassAxios.get('/service-categories');
       cachedServices = vtpassRes.data.content;
@@ -93,7 +92,7 @@ exports.payBill = async (req, res) => {
   }
   try {
     const request_id = `BILL-${Date.now()}`;
-    // For airtime, do not send variation_code if not needed
+    // Build payload
     const payload = {
       request_id,
       serviceID,
@@ -101,10 +100,15 @@ exports.payBill = async (req, res) => {
       amount,
       phone
     };
+    // Only add variation_code if present (for data, TV, etc.)
     if (variation_code) {
       payload.variation_code = variation_code;
     }
+    // Debug: log payload
+    console.log('VTPass PAY payload:', payload);
+
     const response = await vtpassAxios.post('/pay', payload);
+    // Debug: log VTPass response
     console.log('VTPass response:', response.data);
 
     await db.BillPayment.create({
@@ -172,9 +176,13 @@ exports.purchaseMtnVtu = async (req, res) => {
       serviceID: 'mtn',
       amount,
       phone,
-      billersCode: phone // <-- This is required by VTPass for airtime!
+      billersCode: phone // Required by VTPass for airtime!
     };
+    // Debug: log payload
+    console.log('VTPass PAY payload:', payload);
+
     const response = await vtpassAxios.post('/pay', payload);
+    // Debug: log VTPass response
     console.log('VTPass response:', response.data);
 
     await db.BillPayment.create({
