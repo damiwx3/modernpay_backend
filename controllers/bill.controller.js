@@ -35,7 +35,6 @@ exports.getAirtimeCategories = async (req, res) => {
       console.error('VTPass /services did not return an array:', vtpassRes.data);
       return res.status(500).json({ message: 'VTPass /services error', error: vtpassRes.data });
     }
-    // Map serviceID to biller_code for frontend compatibility
     const mapped = vtpassRes.data.content.map(item => ({
       ...item,
       biller_code: item.serviceID,
@@ -46,7 +45,6 @@ exports.getAirtimeCategories = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch airtime categories', error: err.message });
   }
 };
-
 // 3. Get Data categories (filter from /services)
 exports.getDataCategories = async (req, res) => {
   try {
