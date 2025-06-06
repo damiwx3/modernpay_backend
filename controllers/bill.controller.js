@@ -10,7 +10,8 @@ exports.getCategories = async (req, res) => {
     const now = Date.now();
     // Refresh cache every 10 minutes
     if (!cachedServices || now - lastFetchTime > 10 * 60 * 1000) {
-      const vtpassRes = await vtpassAxios.get('/services');
+      // Use the correct endpoint for categories
+      const vtpassRes = await vtpassAxios.get('/service-categories');
       cachedServices = vtpassRes.data.content;
       lastFetchTime = now;
     }
@@ -18,7 +19,6 @@ exports.getCategories = async (req, res) => {
   } catch (err) {
     console.error('VTPass error (getCategories):', err.response?.data || err.message);
     if (cachedServices) {
-      // Serve cached data if available
       res.status(200).json({ categories: cachedServices, warning: 'Serving cached data' });
     } else {
       res.status(500).json({ message: 'Failed to fetch categories', error: err.message });
