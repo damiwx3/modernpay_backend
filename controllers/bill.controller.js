@@ -30,6 +30,10 @@ exports.getCategories = async (req, res) => {
 exports.getAirtimeCategories = async (req, res) => {
   try {
     const vtpassRes = await vtpassAxios.get('/services');
+    if (!Array.isArray(vtpassRes.data.content)) {
+      console.error('VTPass /services did not return an array:', vtpassRes.data);
+      return res.status(500).json({ message: 'VTPass /services error', error: vtpassRes.data });
+    }
     const airtime = vtpassRes.data.content.filter(s => s.service_type === 'airtime');
     res.json({ categories: airtime });
   } catch (err) {
@@ -42,6 +46,10 @@ exports.getAirtimeCategories = async (req, res) => {
 exports.getDataCategories = async (req, res) => {
   try {
     const vtpassRes = await vtpassAxios.get('/services');
+    if (!Array.isArray(vtpassRes.data.content)) {
+      console.error('VTPass /services did not return an array:', vtpassRes.data);
+      return res.status(500).json({ message: 'VTPass /services error', error: vtpassRes.data });
+    }
     const data = vtpassRes.data.content.filter(s => s.service_type === 'data');
     res.json({ categories: data });
   } catch (err) {
