@@ -191,7 +191,7 @@ exports.sendBulkNotification = async (req, res) => {
       await Promise.allSettled(promises);
 
       // Optional: Add a delay between batches to avoid rate limits
-      // await new Promise(resolve => setTimeout(resolve, 1000));
+       await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     res.status(200).json({
