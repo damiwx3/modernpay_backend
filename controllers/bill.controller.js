@@ -16,6 +16,7 @@ exports.getCategories = async (req, res) => {
     }
     res.status(200).json({ categories: cachedServices });
   } catch (err) {
+    console.error('VTPass error (getCategories):', err.response?.data || err.message);
     if (cachedServices) {
       // Serve cached data if available
       res.status(200).json({ categories: cachedServices, warning: 'Serving cached data' });
@@ -24,6 +25,7 @@ exports.getCategories = async (req, res) => {
     }
   }
 };
+
 // 2. Get Airtime categories (filter from /services)
 exports.getAirtimeCategories = async (req, res) => {
   try {
@@ -31,6 +33,7 @@ exports.getAirtimeCategories = async (req, res) => {
     const airtime = vtpassRes.data.content.filter(s => s.service_type === 'airtime');
     res.json({ categories: airtime });
   } catch (err) {
+    console.error('VTPass error (getAirtimeCategories):', err.response?.data || err.message);
     res.status(500).json({ message: 'Failed to fetch airtime categories', error: err.message });
   }
 };
@@ -42,6 +45,7 @@ exports.getDataCategories = async (req, res) => {
     const data = vtpassRes.data.content.filter(s => s.service_type === 'data');
     res.json({ categories: data });
   } catch (err) {
+    console.error('VTPass error (getDataCategories):', err.response?.data || err.message);
     res.status(500).json({ message: 'Failed to fetch data categories', error: err.message });
   }
 };
@@ -60,6 +64,7 @@ exports.validateCustomer = async (req, res) => {
     });
     res.json(response.data);
   } catch (err) {
+    console.error('VTPass error (validateCustomer):', err.response?.data || err.message);
     res.status(500).json({ message: 'VTPass validation failed', error: err.message });
   }
 };
@@ -82,7 +87,7 @@ exports.payBill = async (req, res) => {
     };
     const response = await vtpassAxios.post('/pay', payload);
 
-     // Save record (PUT THIS HERE)
+    // Save record
     await db.BillPayment.create({
       userId: req.user.id,
       serviceType: serviceID,
@@ -101,6 +106,7 @@ exports.payBill = async (req, res) => {
       reference: request_id
     });
   } catch (err) {
+    console.error('VTPass error (payBill):', err.response?.data || err.message);
     res.status(500).json({ message: 'VTPass payment failed', error: err.message });
   }
 };
@@ -114,6 +120,7 @@ exports.getHistory = async (req, res) => {
     });
     res.status(200).json({ history });
   } catch (err) {
+    console.error('VTPass error (getHistory):', err.response?.data || err.message);
     res.status(500).json({ message: 'Failed to fetch history', error: err.message });
   }
 };
@@ -128,6 +135,7 @@ exports.getBundles = async (req, res) => {
     const response = await vtpassAxios.get(`/service-variations?serviceID=${serviceID}`);
     res.status(200).json({ bundles: response.data.content.variations });
   } catch (err) {
+    console.error('VTPass error (getBundles):', err.response?.data || err.message);
     res.status(500).json({ message: 'Failed to load bundles', error: err.message });
   }
 };
