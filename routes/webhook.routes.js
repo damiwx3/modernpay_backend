@@ -45,6 +45,44 @@ const webhookController = require('../controllers/webhook.controller');
  *         description: Internal webhook error
  */
 router.post('/webhook/paystack', webhookController.paystackWebhook);
+/**
+ * @swagger
+ * /webhook/vtpass:
+ *   post:
+ *     summary: VTPass webhook endpoint for bill payment status updates
+ *     description: Receives VTPass payment notifications and updates bill payment status.
+ *     tags:
+ *       - Webhooks
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               request_id:
+ *                 type: string
+ *                 example: "BILL-1717690000000"
+ *               reference:
+ *                 type: string
+ *                 example: "BILL-1717690000000"
+ *               status:
+ *                 type: string
+ *                 example: "delivered"
+ *               code:
+ *                 type: string
+ *                 example: "000"
+ *               response_description:
+ *                 type: string
+ *                 example: "Transaction Successful"
+ *               data:
+ *                 type: object
+ *     responses:
+ *       200:
+ *         description: Webhook received and processed
+ *       500:
+ *         description: Internal webhook error
+ */
 router.post('/vtpass', webhookController.vtpassWebhook);
 
 module.exports = router;
