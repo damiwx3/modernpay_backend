@@ -45,5 +45,6 @@ const webhookController = require('../controllers/webhook.controller');
  *         description: Internal webhook error
  */
 router.post('/webhook/paystack', webhookController.paystackWebhook);
+router.post('/vtpass', webhookController.vtpassWebhook);
 
 module.exports = router;
