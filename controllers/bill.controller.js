@@ -144,3 +144,57 @@ exports.getBundles = async (req, res) => {
     res.status(500).json({ message: 'Failed to load bundles', error: err.message });
   }
 };
+// 8. Purchase MTN VTU Airtime
+exports.purchaseMtnVtu = async (req, res) => {
+  const { amount, phone } = req.body;
+  if (!amount || !phone) {
+    return res.status(400).json({ message: 'amount and phone are required' });
+  }
+  try {
+    const request_id = `MTNVTU-${Date.now()}`;
+    const payload = {
+      request_id,
+      serviceID: 'mtn',
+      amount,
+      phone
+    };
+    const response = await vtpassAxios.post('/pay', payload);
+
+    // Save record (optional, for your own tracking)
+    await db.BillPayment.create({
+      userId: req.user.id,
+      serviceType: 'mtn',
+      amount,
+      reference: request_id,
+      status: response.data.code === '000' ? 'success' : 'failed',
+      customer: phone,
+      responseData: response.data,
+      paidAt: response.data.code === '000' ? new Date() : null
+    });
+
+    res.status(201).json({
+      message: response.data.response_description,
+      status: response.data.code === '000' ? 'success' : 'failed',
+      data: response.data,
+      reference: request_id
+    });
+  } catch (err) {
+    console.error('VTPass error (purchaseMtnVtu):', err.response?.data || err.message);
+    res.status(500).json({ message: 'MTN VTU purchase failed', error: err.message });
+  }
+};
+// 9. Query VTU Transaction Status
+exports.queryVtuStatus = async (req, res) => {
+  const { request_id } = req.body;
+  if (!request_id) {
+    return res.status(400).json({ message: 'request_id is required' });
+  }
+  try {
+    const payload = { request_id };
+    const response = await vtpassAxios.post('/requery', payload);
+    res.status(200).json(response.data);
+  } catch (err) {
+    console.error('VTPass error (queryVtuStatus):', err.response?.data || err.message);
+    res.status(500).json({ message: 'Failed to query VTU status', error: err.message });
+  }
+};
