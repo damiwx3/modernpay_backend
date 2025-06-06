@@ -5,11 +5,13 @@ const vtpassAxios = require('../utils/vtpass');
 let cachedServices = null;
 let lastFetchTime = 0;
 
+// In getCategories
 exports.getCategories = async (req, res) => {
   try {
     const now = Date.now();
     if (!cachedServices || now - lastFetchTime > 10 * 60 * 1000) {
       const vtpassRes = await vtpassAxios.get('/service-categories');
+      console.log('VTPass /service-categories:', vtpassRes.data); // <-- Add this line
       cachedServices = vtpassRes.data.content;
       lastFetchTime = now;
     }
