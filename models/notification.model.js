@@ -5,6 +5,8 @@ module.exports = (sequelize, DataTypes) => {
     title: { type: DataTypes.STRING, allowNull: false },
     message: { type: DataTypes.TEXT, allowNull: false },
     read: { type: DataTypes.BOOLEAN, defaultValue: false }
+  }, {
+    timestamps: true
   });
   return Notification;
 };
