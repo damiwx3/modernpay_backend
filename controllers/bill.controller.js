@@ -223,3 +223,16 @@ exports.queryVtuStatus = async (req, res) => {
     res.status(500).json({ message: 'Failed to query VTU status', error: err.message });
   }
 };
+// Add this to bill.controller.js
+exports.getServicesByCategory = async (req, res) => {
+  const { identifier } = req.query;
+  if (!identifier) {
+    return res.status(400).json({ message: 'identifier is required' });
+  }
+  try {
+    const vtpassRes = await vtpassAxios.get(`/services?identifier=${identifier}`);
+    res.status(200).json({ services: vtpassRes.data.content });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch services', error: err.message });
+  }
+};
