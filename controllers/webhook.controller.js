@@ -168,3 +168,13 @@ exports.paystackWebhook = async (req, res) => {
     res.status(500).json({ message: 'Internal webhook error' });
   }
 };
+
+exports.vtpassWebhook = async (req, res) => {
+  // VTPass will POST to this endpoint with payment status, etc.
+  // You can log, verify, and update your DB as needed.
+  console.log('VTPass Webhook received:', req.body);
+
+  // TODO: Add your logic to update payment status, etc.
+
+  res.status(200).send('Webhook received');
+};
