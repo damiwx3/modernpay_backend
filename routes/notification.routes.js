@@ -9,5 +9,5 @@ router.get('/', controller.getNotifications);
 router.get('/unread-count', controller.getUnreadCount);
 router.post('/mark-read', controller.markAllRead);
 router.post('/:id/mark-read', controller.markOneRead);
-
+const { androidApp, iosApp } = require('../firebase');
 module.exports = router;
