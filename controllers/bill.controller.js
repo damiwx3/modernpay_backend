@@ -69,13 +69,16 @@ exports.payBill = async (req, res) => {
     };
     const response = await vtpassAxios.post('/pay', payload);
 
-    // Save record
+     // Save record (PUT THIS HERE)
     await db.BillPayment.create({
       userId: req.user.id,
       serviceType: serviceID,
       amount,
       reference: request_id,
-      status: response.data.code === '000' ? 'success' : 'failed'
+      status: response.data.code === '000' ? 'success' : 'failed',
+      customer: billersCode,
+      responseData: response.data,
+      paidAt: response.data.code === '000' ? new Date() : null
     });
 
     res.status(201).json({
