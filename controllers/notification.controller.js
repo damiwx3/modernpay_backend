@@ -1,4 +1,5 @@
 const db = require('../models');
+const admin = require('../firebase');
 
 // Example Notification model: { id, userId, message, read, createdAt }
 
@@ -88,18 +89,44 @@ exports.deleteAllNotifications = async (req, res) => {
     res.status(500).json({ message: 'Failed to delete all notifications' });
   }
 };
-
-// 8. Create/send a notification (for system use)
+// 8. Create/send a notification (for system use, now with push support)
 exports.createNotification = async (req, res) => {
   try {
     const userId = req.body.userId || req.user.id;
-    const { message } = req.body;
+    const { title, message } = req.body;
     if (!message) return res.status(400).json({ message: 'Message is required' });
+
+    // Save in-app notification
     const notification = await db.Notification.create({
       userId,
+      title: title || 'Notification',
       message,
       read: false,
     });
+
+    // Send push notification if user has deviceToken
+    const user = await db.User.findByPk(userId);
+    if (user && user.deviceToken) {
+      const payload = {
+        notification: {
+          title: title || 'Notification',
+          body: message,
+        },
+        data: {
+          notificationId: notification.id.toString(),
+        }
+      };
+      try {
+        await admin.messaging().send({
+          token: user.deviceToken,
+          ...payload,
+        });
+      } catch (pushErr) {
+        // Optionally log pushErr for debugging
+        console.error('Push notification error:', pushErr.message);
+      }
+    }
+
     res.status(201).json({ notification });
   } catch (err) {
     res.status(500).json({ message: 'Failed to create notification' });
