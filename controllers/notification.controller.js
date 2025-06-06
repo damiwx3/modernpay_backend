@@ -1,5 +1,6 @@
 const db = require('../models');
 const admin = require('../firebase');
+const { androidApp, iosApp } = require('../firebase'); // Import both app instances
 
 // Example Notification model: { id, userId, message, read, createdAt }
 
@@ -89,6 +90,7 @@ exports.deleteAllNotifications = async (req, res) => {
     res.status(500).json({ message: 'Failed to delete all notifications' });
   }
 };
+
 // 8. Create/send a notification (for system use, now with push support)
 exports.createNotification = async (req, res) => {
   try {
@@ -104,9 +106,10 @@ exports.createNotification = async (req, res) => {
       read: false,
     });
 
-    // Send push notification if user has deviceToken
+    // Send push notification if user has deviceToken and platform
     const user = await db.User.findByPk(userId);
-    if (user && user.deviceToken) {
+    if (user && user.deviceToken && user.platform) {
+      const firebaseApp = user.platform === 'ios' ? iosApp : androidApp;
       const payload = {
         notification: {
           title: title || 'Notification',
@@ -117,12 +120,11 @@ exports.createNotification = async (req, res) => {
         }
       };
       try {
-        await admin.messaging().send({
+        await firebaseApp.messaging().send({
           token: user.deviceToken,
           ...payload,
         });
       } catch (pushErr) {
-        // Optionally log pushErr for debugging
         console.error('Push notification error:', pushErr.message);
       }
     }
