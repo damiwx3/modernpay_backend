@@ -4,6 +4,10 @@ const VTPASS_BASE = process.env.VTPASS_BASE || 'https://sandbox.vtpass.com/api';
 const VTPASS_USERNAME = process.env.VTPASS_USERNAME;
 const VTPASS_PASSWORD = process.env.VTPASS_PASSWORD;
 
+// Add these lines for debugging:
+console.log('VTPASS_USERNAME:', VTPASS_USERNAME);
+console.log('VTPASS_PASSWORD:', VTPASS_PASSWORD);
+
 const vtpassAxios = axios.create({
   baseURL: VTPASS_BASE,
   headers: {
