@@ -30,11 +30,17 @@ exports.getCategories = async (req, res) => {
 exports.getAirtimeCategories = async (req, res) => {
   try {
     const vtpassRes = await vtpassAxios.get('/services?identifier=airtime');
+    console.log('Airtime categories response:', vtpassRes.data.content);
     if (!Array.isArray(vtpassRes.data.content)) {
       console.error('VTPass /services did not return an array:', vtpassRes.data);
       return res.status(500).json({ message: 'VTPass /services error', error: vtpassRes.data });
     }
-    res.json({ categories: vtpassRes.data.content });
+    // Map serviceID to biller_code for frontend compatibility
+    const mapped = vtpassRes.data.content.map(item => ({
+      ...item,
+      biller_code: item.serviceID,
+    }));
+    res.json({ categories: mapped });
   } catch (err) {
     console.error('VTPass error (getAirtimeCategories):', err.response?.data || err.message);
     res.status(500).json({ message: 'Failed to fetch airtime categories', error: err.message });
@@ -45,16 +51,23 @@ exports.getAirtimeCategories = async (req, res) => {
 exports.getDataCategories = async (req, res) => {
   try {
     const vtpassRes = await vtpassAxios.get('/services?identifier=data');
+    console.log('Data categories response:', vtpassRes.data.content);
     if (!Array.isArray(vtpassRes.data.content)) {
       console.error('VTPass /services did not return an array:', vtpassRes.data);
       return res.status(500).json({ message: 'VTPass /services error', error: vtpassRes.data });
     }
-    res.json({ categories: vtpassRes.data.content });
+    // Map serviceID to biller_code for frontend compatibility
+    const mapped = vtpassRes.data.content.map(item => ({
+      ...item,
+      biller_code: item.serviceID,
+    }));
+    res.json({ categories: mapped });
   } catch (err) {
     console.error('VTPass error (getDataCategories):', err.response?.data || err.message);
     res.status(500).json({ message: 'Failed to fetch data categories', error: err.message });
   }
 };
+
 // 4. Validate customer (e.g. smartcard, meter, etc.)
 exports.validateCustomer = async (req, res) => {
   const { serviceID, billersCode, type } = req.body;
@@ -144,6 +157,7 @@ exports.getBundles = async (req, res) => {
     res.status(500).json({ message: 'Failed to load bundles', error: err.message });
   }
 };
+
 // 8. Purchase MTN VTU Airtime
 exports.purchaseMtnVtu = async (req, res) => {
   const { amount, phone } = req.body;
@@ -183,6 +197,7 @@ exports.purchaseMtnVtu = async (req, res) => {
     res.status(500).json({ message: 'MTN VTU purchase failed', error: err.message });
   }
 };
+
 // 9. Query VTU Transaction Status
 exports.queryVtuStatus = async (req, res) => {
   const { request_id } = req.body;
