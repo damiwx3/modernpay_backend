@@ -29,13 +29,12 @@ exports.getCategories = async (req, res) => {
 // 2. Get Airtime categories (filter from /services)
 exports.getAirtimeCategories = async (req, res) => {
   try {
-    const vtpassRes = await vtpassAxios.get('/services');
+    const vtpassRes = await vtpassAxios.get('/services?identifier=airtime');
     if (!Array.isArray(vtpassRes.data.content)) {
       console.error('VTPass /services did not return an array:', vtpassRes.data);
       return res.status(500).json({ message: 'VTPass /services error', error: vtpassRes.data });
     }
-    const airtime = vtpassRes.data.content.filter(s => s.service_type === 'airtime');
-    res.json({ categories: airtime });
+    res.json({ categories: vtpassRes.data.content });
   } catch (err) {
     console.error('VTPass error (getAirtimeCategories):', err.response?.data || err.message);
     res.status(500).json({ message: 'Failed to fetch airtime categories', error: err.message });
@@ -45,19 +44,17 @@ exports.getAirtimeCategories = async (req, res) => {
 // 3. Get Data categories (filter from /services)
 exports.getDataCategories = async (req, res) => {
   try {
-    const vtpassRes = await vtpassAxios.get('/services');
+    const vtpassRes = await vtpassAxios.get('/services?identifier=data');
     if (!Array.isArray(vtpassRes.data.content)) {
       console.error('VTPass /services did not return an array:', vtpassRes.data);
       return res.status(500).json({ message: 'VTPass /services error', error: vtpassRes.data });
     }
-    const data = vtpassRes.data.content.filter(s => s.service_type === 'data');
-    res.json({ categories: data });
+    res.json({ categories: vtpassRes.data.content });
   } catch (err) {
     console.error('VTPass error (getDataCategories):', err.response?.data || err.message);
     res.status(500).json({ message: 'Failed to fetch data categories', error: err.message });
   }
 };
-
 // 4. Validate customer (e.g. smartcard, meter, etc.)
 exports.validateCustomer = async (req, res) => {
   const { serviceID, billersCode, type } = req.body;
