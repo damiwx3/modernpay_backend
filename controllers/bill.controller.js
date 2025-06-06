@@ -2,15 +2,28 @@ const db = require('../models');
 const vtpassAxios = require('../utils/vtpass');
 
 // 1. List all VTPass services
+let cachedServices = null;
+let lastFetchTime = 0;
+
 exports.getCategories = async (req, res) => {
   try {
-    const vtpassRes = await vtpassAxios.get('/services');
-    res.status(200).json({ categories: vtpassRes.data.content });
+    const now = Date.now();
+    // Refresh cache every 10 minutes
+    if (!cachedServices || now - lastFetchTime > 10 * 60 * 1000) {
+      const vtpassRes = await vtpassAxios.get('/services');
+      cachedServices = vtpassRes.data.content;
+      lastFetchTime = now;
+    }
+    res.status(200).json({ categories: cachedServices });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch categories', error: err.message });
+    if (cachedServices) {
+      // Serve cached data if available
+      res.status(200).json({ categories: cachedServices, warning: 'Serving cached data' });
+    } else {
+      res.status(500).json({ message: 'Failed to fetch categories', error: err.message });
+    }
   }
 };
-
 // 2. Get Airtime categories (filter from /services)
 exports.getAirtimeCategories = async (req, res) => {
   try {
