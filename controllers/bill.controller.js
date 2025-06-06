@@ -35,9 +35,15 @@ exports.getAirtimeCategories = async (req, res) => {
       console.error('VTPass /services did not return an array:', vtpassRes.data);
       return res.status(500).json({ message: 'VTPass /services error', error: vtpassRes.data });
     }
+    // Improved mapping: only return relevant fields and use clear names
     const mapped = vtpassRes.data.content.map(item => ({
-      ...item,
-      biller_code: item.serviceID,
+      code: item.serviceID,
+      name: item.name,
+      minAmount: item.minimium_amount,
+      maxAmount: item.maximum_amount,
+      fee: item.convinience_fee,
+      type: item.product_type,
+      image: item.image,
     }));
     res.json({ categories: mapped });
   } catch (err) {
