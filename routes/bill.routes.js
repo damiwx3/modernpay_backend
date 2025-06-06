@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/bill.controller');
+const billController = require('../controllers/bill.controller');
 const auth = require('../middleware/auth.middleware');
 
 /**
@@ -145,5 +146,8 @@ router.get('/history', auth, controller.getHistory);
  *         description: Returns list of available bundles
  */
 router.get('/bundles/:serviceID', auth, controller.getBundles);
+
+router.post('/mtn-vtu', billController.purchaseMtnVtu);
+router.post('/vtu-status', billController.queryVtuStatus);
 
 module.exports = router;
