@@ -233,6 +233,7 @@ exports.getServicesByCategory = async (req, res) => {
   }
   try {
     const vtpassRes = await vtpassAxios.get(`/services?identifier=${identifier}`);
+    console.log(`VTPass /services?identifier=${identifier}:`, vtpassRes.data); // <-- Add this line
     res.status(200).json({ services: vtpassRes.data.content });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch services', error: err.message });
