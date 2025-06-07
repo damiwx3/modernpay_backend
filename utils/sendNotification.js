@@ -42,6 +42,13 @@ const sendNotification = async (user, message, subject = 'ModernPay Notification
         status: 'sent'
       });
     }
+    await db.Notification.create({
+  userId: user.id,
+  title: subject,
+  message,
+  data: customData || null,
+  read: false
+});
 
     // Save logs to database
     for (const log of logs) {
