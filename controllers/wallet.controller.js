@@ -330,13 +330,22 @@ exports.createVirtualAccount = async (req, res) => {
       raw: accountData,
     });
 
+    // 6. Update user's wallet with the new virtual account number and bank name
+    await db.Wallet.update(
+      {
+        accountNumber: savedAccount.accountNumber,
+        bankName: savedAccount.bankName,
+        accountName: savedAccount.accountName
+      },
+      { where: { userId: user.id } }
+    );
+
     res.status(200).json({ message: 'Virtual account created', account: savedAccount });
   } catch (err) {
     console.error('Create virtual account error:', err.response?.data || err.message);
     res.status(500).json({ message: 'Failed to create virtual account', error: err.response?.data || err.message });
   }
 };
-
 // 🔒 Set Transaction PIN
 exports.setTransactionPin = async (req, res) => {
   if (!req.user || !req.user.id) {
