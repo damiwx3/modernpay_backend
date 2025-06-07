@@ -48,7 +48,7 @@ app.use('/api/kyc', kycRoutes);
 app.use('/api/wallets', walletRoutes);
 app.use('/api/contribution-cycles', contributionCycleRoutes);
 app.use('/api/audit', auditRoutes);
-app.use('/api/webhooks', require('./routes/webhook.routes'));
+app.use('/webhook', require('./routes/webhook.routes'));
 //app.use('/', require('./routes/webhook.routes'));
 app.use('/api/virtual-cards', require('./routes/virtual_card.routes'));
 app.use('/api/system', require('./routes/system.routes'));
