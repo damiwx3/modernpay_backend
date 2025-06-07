@@ -2,8 +2,7 @@ const admin = require('firebase-admin');
 
 // Initialize Firebase Admin only once in your app!
 if (!admin.apps.length) {
-  const serviceAccount = require('../path/to/your-firebase-service-account.json'); // <-- Replace with your actual path
-
+  const serviceAccount = require('../config/firebase-android.json');
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)
   });
