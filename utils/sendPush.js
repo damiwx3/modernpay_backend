@@ -2,7 +2,7 @@ const admin = require('firebase-admin');
 
 // Initialize Firebase Admin only once in your app!
 if (!admin.apps.length) {
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  const serviceAccount = JSON.parse(process.env.FIREBASE_ANDROID_SERVICE_ACCOUNT);
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)
   });
