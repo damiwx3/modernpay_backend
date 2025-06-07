@@ -1,9 +1,19 @@
 const db = require('../models');
 const crypto = require('crypto');
 
+// --- Notification stubs (implement as needed) ---
+async function sendInAppNotification(userId, message) {
+  // Save to DB or push via socket
+}
+async function sendEmail(userId, message) {
+  // Use nodemailer or any email service
+}
+async function sendSMS(userId, message) {
+  // Use Twilio, Termii, etc.
+}
+
 // Paystack webhook handler
 exports.paystackWebhook = async (req, res) => {
-  // 1️⃣ Verify Paystack signature for security
   const secret = process.env.PAYSTACK_SECRET_KEY;
   const hash = crypto.createHmac('sha512', secret)
     .update(JSON.stringify(req.body))
@@ -16,7 +26,7 @@ exports.paystackWebhook = async (req, res) => {
   const event = req.body;
 
   try {
-    // 2️⃣ Log Webhook
+    // Log Webhook
     await db.WebhookLog.create({
       event: event.event || 'paystack',
       reference: event.data?.reference,
@@ -24,7 +34,7 @@ exports.paystackWebhook = async (req, res) => {
       payload: event,
     });
 
-    // 3️⃣ Handle charge.success (Wallet Funding)
+    // 1️⃣ Handle charge.success (Card/Bank Wallet Funding)
     if (
       event.event === 'charge.success' &&
       event.data.status === 'success' &&
@@ -58,10 +68,15 @@ exports.paystackWebhook = async (req, res) => {
       wallet.balance += parseFloat(amount);
       await wallet.save();
 
+      // Notify user
+      sendInAppNotification(user.id, `Wallet funded: ₦${amount} via Paystack`);
+      sendEmail(user.id, `Your wallet has been credited with ₦${amount}`);
+      sendSMS(user.id, `Your wallet has been credited with ₦${amount}`);
+
       console.log(`✅ Paystack wallet funded: ₦${amount} for ${email}`);
     }
 
-    // 4️⃣ Handle charge.failed
+    // 2️⃣ Handle charge.failed
     if (
       event.event === 'charge.failed' &&
       event.data.reference
@@ -73,7 +88,7 @@ exports.paystackWebhook = async (req, res) => {
       console.log(`❌ Paystack charge failed for reference: ${event.data.reference}`);
     }
 
-    // 5️⃣ Handle transfer.success
+    // 3️⃣ Handle transfer.success
     if (
       event.event === 'transfer.success' &&
       event.data.reference
@@ -85,7 +100,7 @@ exports.paystackWebhook = async (req, res) => {
       console.log(`✅ Paystack transfer successful for reference: ${event.data.reference}`);
     }
 
-    // 6️⃣ Handle transfer.failed
+    // 4️⃣ Handle transfer.failed
     if (
       event.event === 'transfer.failed' &&
       event.data.reference
@@ -98,7 +113,7 @@ exports.paystackWebhook = async (req, res) => {
       console.log(`❌ Paystack transfer failed for reference: ${event.data.reference}`);
     }
 
-    // 7️⃣ Handle transfer.reversed
+    // 5️⃣ Handle transfer.reversed
     if (
       event.event === 'transfer.reversed' &&
       event.data.reference
@@ -111,7 +126,7 @@ exports.paystackWebhook = async (req, res) => {
       console.log(`↩️ Paystack transfer reversed for reference: ${event.data.reference}`);
     }
 
-    // 8️⃣ Handle transfer.pending
+    // 6️⃣ Handle transfer.pending
     if (
       event.event === 'transfer.pending' &&
       event.data.reference
@@ -123,7 +138,7 @@ exports.paystackWebhook = async (req, res) => {
       console.log(`⏳ Paystack transfer pending for reference: ${event.data.reference}`);
     }
 
-    // 9️⃣ Handle dedicatedaccount.credited (Virtual Account Funding)
+    // 7️⃣ Handle dedicatedaccount.credited (Virtual Account Funding)
     if (
       event.event === 'dedicatedaccount.credited' &&
       event.data.reference &&
@@ -131,11 +146,11 @@ exports.paystackWebhook = async (req, res) => {
     ) {
       const reference = event.data.reference;
       const amount = event.data.amount / 100;
-      const customer = event.data.customer;
+      const accountNumber = event.data.account_number;
 
-      // Find user by virtual account or customer code
+      // Find user by virtual account
       const virtualAccount = await db.VirtualAccount.findOne({
-        where: { accountNumber: event.data.account_number }
+        where: { accountNumber }
       });
       if (virtualAccount) {
         const user = await db.User.findOne({ where: { id: virtualAccount.userId } });
@@ -155,6 +170,11 @@ exports.paystackWebhook = async (req, res) => {
 
           wallet.balance += parseFloat(amount);
           await wallet.save();
+
+          // Notify user
+          sendInAppNotification(user.id, `Wallet funded: ₦${amount} via Virtual Account`);
+          sendEmail(user.id, `Your wallet has been credited with ₦${amount} via Virtual Account`);
+          sendSMS(user.id, `Your wallet has been credited with ₦${amount} via Virtual Account`);
 
           console.log(`✅ Virtual account funded: ₦${amount} for user ${user.email}`);
         }
@@ -228,60 +248,4 @@ exports.vtpassWebhook = async (req, res) => {
     console.error('❌ VTPass Webhook error:', err.message);
     res.status(500).json({ message: 'Internal webhook error' });
   }
-};
-// Add at the bottom of the file
-exports.paystackWebhook = async (req, res) => {
-  // Paystack sends events as POST JSON
-  const event = req.body;
-  // For security, verify the Paystack signature
-  const crypto = require('crypto');
-  const hash = crypto.createHmac('sha512', process.env.PAYSTACK_SECRET_KEY)
-    .update(JSON.stringify(req.body)).digest('hex');
-  if (req.headers['x-paystack-signature'] !== hash) {
-    return res.status(401).send('Invalid signature');
-  }
-
-  // Only handle successful charge events for dedicated accounts
-  if (event.event === 'charge.success' && event.data.status === 'success') {
-    try {
-      const accountNumber = event.data.metadata?.account_number || event.data.authorization?.receiver_bank_account_number;
-      const amount = parseFloat(event.data.amount) / 100;
-      const reference = event.data.reference;
-      // Find the virtual account in your DB
-      const virtualAccount = await db.VirtualAccount.findOne({ where: { accountNumber } });
-      if (!virtualAccount) return res.status(404).send('Account not found');
-      const userId = virtualAccount.userId;
-      // Credit the user's wallet
-      const wallet = await db.Wallet.findOne({ where: { userId } });
-      wallet.balance = parseFloat(wallet.balance) + amount;
-      await wallet.save();
-
-      // Log transaction
-      await db.Transaction.create({
-        userId,
-        type: 'credit',
-        amount,
-        reference,
-        description: 'Wallet deposit via Paystack',
-        status: 'success',
-        category: 'Wallet Funding',
-        senderName: event.data.customer?.first_name || null,
-        senderAccountNumber: event.data.customer?.customer_code || null,
-        recipientName: wallet.accountName || null,
-        recipientAccount: wallet.accountNumber || null,
-        bankName: event.data.authorization?.bank || null,
-      });
-
-      // Send notifications (implement these functions)
-      sendInAppNotification(userId, `Wallet funded: ₦${amount} via Paystack`);
-      sendEmail(userId, `Your wallet has been credited with ₦${amount}`);
-      sendSMS(userId, `Your wallet has been credited with ₦${amount}`);
-
-      return res.sendStatus(200);
-    } catch (err) {
-      console.error('Webhook error:', err);
-      return res.status(500).send('Webhook processing failed');
-    }
-  }
-  res.sendStatus(200);
 };
