@@ -1,5 +1,6 @@
 const sendEmail = require('./sendEmail');
 const sendSms = require('./sendSms');
+const sendPush = require('./sendPush'); // <-- You need to implement this
 const db = require('../models');
 
 const sendNotification = async (user, message, subject = 'ModernPay Notification') => {
@@ -29,21 +30,35 @@ const sendNotification = async (user, message, subject = 'ModernPay Notification
       });
     }
 
+    // Push/In-app notification
+    if (user.deviceToken) {
+      await sendPush(user.deviceToken, subject, message); // Implement sendPush for your platform
+      logs.push({
+        userId: user.id,
+        deviceToken: user.deviceToken,
+        channel: 'push',
+        subject,
+        message,
+        status: 'sent'
+      });
+    }
+
     // Save logs to database
     for (const log of logs) {
       await db.NotificationLog.create(log);
     }
 
-    console.log(`📤 Notification sent to ${user.email || user.phoneNumber}`);
+    console.log(`📤 Notification sent to ${user.email || user.phoneNumber || user.deviceToken}`);
   } catch (err) {
-    console.error(`❌ Notification failed for ${user.email || user.phoneNumber}: ${err.message}`);
+    console.error(`❌ Notification failed for ${user.email || user.phoneNumber || user.deviceToken}: ${err.message}`);
 
     // Log failed attempt
     await db.NotificationLog.create({
       userId: user.id,
       email: user.email,
       phone: user.phoneNumber,
-      channel: user.email ? 'email' : 'sms',
+      deviceToken: user.deviceToken,
+      channel: user.deviceToken ? 'push' : (user.email ? 'email' : 'sms'),
       subject,
       message,
       status: 'failed'
