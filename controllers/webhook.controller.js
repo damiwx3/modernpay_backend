@@ -14,19 +14,18 @@ exports.paystackWebhook = async (req, res) => {
   }
 
   const event = req.body;
+  let webhookLogId = null;
+  let user = null;
 
   try {
-    // Log Webhook
-    try {
-      await db.WebhookLog.create({
-        event: event.event || 'paystack',
-        reference: event.data?.reference,
-        status: event.data?.status || 'received',
-        payload: event,
-      });
-    } catch (logErr) {
-      console.error('WebhookLog error:', logErr.message);
-    }
+    // Log Webhook (initial, may update later)
+    let webhookLog = await db.WebhookLog.create({
+      event: event.event || 'paystack',
+      reference: event.data?.reference,
+      status: event.data?.status || 'received',
+      payload: event,
+    });
+    webhookLogId = webhookLog.id;
 
     // 1️⃣ Handle charge.success (Card/Bank Wallet Funding)
     if (
@@ -36,11 +35,10 @@ exports.paystackWebhook = async (req, res) => {
       event.data.reference
     ) {
       const reference = event.data.reference;
-      const amount = event.data.amount / 100; // Paystack sends amount in kobo
+      const amount = event.data.amount / 100;
       const email = event.data.customer.email;
 
-      // Find user by email (or use metadata for userId if you set it)
-      const user = await db.User.findOne({ where: { email } });
+      user = await db.User.findOne({ where: { email } });
       if (!user) return res.status(404).json({ message: 'User not found' });
 
       const wallet = await db.Wallet.findOne({ where: { userId: user.id } });
@@ -62,14 +60,19 @@ exports.paystackWebhook = async (req, res) => {
       wallet.balance += parseFloat(amount);
       await wallet.save();
 
-      // Notify user (in-app, email, SMS) with reference
+      // Update WebhookLog with userId
+      await db.WebhookLog.update({ userId: user.id }, { where: { id: webhookLogId } });
+
+      // Notify user and update notificationSent
       try {
         await sendNotification(
           user,
           `Your wallet has been credited with ₦${amount}. Reference: ${reference}`,
           'Wallet Credit'
         );
+        await db.WebhookLog.update({ notificationSent: true }, { where: { id: webhookLogId } });
       } catch (notifyErr) {
+        await db.WebhookLog.update({ errorMessage: notifyErr.message }, { where: { id: webhookLogId } });
         console.error('Notification error:', notifyErr.message);
       }
 
@@ -85,20 +88,24 @@ exports.paystackWebhook = async (req, res) => {
         { status: 'failed' },
         { where: { reference: event.data.reference } }
       );
-      // Notify user of failed funding
       try {
         const email = event.data.customer?.email;
         if (email) {
-          const user = await db.User.findOne({ where: { email } });
+          user = await db.User.findOne({ where: { email } });
           if (user) {
             await sendNotification(
               user,
               `Your wallet funding attempt failed. Reference: ${event.data.reference}`,
               'Wallet Funding Failed'
             );
+            await db.WebhookLog.update(
+              { userId: user.id, notificationSent: true },
+              { where: { id: webhookLogId } }
+            );
           }
         }
       } catch (notifyErr) {
+        await db.WebhookLog.update({ errorMessage: notifyErr.message }, { where: { id: webhookLogId } });
         console.error('Notification error:', notifyErr.message);
       }
       console.log(`❌ Paystack charge failed for reference: ${event.data.reference}`);
@@ -125,26 +132,30 @@ exports.paystackWebhook = async (req, res) => {
         { status: 'failed' },
         { where: { reference: event.data.reference } }
       );
-      // Optionally notify user of failed transfer
       try {
         const tx = await db.Transaction.findOne({ where: { reference: event.data.reference } });
         if (tx) {
-          const user = await db.User.findOne({ where: { id: tx.userId } });
+          user = await db.User.findOne({ where: { id: tx.userId } });
           if (user) {
             await sendNotification(
               user,
               `Your transfer attempt failed. Reference: ${event.data.reference}`,
               'Transfer Failed'
             );
+            await db.WebhookLog.update(
+              { userId: user.id, notificationSent: true },
+              { where: { id: webhookLogId } }
+            );
           }
         }
       } catch (notifyErr) {
+        await db.WebhookLog.update({ errorMessage: notifyErr.message }, { where: { id: webhookLogId } });
         console.error('Notification error:', notifyErr.message);
       }
       console.log(`❌ Paystack transfer failed for reference: ${event.data.reference}`);
     }
 
-    // 5️⃣ Handle transfer.reversed
+    // 5️⃣ Handle transfer.reversed (notify user)
     if (
       event.event === 'transfer.reversed' &&
       event.data.reference
@@ -153,20 +164,24 @@ exports.paystackWebhook = async (req, res) => {
         { status: 'reversed' },
         { where: { reference: event.data.reference } }
       );
-      // Optionally notify user of reversal
       try {
         const tx = await db.Transaction.findOne({ where: { reference: event.data.reference } });
         if (tx) {
-          const user = await db.User.findOne({ where: { id: tx.userId } });
+          user = await db.User.findOne({ where: { id: tx.userId } });
           if (user) {
             await sendNotification(
               user,
               `A transfer was reversed. Reference: ${event.data.reference}`,
               'Transfer Reversed'
             );
+            await db.WebhookLog.update(
+              { userId: user.id, notificationSent: true },
+              { where: { id: webhookLogId } }
+            );
           }
         }
       } catch (notifyErr) {
+        await db.WebhookLog.update({ errorMessage: notifyErr.message }, { where: { id: webhookLogId } });
         console.error('Notification error:', notifyErr.message);
       }
       console.log(`↩️ Paystack transfer reversed for reference: ${event.data.reference}`);
@@ -194,12 +209,11 @@ exports.paystackWebhook = async (req, res) => {
       const amount = event.data.amount / 100;
       const accountNumber = event.data.account_number;
 
-      // Find user by virtual account
       const virtualAccount = await db.VirtualAccount.findOne({
         where: { accountNumber }
       });
       if (virtualAccount) {
-        const user = await db.User.findOne({ where: { id: virtualAccount.userId } });
+        user = await db.User.findOne({ where: { id: virtualAccount.userId } });
         const wallet = await db.Wallet.findOne({ where: { userId: user.id } });
 
         // Prevent duplicate credit
@@ -217,14 +231,19 @@ exports.paystackWebhook = async (req, res) => {
           wallet.balance += parseFloat(amount);
           await wallet.save();
 
-          // Notify user (in-app, email, SMS) with reference
+          // Update WebhookLog with userId
+          await db.WebhookLog.update({ userId: user.id }, { where: { id: webhookLogId } });
+
+          // Notify user and update notificationSent
           try {
             await sendNotification(
               user,
               `Your wallet has been credited with ₦${amount} via Virtual Account. Reference: ${reference}`,
               'Wallet Credit'
             );
+            await db.WebhookLog.update({ notificationSent: true }, { where: { id: webhookLogId } });
           } catch (notifyErr) {
+            await db.WebhookLog.update({ errorMessage: notifyErr.message }, { where: { id: webhookLogId } });
             console.error('Notification error:', notifyErr.message);
           }
 
@@ -238,34 +257,34 @@ exports.paystackWebhook = async (req, res) => {
       console.log('Unhandled Paystack event:', event.event);
     }
 
-    // Always respond 200 OK to prevent repeated webhook calls
     res.status(200).send('Webhook received');
   } catch (err) {
+    if (webhookLogId) {
+      await db.WebhookLog.update({ errorMessage: err.message }, { where: { id: webhookLogId } });
+    }
     console.error('❌ Paystack Webhook error:', err.message);
     res.status(500).json({ message: 'Internal webhook error' });
   }
 };
 
 exports.vtpassWebhook = async (req, res) => {
+  let webhookLogId = null;
   try {
     const payload = req.body;
     console.log('VTPass Webhook received:', payload);
 
     // 1️⃣ Log the webhook event
-    try {
-      await db.WebhookLog.create({
-        event: 'vtpass',
-        reference: payload.request_id || payload.reference,
-        status: payload.status || payload.code || 'received',
-        payload: payload,
-      });
-    } catch (logErr) {
-      console.error('WebhookLog error:', logErr.message);
-    }
+    let webhookLog = await db.WebhookLog.create({
+      event: 'vtpass',
+      reference: payload.request_id || payload.reference,
+      status: payload.status || payload.code || 'received',
+      payload: payload,
+    });
+    webhookLogId = webhookLog.id;
 
     // 2️⃣ Extract reference/request_id and status
     const reference = payload.request_id || payload.reference;
-    const status = payload.status || payload.code; // e.g. 'delivered', 'failed', '000', etc.
+    const status = payload.status || payload.code;
 
     if (!reference) {
       console.warn('No reference/request_id in VTPass webhook');
@@ -286,7 +305,6 @@ exports.vtpassWebhook = async (req, res) => {
 
     // 5️⃣ Determine new status
     let newStatus = 'failed';
-    // VTPass may send 'delivered' or code '000' for success
     if (
       status === 'delivered' ||
       status === 'DELIVERED' ||
@@ -301,8 +319,6 @@ exports.vtpassWebhook = async (req, res) => {
     bill.responseData = payload;
     bill.paidAt = newStatus === 'success' ? new Date() : null;
     await bill.save();
-
-    console.log(`BillPayment ${reference} updated to ${newStatus}`);
 
     // 7️⃣ Notify user about bill payment status (with extra details)
     try {
@@ -320,13 +336,21 @@ exports.vtpassWebhook = async (req, res) => {
           notifyMsg = `Your bill payment (${bill.type || 'service'}) of ₦${bill.amount} failed. ${details}Reference: ${reference}`;
         }
         await sendNotification(user, notifyMsg, notifyTitle);
+        await db.WebhookLog.update(
+          { userId: user.id, notificationSent: true },
+          { where: { id: webhookLogId } }
+        );
       }
     } catch (notifyErr) {
+      await db.WebhookLog.update({ errorMessage: notifyErr.message }, { where: { id: webhookLogId } });
       console.error('Notification error (VTPass):', notifyErr.message);
     }
 
     res.status(200).send('Webhook received');
   } catch (err) {
+    if (webhookLogId) {
+      await db.WebhookLog.update({ errorMessage: err.message }, { where: { id: webhookLogId } });
+    }
     console.error('❌ VTPass Webhook error:', err.message);
     res.status(500).json({ message: 'Internal webhook error' });
   }
