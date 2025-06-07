@@ -85,4 +85,6 @@ router.post('/webhook/paystack', webhookController.paystackWebhook);
  */
 router.post('/vtpass', webhookController.vtpassWebhook);
 
+const walletController = require('../controllers/wallet.controller');
+
 module.exports = router;
