@@ -62,9 +62,13 @@ exports.paystackWebhook = async (req, res) => {
       wallet.balance += parseFloat(amount);
       await wallet.save();
 
-      // Notify user (in-app, email, SMS)
+      // Notify user (in-app, email, SMS) with reference
       try {
-        await sendNotification(user, `Your wallet has been credited with ₦${amount}`, 'Wallet Credit');
+        await sendNotification(
+          user,
+          `Your wallet has been credited with ₦${amount}. Reference: ${reference}`,
+          'Wallet Credit'
+        );
       } catch (notifyErr) {
         console.error('Notification error:', notifyErr.message);
       }
@@ -72,7 +76,7 @@ exports.paystackWebhook = async (req, res) => {
       console.log(`✅ Paystack wallet funded: ₦${amount} for ${email}`);
     }
 
-    // 2️⃣ Handle charge.failed
+    // 2️⃣ Handle charge.failed (notify user)
     if (
       event.event === 'charge.failed' &&
       event.data.reference
@@ -81,6 +85,22 @@ exports.paystackWebhook = async (req, res) => {
         { status: 'failed' },
         { where: { reference: event.data.reference } }
       );
+      // Notify user of failed funding
+      try {
+        const email = event.data.customer?.email;
+        if (email) {
+          const user = await db.User.findOne({ where: { email } });
+          if (user) {
+            await sendNotification(
+              user,
+              `Your wallet funding attempt failed. Reference: ${event.data.reference}`,
+              'Wallet Funding Failed'
+            );
+          }
+        }
+      } catch (notifyErr) {
+        console.error('Notification error:', notifyErr.message);
+      }
       console.log(`❌ Paystack charge failed for reference: ${event.data.reference}`);
     }
 
@@ -96,16 +116,31 @@ exports.paystackWebhook = async (req, res) => {
       console.log(`✅ Paystack transfer successful for reference: ${event.data.reference}`);
     }
 
-    // 4️⃣ Handle transfer.failed
+    // 4️⃣ Handle transfer.failed (notify user)
     if (
       event.event === 'transfer.failed' &&
       event.data.reference
     ) {
-      // Optionally refund wallet here
       await db.Transaction.update(
         { status: 'failed' },
         { where: { reference: event.data.reference } }
       );
+      // Optionally notify user of failed transfer
+      try {
+        const tx = await db.Transaction.findOne({ where: { reference: event.data.reference } });
+        if (tx) {
+          const user = await db.User.findOne({ where: { id: tx.userId } });
+          if (user) {
+            await sendNotification(
+              user,
+              `Your transfer attempt failed. Reference: ${event.data.reference}`,
+              'Transfer Failed'
+            );
+          }
+        }
+      } catch (notifyErr) {
+        console.error('Notification error:', notifyErr.message);
+      }
       console.log(`❌ Paystack transfer failed for reference: ${event.data.reference}`);
     }
 
@@ -114,11 +149,26 @@ exports.paystackWebhook = async (req, res) => {
       event.event === 'transfer.reversed' &&
       event.data.reference
     ) {
-      // Optionally refund wallet here
       await db.Transaction.update(
         { status: 'reversed' },
         { where: { reference: event.data.reference } }
       );
+      // Optionally notify user of reversal
+      try {
+        const tx = await db.Transaction.findOne({ where: { reference: event.data.reference } });
+        if (tx) {
+          const user = await db.User.findOne({ where: { id: tx.userId } });
+          if (user) {
+            await sendNotification(
+              user,
+              `A transfer was reversed. Reference: ${event.data.reference}`,
+              'Transfer Reversed'
+            );
+          }
+        }
+      } catch (notifyErr) {
+        console.error('Notification error:', notifyErr.message);
+      }
       console.log(`↩️ Paystack transfer reversed for reference: ${event.data.reference}`);
     }
 
@@ -167,9 +217,13 @@ exports.paystackWebhook = async (req, res) => {
           wallet.balance += parseFloat(amount);
           await wallet.save();
 
-          // Notify user (in-app, email, SMS)
+          // Notify user (in-app, email, SMS) with reference
           try {
-            await sendNotification(user, `Your wallet has been credited with ₦${amount} via Virtual Account`, 'Wallet Credit');
+            await sendNotification(
+              user,
+              `Your wallet has been credited with ₦${amount} via Virtual Account. Reference: ${reference}`,
+              'Wallet Credit'
+            );
           } catch (notifyErr) {
             console.error('Notification error:', notifyErr.message);
           }
@@ -177,6 +231,11 @@ exports.paystackWebhook = async (req, res) => {
           console.log(`✅ Virtual account funded: ₦${amount} for user ${user.email}`);
         }
       }
+    }
+
+    // Log unhandled events
+    else {
+      console.log('Unhandled Paystack event:', event.event);
     }
 
     // Always respond 200 OK to prevent repeated webhook calls
@@ -245,17 +304,20 @@ exports.vtpassWebhook = async (req, res) => {
 
     console.log(`BillPayment ${reference} updated to ${newStatus}`);
 
-    // 7️⃣ Notify user about bill payment status
+    // 7️⃣ Notify user about bill payment status (with extra details)
     try {
       const user = await db.User.findOne({ where: { id: bill.userId } });
       if (user) {
         let notifyMsg, notifyTitle;
+        let details = '';
+        if (bill.phone) details += `Phone: ${bill.phone}. `;
+        if (bill.meterNumber) details += `Meter: ${bill.meterNumber}. `;
         if (newStatus === 'success') {
           notifyTitle = 'Bill Payment Successful';
-          notifyMsg = `Your bill payment (${bill.type || 'service'}) of ₦${bill.amount} was successful.`;
+          notifyMsg = `Your bill payment (${bill.type || 'service'}) of ₦${bill.amount} was successful. ${details}Reference: ${reference}`;
         } else {
           notifyTitle = 'Bill Payment Failed';
-          notifyMsg = `Your bill payment (${bill.type || 'service'}) of ₦${bill.amount} failed.`;
+          notifyMsg = `Your bill payment (${bill.type || 'service'}) of ₦${bill.amount} failed. ${details}Reference: ${reference}`;
         }
         await sendNotification(user, notifyMsg, notifyTitle);
       }
