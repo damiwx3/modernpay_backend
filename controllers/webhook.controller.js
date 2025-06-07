@@ -229,3 +229,59 @@ exports.vtpassWebhook = async (req, res) => {
     res.status(500).json({ message: 'Internal webhook error' });
   }
 };
+// Add at the bottom of the file
+exports.paystackWebhook = async (req, res) => {
+  // Paystack sends events as POST JSON
+  const event = req.body;
+  // For security, verify the Paystack signature
+  const crypto = require('crypto');
+  const hash = crypto.createHmac('sha512', process.env.PAYSTACK_SECRET_KEY)
+    .update(JSON.stringify(req.body)).digest('hex');
+  if (req.headers['x-paystack-signature'] !== hash) {
+    return res.status(401).send('Invalid signature');
+  }
+
+  // Only handle successful charge events for dedicated accounts
+  if (event.event === 'charge.success' && event.data.status === 'success') {
+    try {
+      const accountNumber = event.data.metadata?.account_number || event.data.authorization?.receiver_bank_account_number;
+      const amount = parseFloat(event.data.amount) / 100;
+      const reference = event.data.reference;
+      // Find the virtual account in your DB
+      const virtualAccount = await db.VirtualAccount.findOne({ where: { accountNumber } });
+      if (!virtualAccount) return res.status(404).send('Account not found');
+      const userId = virtualAccount.userId;
+      // Credit the user's wallet
+      const wallet = await db.Wallet.findOne({ where: { userId } });
+      wallet.balance = parseFloat(wallet.balance) + amount;
+      await wallet.save();
+
+      // Log transaction
+      await db.Transaction.create({
+        userId,
+        type: 'credit',
+        amount,
+        reference,
+        description: 'Wallet deposit via Paystack',
+        status: 'success',
+        category: 'Wallet Funding',
+        senderName: event.data.customer?.first_name || null,
+        senderAccountNumber: event.data.customer?.customer_code || null,
+        recipientName: wallet.accountName || null,
+        recipientAccount: wallet.accountNumber || null,
+        bankName: event.data.authorization?.bank || null,
+      });
+
+      // Send notifications (implement these functions)
+      sendInAppNotification(userId, `Wallet funded: ₦${amount} via Paystack`);
+      sendEmail(userId, `Your wallet has been credited with ₦${amount}`);
+      sendSMS(userId, `Your wallet has been credited with ₦${amount}`);
+
+      return res.sendStatus(200);
+    } catch (err) {
+      console.error('Webhook error:', err);
+      return res.status(500).send('Webhook processing failed');
+    }
+  }
+  res.sendStatus(200);
+};
