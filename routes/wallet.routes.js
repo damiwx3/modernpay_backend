@@ -279,5 +279,7 @@ router.post('/set-pin', auth, walletController.setTransactionPin);
  *         description: Failed to fetch transaction
  */
 router.get('/transaction/:reference', auth, walletController.getTransactionByReference);
+router.get('/supported-dedicated-banks', auth, walletController.getSupportedDedicatedBanks);
+
 
 module.exports = router;
