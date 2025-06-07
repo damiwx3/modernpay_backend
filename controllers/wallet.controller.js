@@ -271,10 +271,18 @@ exports.createVirtualAccount = async (req, res) => {
       return res.status(200).json({ message: 'Virtual account already exists', account: existingAccount });
     }
 
-    // 3. Create or fetch Paystack customer
+    // 3. Validate preferred bank
+    const supportedBanksRes = await axios.get('https://api.paystack.co/bank?type=dedicated_account', {
+      headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` }
+    });
+    const supportedBanks = supportedBanksRes.data.data.map(b => b.slug);
+    if (!supportedBanks.includes(preferred_bank)) {
+      return res.status(400).json({ message: 'Selected bank is not supported for virtual accounts.' });
+    }
+
+    // 4. Create or fetch Paystack customer
     let customerCode = user.paystackCustomerCode;
     if (!customerCode) {
-      // Create customer on Paystack
       const customerRes = await axios.post(
         'https://api.paystack.co/customer',
         {
@@ -291,12 +299,11 @@ exports.createVirtualAccount = async (req, res) => {
         }
       );
       customerCode = customerRes.data.data.customer_code;
-      // Optionally save to your user model for future use
       user.paystackCustomerCode = customerCode;
       await user.save();
     }
 
-    // 4. Create virtual account via Paystack
+    // 5. Create virtual account via Paystack
     const response = await axios.post(
       'https://api.paystack.co/dedicated_account',
       {
@@ -314,7 +321,7 @@ exports.createVirtualAccount = async (req, res) => {
       }
     );
 
-    // 5. Store returned account details in your DB
+    // 6. Store returned account details in your DB
     const accountData = response.data.data;
     const savedAccount = await db.VirtualAccount.create({
       userId: user.id,
@@ -330,7 +337,7 @@ exports.createVirtualAccount = async (req, res) => {
       raw: accountData,
     });
 
-    // 6. Update user's wallet with the new virtual account number and bank name
+    // 7. Update user's wallet with the new virtual account number and bank name
     await db.Wallet.update(
       {
         accountNumber: savedAccount.accountNumber,
