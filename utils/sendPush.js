@@ -13,8 +13,9 @@ if (!admin.apps.length) {
  * @param {string} deviceToken - The FCM device token.
  * @param {string} title - Notification title.
  * @param {string} body - Notification message/body.
+ * @param {object} customData - (Optional) Custom data to send with the notification.
  */
-const sendPush = async (deviceToken, title, body) => {
+const sendPush = async (deviceToken, title, body, customData = {}) => {
   const message = {
     token: deviceToken,
     notification: {
@@ -22,7 +23,14 @@ const sendPush = async (deviceToken, title, body) => {
       body
     },
     data: {
-      // You can add custom data here if needed
+      // Example custom fields:
+      type: customData.type || 'general',
+      transactionId: customData.transactionId || '',
+      amount: customData.amount || '',
+      reference: customData.reference || '',
+      screen: customData.screen || '',
+      // Add any other custom fields you want here
+      ...customData // This allows you to pass any extra fields dynamically
     }
   };
 
