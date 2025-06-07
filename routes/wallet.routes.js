@@ -563,6 +563,7 @@ router.post('/set-pin', auth, walletController.setTransactionPin);
 router.get('/transaction/:reference', auth, walletController.getTransactionByReference);
 router.get('/supported-dedicated-banks', auth, walletController.getSupportedDedicatedBanks);
 router.get('/transactions', auth, walletController.getTransactions);
+router.get('/user-by-account/:accountNumber', auth, walletController.getUserByAccountNumber);
 
 
 module.exports = router;
