@@ -410,3 +410,28 @@ exports.getTransactions = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch transactions', error: err.message });
   }
 };
+// 👤 Get User by Account Number (for recipient verification)
+exports.getUserByAccountNumber = async (req, res) => {
+  const { accountNumber } = req.params;
+  if (!accountNumber) {
+    return res.status(400).json({ message: 'Account number is required' });
+  }
+  try {
+    const wallet = await db.Wallet.findOne({ where: { accountNumber } });
+    if (!wallet) {
+      return res.status(404).json({ message: 'Account not found' });
+    }
+    const user = await db.User.findOne({ where: { id: wallet.userId } });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.status(200).json({
+      accountNumber: wallet.accountNumber,
+      accountName: wallet.accountName || user.fullName || user.name || user.email,
+      userId: user.id,
+      email: user.email,
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch user', error: err.message });
+  }
+};
