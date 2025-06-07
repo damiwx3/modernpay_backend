@@ -1,16 +1,6 @@
 const db = require('../models');
 const crypto = require('crypto');
-
-// --- Notification stubs (implement as needed) ---
-async function sendInAppNotification(userId, message) {
-  // Save to DB or push via socket
-}
-async function sendEmail(userId, message) {
-  // Use nodemailer or any email service
-}
-async function sendSMS(userId, message) {
-  // Use Twilio, Termii, etc.
-}
+const sendNotification = require('../utils/sendNotification');
 
 // Paystack webhook handler
 exports.paystackWebhook = async (req, res) => {
@@ -27,12 +17,16 @@ exports.paystackWebhook = async (req, res) => {
 
   try {
     // Log Webhook
-    await db.WebhookLog.create({
-      event: event.event || 'paystack',
-      reference: event.data?.reference,
-      status: event.data?.status || 'received',
-      payload: event,
-    });
+    try {
+      await db.WebhookLog.create({
+        event: event.event || 'paystack',
+        reference: event.data?.reference,
+        status: event.data?.status || 'received',
+        payload: event,
+      });
+    } catch (logErr) {
+      console.error('WebhookLog error:', logErr.message);
+    }
 
     // 1️⃣ Handle charge.success (Card/Bank Wallet Funding)
     if (
@@ -68,10 +62,12 @@ exports.paystackWebhook = async (req, res) => {
       wallet.balance += parseFloat(amount);
       await wallet.save();
 
-      // Notify user
-      sendInAppNotification(user.id, `Wallet funded: ₦${amount} via Paystack`);
-      sendEmail(user.id, `Your wallet has been credited with ₦${amount}`);
-      sendSMS(user.id, `Your wallet has been credited with ₦${amount}`);
+      // Notify user (in-app, email, SMS)
+      try {
+        await sendNotification(user, `Your wallet has been credited with ₦${amount}`, 'Wallet Credit');
+      } catch (notifyErr) {
+        console.error('Notification error:', notifyErr.message);
+      }
 
       console.log(`✅ Paystack wallet funded: ₦${amount} for ${email}`);
     }
@@ -171,10 +167,12 @@ exports.paystackWebhook = async (req, res) => {
           wallet.balance += parseFloat(amount);
           await wallet.save();
 
-          // Notify user
-          sendInAppNotification(user.id, `Wallet funded: ₦${amount} via Virtual Account`);
-          sendEmail(user.id, `Your wallet has been credited with ₦${amount} via Virtual Account`);
-          sendSMS(user.id, `Your wallet has been credited with ₦${amount} via Virtual Account`);
+          // Notify user (in-app, email, SMS)
+          try {
+            await sendNotification(user, `Your wallet has been credited with ₦${amount} via Virtual Account`, 'Wallet Credit');
+          } catch (notifyErr) {
+            console.error('Notification error:', notifyErr.message);
+          }
 
           console.log(`✅ Virtual account funded: ₦${amount} for user ${user.email}`);
         }
@@ -195,12 +193,16 @@ exports.vtpassWebhook = async (req, res) => {
     console.log('VTPass Webhook received:', payload);
 
     // 1️⃣ Log the webhook event
-    await db.WebhookLog.create({
-      event: 'vtpass',
-      reference: payload.request_id || payload.reference,
-      status: payload.status || payload.code || 'received',
-      payload: payload,
-    });
+    try {
+      await db.WebhookLog.create({
+        event: 'vtpass',
+        reference: payload.request_id || payload.reference,
+        status: payload.status || payload.code || 'received',
+        payload: payload,
+      });
+    } catch (logErr) {
+      console.error('WebhookLog error:', logErr.message);
+    }
 
     // 2️⃣ Extract reference/request_id and status
     const reference = payload.request_id || payload.reference;
@@ -242,6 +244,24 @@ exports.vtpassWebhook = async (req, res) => {
     await bill.save();
 
     console.log(`BillPayment ${reference} updated to ${newStatus}`);
+
+    // 7️⃣ Notify user about bill payment status
+    try {
+      const user = await db.User.findOne({ where: { id: bill.userId } });
+      if (user) {
+        let notifyMsg, notifyTitle;
+        if (newStatus === 'success') {
+          notifyTitle = 'Bill Payment Successful';
+          notifyMsg = `Your bill payment (${bill.type || 'service'}) of ₦${bill.amount} was successful.`;
+        } else {
+          notifyTitle = 'Bill Payment Failed';
+          notifyMsg = `Your bill payment (${bill.type || 'service'}) of ₦${bill.amount} failed.`;
+        }
+        await sendNotification(user, notifyMsg, notifyTitle);
+      }
+    } catch (notifyErr) {
+      console.error('Notification error (VTPass):', notifyErr.message);
+    }
 
     res.status(200).send('Webhook received');
   } catch (err) {
