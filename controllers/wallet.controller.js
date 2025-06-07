@@ -353,6 +353,18 @@ exports.createVirtualAccount = async (req, res) => {
     res.status(500).json({ message: 'Failed to create virtual account', error: err.response?.data || err.message });
   }
 };
+exports.getSupportedDedicatedBanks = async (req, res) => {
+  try {
+    const response = await axios.get('https://api.paystack.co/bank?type=dedicated_account', {
+      headers: {
+        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`
+      }
+    });
+    res.status(200).json({ banks: response.data.data });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch dedicated banks', error: err.response?.data || err.message });
+  }
+};
 // 🔒 Set Transaction PIN
 exports.setTransactionPin = async (req, res) => {
   if (!req.user || !req.user.id) {
