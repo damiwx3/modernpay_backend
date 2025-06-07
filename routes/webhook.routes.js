@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const webhookController = require('../controllers/webhook.controller');
-const walletController = require('../controllers/wallet.controller'); // <-- Add this line
 
 /**
  * @swagger
@@ -45,7 +44,7 @@ const walletController = require('../controllers/wallet.controller'); // <-- Add
  *       500:
  *         description: Internal webhook error
  */
-router.post('/webhook/paystack', webhookController.paystackWebhook); // Use webhookController
+router.post('/paystack', webhookController.paystackWebhook);
 
 /**
  * @swagger
