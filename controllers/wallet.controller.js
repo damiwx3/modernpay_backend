@@ -402,3 +402,11 @@ exports.getTransactionByReference = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch transaction', error: err.message });
   }
 };
+exports.getTransactions = async (req, res) => {
+  try {
+    const transactions = await db.Transaction.findAll({ where: { userId: req.user.id }, order: [['createdAt', 'DESC']] });
+    res.status(200).json({ transactions });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch transactions', error: err.message });
+  }
+};
