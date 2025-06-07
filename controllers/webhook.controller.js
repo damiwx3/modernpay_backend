@@ -199,58 +199,70 @@ exports.paystackWebhook = async (req, res) => {
       console.log(`⏳ Paystack transfer pending for reference: ${event.data.reference}`);
     }
 
-    // 7️⃣ Handle dedicatedaccount.credited (Virtual Account Funding)
-    if (
-      event.event === 'dedicatedaccount.credited' &&
-      event.data.reference &&
-      event.data.amount
-    ) {
-      const reference = event.data.reference;
-      const amount = event.data.amount / 100;
-      const accountNumber = event.data.account_number;
+   // ...inside your paystackWebhook handler...
 
-      const virtualAccount = await db.VirtualAccount.findOne({
-        where: { accountNumber }
-      });
-      if (virtualAccount) {
-        user = await db.User.findOne({ where: { id: virtualAccount.userId } });
-        const wallet = await db.Wallet.findOne({ where: { userId: user.id } });
+// 7️⃣ Handle dedicatedaccount.credited (Virtual Account Funding)
+if (
+  event.event === 'dedicatedaccount.credited' &&
+  event.data.reference &&
+  event.data.amount
+) {
+  const reference = event.data.reference;
+  const amount = event.data.amount / 100;
+  const accountNumber = event.data.account_number;
 
-        // Prevent duplicate credit
-        const exists = await db.Transaction.findOne({ where: { reference } });
-        if (!exists) {
-          await db.Transaction.create({
-            userId: wallet.userId,
-            type: 'credit',
-            amount: parseFloat(amount),
-            reference: reference,
-            description: 'Paystack virtual account funding',
-            status: 'success',
-          });
+  const virtualAccount = await db.VirtualAccount.findOne({
+    where: { accountNumber }
+  });
+  if (virtualAccount) {
+    user = await db.User.findOne({ where: { id: virtualAccount.userId } });
+    const wallet = await db.Wallet.findOne({ where: { userId: user.id } });
 
-          wallet.balance += parseFloat(amount);
-          await wallet.save();
-
-          // Update WebhookLog with userId
-          await db.WebhookLog.update({ userId: user.id }, { where: { id: webhookLogId } });
-
-          // Notify user and update notificationSent
-          try {
-            await sendNotification(
-              user,
-              `Your wallet has been credited with ₦${amount} via Virtual Account. Reference: ${reference}`,
-              'Wallet Credit'
-            );
-            await db.WebhookLog.update({ notificationSent: true }, { where: { id: webhookLogId } });
-          } catch (notifyErr) {
-            await db.WebhookLog.update({ errorMessage: notifyErr.message }, { where: { id: webhookLogId } });
-            console.error('Notification error:', notifyErr.message);
-          }
-
-          console.log(`✅ Virtual account funded: ₦${amount} for user ${user.email}`);
-        }
+    // Prevent duplicate credit
+    const exists = await db.Transaction.findOne({ where: { reference } });
+    if (!exists) {
+      // Extract sender name if available
+      let senderName = '';
+      if (event.data.sender && event.data.sender.name) {
+        senderName = event.data.sender.name;
       }
+
+      let description = senderName
+        ? `Transfer from ${senderName}`
+        : 'Paystack virtual account funding';
+
+      await db.Transaction.create({
+        userId: wallet.userId,
+        type: 'credit',
+        amount: parseFloat(amount),
+        reference: reference,
+        description: description,
+        status: 'success',
+      });
+
+      wallet.balance += parseFloat(amount);
+      await wallet.save();
+
+      // Update WebhookLog with userId
+      await db.WebhookLog.update({ userId: user.id }, { where: { id: webhookLogId } });
+
+      // Notify user and update notificationSent
+      try {
+        await sendNotification(
+          user,
+          `Your wallet has been credited with ₦${amount} via Virtual Account. Reference: ${reference}`,
+          'Wallet Credit'
+        );
+        await db.WebhookLog.update({ notificationSent: true }, { where: { id: webhookLogId } });
+      } catch (notifyErr) {
+        await db.WebhookLog.update({ errorMessage: notifyErr.message }, { where: { id: webhookLogId } });
+        console.error('Notification error:', notifyErr.message);
+      }
+
+      console.log(`✅ Virtual account funded: ₦${amount} for user ${user.email}`);
     }
+  }
+}
 
     // Log unhandled events
     else {
