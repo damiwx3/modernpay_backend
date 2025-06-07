@@ -4,6 +4,7 @@ module.exports = (sequelize, DataTypes) => {
     userId: { type: DataTypes.INTEGER, allowNull: false },
     title: { type: DataTypes.STRING, allowNull: false },
     message: { type: DataTypes.TEXT, allowNull: false },
+    data: { type: DataTypes.JSONB, allowNull: true }, // <-- Add this line
     read: { type: DataTypes.BOOLEAN, defaultValue: false }
   }, {
     timestamps: true
