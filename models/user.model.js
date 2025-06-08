@@ -16,6 +16,7 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: 'unverified'
     },
     kycLevel: { type: DataTypes.INTEGER, defaultValue: 1 }, // For tiered KYC
+    kycLimit: { type: DataTypes.BIGINT, allowNull: true }, // <-- Account limit per KYC tier
     bvn: { type: DataTypes.STRING },                        // For BVN storage
     address: { type: DataTypes.STRING },                    // For address
     selfieUrl: { type: DataTypes.STRING },                  // For selfie
