@@ -1,4 +1,4 @@
-zmodule.exports = (sequelize, DataTypes) => {
+module.exports = (sequelize, DataTypes) => {
   const KYCDocument = sequelize.define("KYCDocument", {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
 
