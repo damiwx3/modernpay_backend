@@ -3,6 +3,7 @@ const db = require('../models');
 
 // Tier 1: Phone + Selfie + BVN (Face Match)
 exports.verifyPhoneSelfieBvn = async (req, res) => {
+  console.log('KYC endpoint hit', req.body); 
   const { phone, selfieImage, bvn } = req.body;
   if (!phone || !selfieImage || !bvn) {
     return res.status(400).json({ message: 'Phone, selfie image, and BVN are required' });
