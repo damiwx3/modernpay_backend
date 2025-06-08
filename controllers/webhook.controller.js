@@ -48,20 +48,39 @@ exports.paystackWebhook = async (req, res) => {
       const exists = await db.Transaction.findOne({ where: { reference } });
       if (exists) return res.status(200).send('Already processed');
 
+      // Extract sender name if available
+      let senderName = '';
+      if (event.data.customer && (event.data.customer.first_name || event.data.customer.last_name)) {
+        senderName = `${event.data.customer.first_name || ''} ${event.data.customer.last_name || ''}`.trim();
+      }
+      let description = senderName
+        ? `Wallet funding by ${senderName}`
+        : 'ModernPay wallet funding';
+
       await db.Transaction.create({
         userId: wallet.userId,
         type: 'credit',
         amount: parseFloat(amount),
         reference: reference,
-        description: 'Paystack wallet funding',
+        description: description,
         status: 'success',
       });
 
+      console.log('Wallet balance before:', wallet.balance);
       wallet.balance += parseFloat(amount);
       await wallet.save();
+      console.log('Wallet balance after:', wallet.balance);
 
       // Update WebhookLog with userId
       await db.WebhookLog.update({ userId: user.id }, { where: { id: webhookLogId } });
+
+      // Log user data before notification
+      console.log('User for notification:', {
+        id: user.id,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        deviceToken: user.deviceToken
+      });
 
       // Notify user and update notificationSent
       try {
@@ -240,11 +259,21 @@ exports.paystackWebhook = async (req, res) => {
             status: 'success',
           });
 
+          console.log('Wallet balance before:', wallet.balance);
           wallet.balance += parseFloat(amount);
           await wallet.save();
+          console.log('Wallet balance after:', wallet.balance);
 
           // Update WebhookLog with userId
           await db.WebhookLog.update({ userId: user.id }, { where: { id: webhookLogId } });
+
+          // Log user data before notification
+          console.log('User for notification:', {
+            id: user.id,
+            email: user.email,
+            phoneNumber: user.phoneNumber,
+            deviceToken: user.deviceToken
+          });
 
           // Notify user and update notificationSent
           try {
@@ -279,6 +308,7 @@ exports.paystackWebhook = async (req, res) => {
   }
 };
 
+// VTPass webhook handler (unchanged, but you can add similar logging if needed)
 exports.vtpassWebhook = async (req, res) => {
   let webhookLogId = null;
   try {
