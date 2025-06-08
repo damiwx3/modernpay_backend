@@ -57,13 +57,18 @@ exports.paystackWebhook = async (req, res) => {
         ? `Transfer Recieved From ${senderName}`
         : 'ModernPay wallet funding';
 
-      await db.Transaction.create({
+       await db.Transaction.create({
         userId: wallet.userId,
         type: 'credit',
         amount: parseFloat(amount),
         reference: reference,
         description: description,
         status: 'success',
+        senderName: senderName || null,
+        senderBank: event.data.authorization?.bank || event.data.sender_bank || null,
+        recipientName: senderName || null,
+        recipientBank: event.data.recipient?.bank_name || null,
+        category: 'wallet_funding'
       });
 
       console.log('Wallet balance before:', wallet.balance, 'Amount:', amount);
@@ -252,7 +257,7 @@ exports.paystackWebhook = async (req, res) => {
 
           let description = senderName
             ? `Transfer from ${senderName}`
-            : 'Paystack virtual account funding';
+            : 'ModernPay account funding';
 
           await db.Transaction.create({
             userId: wallet.userId,
@@ -261,6 +266,11 @@ exports.paystackWebhook = async (req, res) => {
             reference: reference,
             description: description,
             status: 'success',
+            senderName: senderName || null,
+            senderBank: event.data.sender_bank || null,
+            recipientName: user.fullName || null,
+            recipientBank: null,
+            category: 'wallet_funding'
           });
 
           console.log('Wallet balance before:', wallet.balance, 'Amount:', amount);
