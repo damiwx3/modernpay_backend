@@ -497,7 +497,6 @@ exports.vtpassWebhook = async (req, res) => {
     res.status(500).json({ message: 'Internal webhook error' });
   }
 };
-
 // Youverify webhook handler
 exports.youverifyWebhook = async (req, res) => {
   const signature = req.headers['x-youverify-signature'];
@@ -514,27 +513,50 @@ exports.youverifyWebhook = async (req, res) => {
     }
   }
 
-  const { reference, status, type, data } = req.body;
+  const { reference, status, type, data, event } = req.body;
 
-  // ✅ Add this check:
-  if (!reference) {
-    console.error('❌ Youverify Webhook error: Missing reference in payload', req.body);
-    return res.status(400).json({ message: 'Missing reference in webhook payload' });
+  // Try to get a reference from known places
+  const ref =
+    reference ||
+    data?.reference ||
+    data?.idNumber ||
+    data?.parentId ||
+    null;
+
+  if (!ref) {
+    console.error('❌ Youverify Webhook error: Missing reference/idNumber in payload', req.body);
+    // Return 200 to avoid unnecessary retries from Youverify
+    return res.status(200).json({ message: 'Event ignored: no reference/idNumber' });
   }
+
   try {
-    // 1️⃣ Find the KYC document by externalReferenceId
-    const kycDoc = await db.KYCDocument.findOne({ where: { externalReferenceId: reference } });
+    // Try to find the KYC document by externalReferenceId or documentNumber
+    const kycDoc = await db.KYCDocument.findOne({
+      where: {
+        [Op.or]: [
+          { externalReferenceId: ref },
+          { documentNumber: ref }
+        ]
+      }
+    });
     if (!kycDoc) {
       return res.status(404).json({ message: 'KYC document not found' });
     }
 
-    // 2️⃣ Update KYC document status
-    kycDoc.status = status;
+    // Update KYC document status and response
+    kycDoc.status = status || data?.status || req.body.status || 'received';
     kycDoc.kycApiResponse = data || req.body;
     await kycDoc.save();
 
-    // 3️⃣ If verified, update user and notify
-    if (status === 'completed' || status === 'approved' || status === 'success') {
+    // If verified, update user and notify
+    if (
+      status === 'completed' ||
+      status === 'approved' ||
+      status === 'success' ||
+      data?.status === 'completed' ||
+      data?.status === 'approved' ||
+      data?.status === 'success'
+    ) {
       const user = await db.User.findByPk(kycDoc.userId);
       if (user) {
         // Optionally update user KYC status/level
@@ -554,7 +576,7 @@ exports.youverifyWebhook = async (req, res) => {
       }
     }
 
-    console.log('✅ Youverify webhook processed:', { reference, status, type });
+    console.log('✅ Youverify webhook processed:', { ref, status, type, event });
     res.status(200).json({ received: true });
   } catch (err) {
     console.error('❌ Youverify Webhook error:', err.message);
