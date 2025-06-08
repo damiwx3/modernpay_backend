@@ -74,8 +74,10 @@ exports.paystackWebhook = async (req, res) => {
       console.log('Wallet balance before:', wallet.balance, 'Amount:', amount);
 console.log('Type of wallet.balance:', typeof wallet.balance, 'Value:', wallet.balance);
 console.log('Type of amount:', typeof amount, 'Value:', amount);
-if (wallet.balance == null) wallet.balance = 0;
-wallet.balance += parseFloat(amount);
+
+if (wallet.balance == null || isNaN(wallet.balance)) wallet.balance = 0;
+wallet.balance = Number(wallet.balance) + Number(amount);
+
 await wallet.save();
 console.log('Wallet balance after:', wallet.balance);
       // Double-check balance in DB
@@ -278,8 +280,10 @@ console.log('Wallet balance after:', wallet.balance);
           console.log('Wallet balance before:', wallet.balance, 'Amount:', amount);
 console.log('Type of wallet.balance:', typeof wallet.balance, 'Value:', wallet.balance);
 console.log('Type of amount:', typeof amount, 'Value:', amount);
-if (wallet.balance == null) wallet.balance = 0;
-wallet.balance += parseFloat(amount);
+
+if (wallet.balance == null || isNaN(wallet.balance)) wallet.balance = 0;
+wallet.balance = Number(wallet.balance) + Number(amount);
+
 await wallet.save();
 console.log('Wallet balance after:', wallet.balance);
           // Double-check balance in DB
