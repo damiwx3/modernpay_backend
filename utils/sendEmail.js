@@ -11,6 +11,10 @@ const transporter = nodemailer.createTransport({
 });
 
 const sendEmail = async ({ to, subject, text, html }) => {
+  if (!to) {
+    console.error('❌ No recipient email address provided to sendEmail');
+    return;
+  }
   try {
     const mailOptions = {
       from: `"ModernPay Admin" <${process.env.EMAIL_USER}>`,
