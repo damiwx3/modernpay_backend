@@ -9,7 +9,12 @@ const sendNotification = async (user, message, subject = 'ModernPay Notification
   try {
     // Email notification
     if (user.email) {
-      await sendEmail(user.email, subject, message);
+      await sendEmail({
+  to: user.email,
+  subject,
+  text: message,
+  html: `<p>${message}</p>`
+});
       logs.push({
         userId: user.id,
         email: user.email,
