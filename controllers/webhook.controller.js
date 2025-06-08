@@ -66,10 +66,14 @@ exports.paystackWebhook = async (req, res) => {
         status: 'success',
       });
 
-      console.log('Wallet balance before:', wallet.balance);
+      console.log('Wallet balance before:', wallet.balance, 'Amount:', amount);
       wallet.balance += parseFloat(amount);
       await wallet.save();
       console.log('Wallet balance after:', wallet.balance);
+
+      // Double-check balance in DB
+      const freshWallet = await db.Wallet.findOne({ where: { userId: user.id } });
+      console.log('Wallet balance in DB:', freshWallet.balance);
 
       // Update WebhookLog with userId
       await db.WebhookLog.update({ userId: user.id }, { where: { id: webhookLogId } });
@@ -259,10 +263,14 @@ exports.paystackWebhook = async (req, res) => {
             status: 'success',
           });
 
-          console.log('Wallet balance before:', wallet.balance);
+          console.log('Wallet balance before:', wallet.balance, 'Amount:', amount);
           wallet.balance += parseFloat(amount);
           await wallet.save();
           console.log('Wallet balance after:', wallet.balance);
+
+          // Double-check balance in DB
+          const freshWallet = await db.Wallet.findOne({ where: { userId: user.id } });
+          console.log('Wallet balance in DB:', freshWallet.balance);
 
           // Update WebhookLog with userId
           await db.WebhookLog.update({ userId: user.id }, { where: { id: webhookLogId } });
@@ -308,7 +316,7 @@ exports.paystackWebhook = async (req, res) => {
   }
 };
 
-// VTPass webhook handler (unchanged, but you can add similar logging if needed)
+// VTPass webhook handler
 exports.vtpassWebhook = async (req, res) => {
   let webhookLogId = null;
   try {
@@ -377,6 +385,12 @@ exports.vtpassWebhook = async (req, res) => {
           notifyTitle = 'Bill Payment Failed';
           notifyMsg = `Your bill payment (${bill.type || 'service'}) of ₦${bill.amount} failed. ${details}Reference: ${reference}`;
         }
+        console.log('User for notification:', {
+          id: user.id,
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+          deviceToken: user.deviceToken
+        });
         await sendNotification(user, notifyMsg, notifyTitle);
         await db.WebhookLog.update(
           { userId: user.id, notificationSent: true },
