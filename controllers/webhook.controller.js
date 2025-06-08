@@ -72,7 +72,8 @@ exports.paystackWebhook = async (req, res) => {
       });
 
       console.log('Wallet balance before:', wallet.balance, 'Amount:', amount);
-// Fix: Ensure balance is not null
+console.log('Type of wallet.balance:', typeof wallet.balance, 'Value:', wallet.balance);
+console.log('Type of amount:', typeof amount, 'Value:', amount);
 if (wallet.balance == null) wallet.balance = 0;
 wallet.balance += parseFloat(amount);
 await wallet.save();
@@ -275,10 +276,12 @@ console.log('Wallet balance after:', wallet.balance);
           });
 
           console.log('Wallet balance before:', wallet.balance, 'Amount:', amount);
-          if (wallet.balance == null) wallet.balance = 0;
-          wallet.balance += parseFloat(amount);
-          await wallet.save();
-          console.log('Wallet balance after:', wallet.balance);
+console.log('Type of wallet.balance:', typeof wallet.balance, 'Value:', wallet.balance);
+console.log('Type of amount:', typeof amount, 'Value:', amount);
+if (wallet.balance == null) wallet.balance = 0;
+wallet.balance += parseFloat(amount);
+await wallet.save();
+console.log('Wallet balance after:', wallet.balance);
           // Double-check balance in DB
           const freshWallet = await db.Wallet.findOne({ where: { userId: user.id } });
           console.log('Wallet balance in DB:', freshWallet.balance);
