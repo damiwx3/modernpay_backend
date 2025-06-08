@@ -1,6 +1,8 @@
 const db = require('../models');
 const crypto = require('crypto');
 const sendNotification = require('../utils/sendNotification');
+const sendEmail = require('../utils/sendEmail');
+const sendSms = require('../utils/sendSms');
 
 // Paystack webhook handler
 exports.paystackWebhook = async (req, res) => {
