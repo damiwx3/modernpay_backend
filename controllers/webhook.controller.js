@@ -495,3 +495,61 @@ exports.vtpassWebhook = async (req, res) => {
     res.status(500).json({ message: 'Internal webhook error' });
   }
 };
+
+// Youverify webhook handler
+exports.youverifyWebhook = async (req, res) => {
+  const signature = req.headers['x-youverify-signature'];
+  const secret = process.env.YOUVERIFY_WEBHOOK_KEY;
+
+  // Verify signature (recommended)
+  if (signature && secret) {
+    const computed = crypto
+      .createHmac('sha256', secret)
+      .update(JSON.stringify(req.body))
+      .digest('hex');
+    if (computed !== signature) {
+      return res.status(401).json({ message: 'Invalid webhook signature' });
+    }
+  }
+
+  const { reference, status, type, data } = req.body;
+  try {
+    // 1️⃣ Find the KYC document by externalReferenceId
+    const kycDoc = await db.KYCDocument.findOne({ where: { externalReferenceId: reference } });
+    if (!kycDoc) {
+      return res.status(404).json({ message: 'KYC document not found' });
+    }
+
+    // 2️⃣ Update KYC document status
+    kycDoc.status = status;
+    kycDoc.kycApiResponse = data || req.body;
+    await kycDoc.save();
+
+    // 3️⃣ If verified, update user and notify
+    if (status === 'completed' || status === 'approved' || status === 'success') {
+      const user = await db.User.findByPk(kycDoc.userId);
+      if (user) {
+        // Optionally update user KYC status/level
+        user.kycStatus = 'verified';
+        await user.save();
+
+        // Prepare notification message
+        const notifyMsg = 'Congratulations! Your identity has been verified. You now have full access to ModernPay features.';
+        const notifyTitle = 'Identity Verified';
+
+        // Push notification
+        try { await sendNotification(user, notifyMsg, notifyTitle); } catch (e) { console.error('Push notification error:', e.message); }
+        // Email
+        try { await sendEmail({ to: user.email, subject: notifyTitle, text: notifyMsg }); } catch (e) { console.error('Email error:', e.message); }
+        // SMS
+        try { if (user.phoneNumber) await sendSms(user.phoneNumber, notifyMsg); } catch (e) { console.error('SMS error:', e.message); }
+      }
+    }
+
+    console.log('✅ Youverify webhook processed:', { reference, status, type });
+    res.status(200).json({ received: true });
+  } catch (err) {
+    console.error('❌ Youverify Webhook error:', err.message);
+    res.status(500).json({ message: 'Internal webhook error' });
+  }
+};
