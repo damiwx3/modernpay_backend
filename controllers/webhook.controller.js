@@ -106,7 +106,7 @@ const alertMsg =
   `Credit\n` +
   `Amt:${formatNaira(amount)}\n` +
   `Acc:${maskedAcc}\n` +
-  `Desc:${reference}/Paystack/ModernPay/${user.fullName || user.firstName || user.email}\n` +
+  `Desc:${reference}/ToModernPay/From/${senderName || 'Sender'}\n` +
   `Date:${new Date().toLocaleDateString('en-GB')}\n` +
   `Avail Bal:${formatNaira(wallet.balance)}\n`;
 
@@ -158,16 +158,54 @@ try {
     }
 
     // 3️⃣ Handle transfer.success
-    if (
-      event.event === 'transfer.success' &&
-      event.data.reference
-    ) {
-      await db.Transaction.update(
-        { status: 'success' },
-        { where: { reference: event.data.reference } }
-      );
-      console.log(`✅ Paystack transfer successful for reference: ${event.data.reference}`);
+    // ...existing code...
+
+// 3️⃣ Handle transfer.success
+if (
+  event.event === 'transfer.success' &&
+  event.data.reference
+) {
+  await db.Transaction.update(
+    { status: 'success' },
+    { where: { reference: event.data.reference } }
+  );
+  // --- Debit Notification Block START ---
+  const tx = await db.Transaction.findOne({ where: { reference: event.data.reference } });
+  if (tx) {
+    user = await db.User.findOne({ where: { id: tx.userId } });
+    const wallet = await db.Wallet.findOne({ where: { userId: user.id } });
+    if (user && wallet) {
+      const maskAccount = (acc) => acc ? acc.slice(0, 3) + '**' + acc.slice(-3) : '***';
+      const formatNaira = (num) => 'NGN' + Number(num).toLocaleString('en-NG', {minimumFractionDigits: 2});
+      const maskedAcc = maskAccount(wallet.accountNumber || wallet.account_number || '');
+      // Use recipientName or recipient_account for recipient info
+      const recipientInfo = tx.recipientName || tx.recipient_account || 'Recipient';
+      const recipientBank = tx.recipientBank || '';
+      const alertMsg =
+        `Debit\n` +
+        `Amt:${formatNaira(tx.amount)}\n` +
+        `Acc:${maskedAcc}\n` +
+        `Desc:${tx.reference}/${recipientInfo}${recipientBank ? '/' + recipientBank : ''}\n` +
+        `Date:${new Date().toLocaleDateString('en-GB')}\n` +
+        `Avail Bal:${formatNaira(wallet.balance)}\n`;
+      try {
+        await sendNotification(
+          user,
+          alertMsg,
+          'Wallet Debit'
+        );
+        await db.WebhookLog.update({ notificationSent: true }, { where: { id: webhookLogId } });
+      } catch (notifyErr) {
+        await db.WebhookLog.update({ errorMessage: notifyErr.message }, { where: { id: webhookLogId } });
+        console.error('Notification error:', notifyErr.message);
+      }
     }
+  }
+  // --- Debit Notification Block END ---
+  console.log(`✅ Paystack transfer successful for reference: ${event.data.reference}`);
+}
+
+// ...existing code...
 
     // 4️⃣ Handle transfer.failed (notify user)
     if (
@@ -326,7 +364,7 @@ const alertMsg =
   `Credit\n` +
   `Amt:${formatNaira(amount)}\n` +
   `Acc:${maskedAcc}\n` +
-  `Desc:${reference}/Paystack/ModernPay/${user.fullName || user.firstName || user.email}\n` +
+  `Desc:${reference}/ToModernPay/from/${senderName || 'Sender'}\n` +
   `Date:${new Date().toLocaleDateString('en-GB')}\n` +
   `Avail Bal:${formatNaira(wallet.balance)}\n`;
 
