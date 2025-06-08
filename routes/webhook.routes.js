@@ -86,4 +86,6 @@ router.post('/paystack', webhookController.paystackWebhook);
  */
 router.post('/vtpass', webhookController.vtpassWebhook);
 
+router.post('/youverify', express.json({ type: '*/*' }), webhookController.youverifyWebhook);
+
 module.exports = router;
