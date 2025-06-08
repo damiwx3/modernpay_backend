@@ -56,7 +56,7 @@ router.post('/verify-government-id', auth, kycController.verifyAnyGovernmentId);
 router.post('/verify-address-utility-bill', auth, kycController.verifyAddressAndUtilityBill);
 
 // Upload KYC Document (optional/manual)
-router.post('/upload', auth, upload.single('document'), kycController.uploadKycDocument);
+//router.post('/upload', auth, upload.single('document'), kycController.uploadKycDocument);
 
 // Get KYC Status and documents
 router.get('/status', auth, kycController.getKycStatus);
