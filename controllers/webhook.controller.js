@@ -54,7 +54,7 @@ exports.paystackWebhook = async (req, res) => {
         senderName = `${event.data.customer.first_name || ''} ${event.data.customer.last_name || ''}`.trim();
       }
       let description = senderName
-        ? `Wallet funding by ${senderName}`
+        ? `Transfer Recieved From ${senderName}`
         : 'ModernPay wallet funding';
 
       await db.Transaction.create({
