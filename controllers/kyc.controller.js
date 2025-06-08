@@ -32,6 +32,20 @@ exports.verifyPhoneAndSelfie = async (req, res) => {
       return res.status(400).json({ message: 'Selfie/Face match failed', details: selfieRes.data });
     }
 
+    // Save to KYCDocuments table
+    await db.KYCDocument.create({
+      userId: req.user.id,
+      documentType: 'selfie',
+      documentNumber: bvn,
+      documentUrl: null,
+      selfieUrl: selfieImage,
+      faceMatchScore: selfieRes.data.data?.score || null,
+      status: 'approved',
+      submittedAt: new Date(),
+      externalReferenceId: selfieRes.data.data?.reference || null,
+      kycApiResponse: selfieRes.data,
+    });
+
     await db.User.update(
       { kycLevel: 1, kycStatus: 'tier1_verified' },
       { where: { id: req.user.id } }
@@ -49,7 +63,7 @@ exports.verifyBvnOrNinAndAddress = async (req, res) => {
     return res.status(400).json({ message: 'BVN or NIN is required' });
   }
   try {
-    let verificationResult;
+    let verificationResult, docType, docNumber;
     if (bvn) {
       const response = await axios.post(
         'https://api.youverify.co/v2/api/identity/ng/bvn',
@@ -57,6 +71,8 @@ exports.verifyBvnOrNinAndAddress = async (req, res) => {
         { headers: { token: process.env.YOUVERIFY_API_KEY } }
       );
       verificationResult = response.data;
+      docType = 'bvn';
+      docNumber = bvn;
       if (verificationResult.status !== 'success') {
         return res.status(400).json({ message: 'BVN verification failed', details: verificationResult });
       }
@@ -67,6 +83,8 @@ exports.verifyBvnOrNinAndAddress = async (req, res) => {
         { headers: { token: process.env.YOUVERIFY_API_KEY } }
       );
       verificationResult = response.data;
+      docType = 'nin';
+      docNumber = nin;
       if (verificationResult.status !== 'success') {
         return res.status(400).json({ message: 'NIN verification failed', details: verificationResult });
       }
@@ -84,7 +102,30 @@ exports.verifyBvnOrNinAndAddress = async (req, res) => {
       if (addressResult.status !== 'success') {
         return res.status(400).json({ message: 'Address verification failed', details: addressResult });
       }
+      // Save address verification as a document
+      await db.KYCDocument.create({
+        userId: req.user.id,
+        documentType: 'address',
+        documentNumber: null,
+        documentUrl: null,
+        status: 'approved',
+        submittedAt: new Date(),
+        externalReferenceId: addressResult.data?.reference || null,
+        kycApiResponse: addressResult,
+      });
     }
+
+    // Save BVN/NIN verification as a document
+    await db.KYCDocument.create({
+      userId: req.user.id,
+      documentType: docType,
+      documentNumber: docNumber,
+      documentUrl: null,
+      status: 'approved',
+      submittedAt: new Date(),
+      externalReferenceId: verificationResult.data?.reference || null,
+      kycApiResponse: verificationResult,
+    });
 
     await db.User.update(
       { kycLevel: 2, kycStatus: 'tier2_verified' },
@@ -114,6 +155,16 @@ exports.verifyAddressOrSelfie = async (req, res) => {
       if (addressResult.status !== 'success') {
         return res.status(400).json({ message: 'Address verification failed', details: addressResult });
       }
+      await db.KYCDocument.create({
+        userId: req.user.id,
+        documentType: 'address',
+        documentNumber: null,
+        documentUrl: null,
+        status: 'approved',
+        submittedAt: new Date(),
+        externalReferenceId: addressResult.data?.reference || null,
+        kycApiResponse: addressResult,
+      });
     }
     if (selfieImage && bvn) {
       const selfieRes = await axios.post(
@@ -125,6 +176,17 @@ exports.verifyAddressOrSelfie = async (req, res) => {
       if (selfieResult.status !== 'success') {
         return res.status(400).json({ message: 'Selfie/Face match failed', details: selfieResult });
       }
+      await db.KYCDocument.create({
+        userId: req.user.id,
+        documentType: 'selfie',
+        documentNumber: bvn,
+        selfieUrl: selfieImage,
+        faceMatchScore: selfieResult.data?.score || null,
+        status: 'approved',
+        submittedAt: new Date(),
+        externalReferenceId: selfieResult.data?.reference || null,
+        kycApiResponse: selfieResult,
+      });
     }
 
     await db.User.update(
@@ -154,6 +216,17 @@ exports.verifyUtilityBill = async (req, res) => {
       return res.status(400).json({ message: 'Utility bill verification failed', details: utilRes.data });
     }
 
+    await db.KYCDocument.create({
+      userId: req.user.id,
+      documentType: 'utility_bill',
+      documentNumber: null,
+      documentUrl: utilityBillImage,
+      status: 'approved',
+      submittedAt: new Date(),
+      externalReferenceId: utilRes.data.data?.reference || null,
+      kycApiResponse: utilRes.data,
+    });
+
     await db.User.update(
       { kycLevel: 4, kycStatus: 'tier4_verified' },
       { where: { id: req.user.id } }
@@ -170,6 +243,14 @@ exports.uploadKycDocument = async (req, res) => {
     return res.status(400).json({ message: 'No document uploaded' });
   }
   // Save file info to DB or process as needed
+  await db.KYCDocument.create({
+    userId: req.user.id,
+    documentType: req.body.documentType || 'other',
+    documentNumber: req.body.documentNumber || null,
+    documentUrl: req.file.path,
+    status: 'pending',
+    submittedAt: new Date(),
+  });
   res.status(201).json({ message: 'KYC document uploaded successfully', file: req.file });
 };
 
