@@ -22,16 +22,20 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
     if (phoneRes.data.status !== 'success') {
       return res.status(400).json({ message: 'Phone verification failed', details: phoneRes.data });
     }
-    // ...rest of your code...
-    // 2. Face match with BVN
-    const selfieRes = await axios.post(
-      'https://api.youverify.co/v2/api/identity/ng/face-match',
-      { bvn, selfie_image: selfieImage },
-      { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
-    );
-    if (selfieRes.data.status !== 'success') {
-      return res.status(400).json({ message: 'Selfie/Face match failed', details: selfieRes.data });
-    }
+    // ...existing code...
+// 2. Face match with BVN
+console.log('Calling Youverify face-match API');
+const selfieRes = await axios.post(
+  'https://api.youverify.co/v2/api/identity/ng/face-match',
+  { bvn, selfie_image: selfieImage },
+  { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
+);
+console.log('Face-match API response:', selfieRes.data);
+
+if (selfieRes.data.status !== 'success') {
+  return res.status(400).json({ message: 'Selfie/Face match failed', details: selfieRes.data });
+}
+// ...rest of your code...
     await db.KYCDocument.create({
       userId: req.user.id,
       documentType: 'selfie',
