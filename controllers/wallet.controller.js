@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const logger = require('../utils/logger');
 const axios = require('axios');
 const bcrypt = require('bcryptjs');
+const sendNotification = require('../utils/sendNotification');
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
@@ -112,43 +113,76 @@ exports.transferFunds = async (req, res) => {
       return res.status(400).json({ message: 'Insufficient balance' });
     }
 
+    // ...existing code...
     senderWallet.balance = parseFloat(senderWallet.balance) - value;
     recipientWallet.balance = parseFloat(recipientWallet.balance) + value;
     await senderWallet.save({ transaction: t });
     await recipientWallet.save({ transaction: t });
 
-   // ...existing code...
-await db.Transaction.bulkCreate([
-  {
-    userId: req.user.id,
-    type: 'debit',
-    amount: value,
-    reference: uuidv4(),
-    description: `Transfer to ${recipientAccountNumber}`,
-    status: 'success',
-    category: 'Wallet Transfer',
-    senderName: senderWallet.accountName || req.user.name || null,
-    senderAccountNumber: senderWallet.accountNumber || null,
-    recipientName: recipientWallet.accountName || null,
-    recipientAccount: recipientWallet.accountNumber || null,
-    bankName: null, // Not needed for wallet transfer
-  },
-  {
-    userId: recipientWallet.userId,
-    type: 'credit',
-    amount: value,
-    reference: uuidv4(),
-    description: `Received from ${senderWallet.accountNumber}`,
-    status: 'success',
-    category: 'Wallet Transfer',
-    senderName: senderWallet.accountName || null,
-    senderAccountNumber: senderWallet.accountNumber || null,
-    recipientName: recipientWallet.accountName || null,
-    recipientAccount: recipientWallet.accountNumber || null,
-    bankName: null,
-  },
-], { transaction: t });
-// ...existing code...
+    // ...existing code...
+    await db.Transaction.bulkCreate([
+      {
+        userId: req.user.id,
+        type: 'debit',
+        amount: value,
+        reference: uuidv4(),
+        description: `Transfer to ${recipientAccountNumber}`,
+        status: 'success',
+        category: 'Wallet Transfer',
+        senderName: senderWallet.accountName || req.user.name || null,
+        senderAccountNumber: senderWallet.accountNumber || null,
+        recipientName: recipientWallet.accountName || null,
+        recipientAccount: recipientWallet.accountNumber || null,
+        bankName: null, // Not needed for wallet transfer
+      },
+      {
+        userId: recipientWallet.userId,
+        type: 'credit',
+        amount: value,
+        reference: uuidv4(),
+        description: `Received from ${senderWallet.accountNumber}`,
+        status: 'success',
+        category: 'Wallet Transfer',
+        senderName: senderWallet.accountName || null,
+        senderAccountNumber: senderWallet.accountNumber || null,
+        recipientName: recipientWallet.accountName || null,
+        recipientAccount: recipientWallet.accountNumber || null,
+        bankName: null,
+      },
+    ], { transaction: t });
+
+    // Fetch sender and recipient user info
+    const senderUser = await db.User.findOne({ where: { id: req.user.id } });
+    const recipientUser = await db.User.findOne({ where: { id: recipientWallet.userId } });
+
+    // Format helpers
+    const maskAccount = (acc) => acc ? acc.slice(0, 3) + '**' + acc.slice(-3) : '***';
+    const formatNaira = (num) => 'NGN' + Number(num).toLocaleString('en-NG', {minimumFractionDigits: 2});
+
+    // Debit notification for sender
+    const senderMaskedAcc = maskAccount(senderWallet.accountNumber || '');
+    const debitMsg =
+      `Debit\n` +
+      `Amt:${formatNaira(value)}\n` +
+      `Acc:${senderMaskedAcc}\n` +
+      `Desc:Wallet/Transfer/${recipientUser.fullName || recipientUser.name || recipientUser.email}\n` +
+      `Date:${new Date().toLocaleDateString('en-GB')}\n` +
+      `Avail Bal:${formatNaira(senderWallet.balance)}\n`;
+
+    await sendNotification(senderUser, debitMsg, 'Wallet Debit');
+
+    // Credit notification for recipient
+    const recipientMaskedAcc = maskAccount(recipientWallet.accountNumber || '');
+    const creditMsg =
+      `Credit\n` +
+      `Amt:${formatNaira(value)}\n` +
+      `Acc:${recipientMaskedAcc}\n` +
+      `Desc:Wallet/Transfer/${senderUser.fullName || senderUser.name || senderUser.email}\n` +
+      `Date:${new Date().toLocaleDateString('en-GB')}\n` +
+      `Avail Bal:${formatNaira(recipientWallet.balance)}\n`;
+
+    await sendNotification(recipientUser, creditMsg, 'Wallet Credit');
+
 
     await t.commit();
 
