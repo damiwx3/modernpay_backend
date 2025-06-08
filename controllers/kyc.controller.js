@@ -13,7 +13,7 @@ exports.verifyPhoneAndSelfie = async (req, res) => {
     const phoneRes = await axios.post(
       'https://api.youverify.co/v2/api/identity/ng/phone',
       { phone },
-      { headers: { token: process.env.YOUVERIFY_API_KEY } }
+      { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
     );
     if (phoneRes.data.status !== 'success') {
       return res.status(400).json({ message: 'Phone verification failed', details: phoneRes.data });
@@ -26,7 +26,7 @@ exports.verifyPhoneAndSelfie = async (req, res) => {
         bvn,
         selfie_image: selfieImage // base64 string or file URL
       },
-      { headers: { token: process.env.YOUVERIFY_API_KEY } }
+      { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
     );
     if (selfieRes.data.status !== 'success') {
       return res.status(400).json({ message: 'Selfie/Face match failed', details: selfieRes.data });
@@ -52,6 +52,7 @@ exports.verifyPhoneAndSelfie = async (req, res) => {
     );
     res.status(200).json({ message: 'Tier 1 unlocked (phone & selfie verified)', phone: phoneRes.data, selfie: selfieRes.data });
   } catch (err) {
+    console.error('Tier 1 KYC failed:', err.response?.data || err.message);
     res.status(500).json({ message: 'Tier 1 KYC failed', error: err.response?.data || err.message });
   }
 };
@@ -68,7 +69,7 @@ exports.verifyBvnOrNinAndAddress = async (req, res) => {
       const response = await axios.post(
         'https://api.youverify.co/v2/api/identity/ng/bvn',
         { id: bvn },
-        { headers: { token: process.env.YOUVERIFY_API_KEY } }
+        { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
       );
       verificationResult = response.data;
       docType = 'bvn';
@@ -80,7 +81,7 @@ exports.verifyBvnOrNinAndAddress = async (req, res) => {
       const response = await axios.post(
         'https://api.youverify.co/v2/api/identity/ng/nin',
         { id: nin },
-        { headers: { token: process.env.YOUVERIFY_API_KEY } }
+        { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
       );
       verificationResult = response.data;
       docType = 'nin';
@@ -96,7 +97,7 @@ exports.verifyBvnOrNinAndAddress = async (req, res) => {
       const addrRes = await axios.post(
         'https://api.youverify.co/v2/api/identity/ng/address',
         { address },
-        { headers: { token: process.env.YOUVERIFY_API_KEY } }
+        { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
       );
       addressResult = addrRes.data;
       if (addressResult.status !== 'success') {
@@ -133,6 +134,7 @@ exports.verifyBvnOrNinAndAddress = async (req, res) => {
     );
     res.status(200).json({ message: 'Tier 2 unlocked (NIN/BVN, ID, address verified)', verification: verificationResult, address: addressResult });
   } catch (err) {
+    console.error('Tier 2 KYC failed:', err.response?.data || err.message);
     res.status(500).json({ message: 'Tier 2 KYC failed', error: err.response?.data || err.message });
   }
 };
@@ -149,7 +151,7 @@ exports.verifyAddressOrSelfie = async (req, res) => {
       const addrRes = await axios.post(
         'https://api.youverify.co/v2/api/identity/ng/address',
         { address },
-        { headers: { token: process.env.YOUVERIFY_API_KEY } }
+        { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
       );
       addressResult = addrRes.data;
       if (addressResult.status !== 'success') {
@@ -170,7 +172,7 @@ exports.verifyAddressOrSelfie = async (req, res) => {
       const selfieRes = await axios.post(
         'https://api.youverify.co/v2/api/identity/ng/face-match',
         { bvn, selfie_image: selfieImage },
-        { headers: { token: process.env.YOUVERIFY_API_KEY } }
+        { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
       );
       selfieResult = selfieRes.data;
       if (selfieResult.status !== 'success') {
@@ -195,6 +197,7 @@ exports.verifyAddressOrSelfie = async (req, res) => {
     );
     res.status(200).json({ message: 'Tier 3 unlocked (address or selfie verified)', address: addressResult, selfie: selfieResult });
   } catch (err) {
+    console.error('Tier 3 KYC failed:', err.response?.data || err.message);
     res.status(500).json({ message: 'Tier 3 KYC failed', error: err.response?.data || err.message });
   }
 };
@@ -210,7 +213,7 @@ exports.verifyUtilityBill = async (req, res) => {
     const utilRes = await axios.post(
       'https://api.youverify.co/v2/api/identity/ng/utility-bill',
       { address, utility_bill_image: utilityBillImage },
-      { headers: { token: process.env.YOUVERIFY_API_KEY } }
+      { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
     );
     if (utilRes.data.status !== 'success') {
       return res.status(400).json({ message: 'Utility bill verification failed', details: utilRes.data });
@@ -233,6 +236,7 @@ exports.verifyUtilityBill = async (req, res) => {
     );
     res.status(200).json({ message: 'Tier 4 unlocked (utility bill verified)', utilityBill: utilRes.data });
   } catch (err) {
+    console.error('Tier 4 KYC failed:', err.response?.data || err.message);
     res.status(500).json({ message: 'Tier 4 KYC failed', error: err.response?.data || err.message });
   }
 };
