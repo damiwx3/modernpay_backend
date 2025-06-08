@@ -8,10 +8,10 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
     return res.status(400).json({ message: 'Phone, selfie image, and BVN are required' });
   }
   try {
-    // 1. Phone verification
+    // 1. Phone verification (Youverify expects "mobile" and "isSubjectConsent")
     const phoneRes = await axios.post(
       'https://api.youverify.co/v2/api/identity/ng/phone',
-      { phone },
+      { mobile: phone, isSubjectConsent: true },
       { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
     );
     if (phoneRes.data.status !== 'success') {
