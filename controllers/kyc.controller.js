@@ -157,13 +157,14 @@ exports.verifyAddressAndUtilityBill = async (req, res) => {
 // Get KYC status
 exports.getKycStatus = async (req, res) => {
   const user = await db.User.findByPk(req.user.id, {
-    attributes: ['kycLevel', 'kycStatus']
+    attributes: ['kycLevel', 'kycStatus', 'kycLimit']
   });
   if (!user) {
     return res.status(404).json({ message: 'User not found' });
   }
   res.status(200).json({
     kycLevel: user.kycLevel,
-    kycStatus: user.kycStatus
+    kycStatus: user.kycStatus,
+    kycLimit: user.kycLimit
   });
 };
