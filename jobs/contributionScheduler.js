@@ -74,7 +74,11 @@ const scheduleContributions = () => {
 
               // Send Email
               if (user.email) {
-                await sendEmail(user.email, 'Contribution Reminder', msg);
+                await sendEmail({
+                  to: user.email,
+                  subject: 'Contribution Reminder',
+                  text: msg
+                });
               }
 
               totalReminders++;
@@ -95,43 +99,43 @@ const scheduleContributions = () => {
         }
 
         // --- Payout Logic ---
-// After all members processed, check if all have paid
-const paidMembers = await db.ContributionPayment.count({
-  where: { cycleId: cycle.id, status: 'paid' }
-});
+        // After all members processed, check if all have paid
+        const paidMembers = await db.ContributionPayment.count({
+          where: { cycleId: cycle.id, status: 'paid' }
+        });
 
-console.log('cycle.cycleNumber:', cycle.cycleNumber);
-console.log('members.length:', members.length);
+        console.log('cycle.cycleNumber:', cycle.cycleNumber);
+        console.log('members.length:', members.length);
 
-if (
-  cycle.cycleNumber &&
-  members.length > 0 &&
-  paidMembers === members.length
-) {
-  // Determine winner (e.g., by cycle number order)
-  const winnerIndex = (cycle.cycleNumber - 1) % members.length;
-  const winner = members[winnerIndex];
+        if (
+          cycle.cycleNumber &&
+          members.length > 0 &&
+          paidMembers === members.length
+        ) {
+          // Determine winner (e.g., by cycle number order)
+          const winnerIndex = (cycle.cycleNumber - 1) % members.length;
+          const winner = members[winnerIndex];
 
-  const winnerWallet = await db.Wallet.findOne({ where: { userId: winner.userId } });
-  const payoutAmount = amount * members.length;
-  winnerWallet.balance = parseFloat(winnerWallet.balance) + payoutAmount;
-  await winnerWallet.save();
+          const winnerWallet = await db.Wallet.findOne({ where: { userId: winner.userId } });
+          const payoutAmount = amount * members.length;
+          winnerWallet.balance = parseFloat(winnerWallet.balance) + payoutAmount;
+          await winnerWallet.save();
 
-  // Log payout transaction
-  await db.Transaction.create({
-    userId: winner.userId,
-    amount: payoutAmount,
-    type: 'credit',
-    description: `Payout for "${group.name}" (Cycle #${cycle.cycleNumber})`
-  });
+          // Log payout transaction
+          await db.Transaction.create({
+            userId: winner.userId,
+            amount: payoutAmount,
+            type: 'credit',
+            description: `Payout for "${group.name}" (Cycle #${cycle.cycleNumber})`
+          });
 
-  // Mark cycle as closed
-  cycle.status = 'closed';
-  await cycle.save();
+          // Mark cycle as closed
+          cycle.status = 'closed';
+          await cycle.save();
 
-  console.log(`🏆 Payout of ₦${payoutAmount} credited to user ${winner.userId}`);
-}
-// --- End Payout Logic ---
+          console.log(`🏆 Payout of ₦${payoutAmount} credited to user ${winner.userId}`);
+        }
+        // --- End Payout Logic ---
       }
 
       console.log('✅ Contribution Scheduler completed.\n');
@@ -147,7 +151,11 @@ if (
 
       const adminEmails = ['admin@modernstarfilms.com', 'babaalawda@gmail.com'];
       for (const email of adminEmails) {
-        await sendEmail(email, 'Daily Contribution Summary', summary);
+        await sendEmail({
+          to: email,
+          subject: 'Daily Contribution Summary',
+          text: summary
+        });
       }
 
     } catch (err) {
