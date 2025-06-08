@@ -302,17 +302,31 @@ console.log('Wallet balance after:', wallet.balance);
           });
 
           // Notify user and update notificationSent
-          try {
-            await sendNotification(
-              user,
-              `Your wallet has been credited with ₦${amount} via Virtual Account. Reference: ${reference}`,
-              'Wallet Credit'
-            );
-            await db.WebhookLog.update({ notificationSent: true }, { where: { id: webhookLogId } });
-          } catch (notifyErr) {
-            await db.WebhookLog.update({ errorMessage: notifyErr.message }, { where: { id: webhookLogId } });
-            console.error('Notification error:', notifyErr.message);
-          }
+          // Format/mask account number (adjust field as needed)
+const maskAccount = (acc) => acc ? acc.slice(0, 3) + '**' + acc.slice(-3) : '***';
+const formatNaira = (num) => 'NGN' + Number(num).toLocaleString('en-NG', {minimumFractionDigits: 2});
+const maskedAcc = maskAccount(wallet.accountNumber || wallet.account_number || '');
+
+// Compose alert message
+const alertMsg =
+  `Credit\n` +
+  `Amt:${formatNaira(amount)}\n` +
+  `Acc:${maskedAcc}\n` +
+  `Desc:${reference}/Paystack/ModernPay/${user.fullName || user.firstName || user.email}\n` +
+  `Date:${new Date().toLocaleDateString('en-GB')}\n` +
+  `Avail Bal:${formatNaira(wallet.balance)}\n`;
+
+try {
+  await sendNotification(
+    user,
+    alertMsg,
+    'Wallet Credit'
+  );
+  await db.WebhookLog.update({ notificationSent: true }, { where: { id: webhookLogId } });
+} catch (notifyErr) {
+  await db.WebhookLog.update({ errorMessage: notifyErr.message }, { where: { id: webhookLogId } });
+  console.error('Notification error:', notifyErr.message);
+}
 
           console.log(`✅ Virtual account funded: ₦${amount} for user ${user.email}`);
         }
