@@ -518,7 +518,7 @@ exports.youverifyWebhook = async (req, res) => {
 
   // ✅ Add this check:
   if (!reference) {
-    console.error('❌ Youverify Webhook error: Missing reference in payload');
+    console.error('❌ Youverify Webhook error: Missing reference in payload', req.body);
     return res.status(400).json({ message: 'Missing reference in webhook payload' });
   }
   try {
