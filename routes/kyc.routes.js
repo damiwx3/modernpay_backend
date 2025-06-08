@@ -6,52 +6,6 @@ const upload = require('../middleware/upload.middleware'); // Multer middleware 
 
 /**
  * @swagger
- * tags:
- *   name: KYC
- *   description: KYC verification and document upload
- */
-
-/**
- * @swagger
- * /api/kyc/verify-phone-selfie:
- *   post:
- *     summary: Tier 1 - Verify phone number and selfie
- *     tags: [KYC]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Tier 1 unlocked (phone & selfie verified)
- */
-
-/**
- * @swagger
- * /api/kyc/verify-bvn-or-nin-address:
- *   post:
- *     summary: Tier 2 - Verify NIN/BVN, ID, and address
- *     tags: [KYC]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Tier 2 unlocked (NIN/BVN, ID, address verified)
- */
-
-/**
- * @swagger
- * /api/kyc/verify-address-or-selfie:
- *   post:
- *     summary: Tier 3 - Address or Selfie Verification
- *     tags: [KYC]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Tier 3 unlocked (address or selfie verified)
- */
-
-/**
- * @swagger
  * /api/kyc/upload:
  *   post:
  *     summary: Upload KYC documents
@@ -92,16 +46,16 @@ const upload = require('../middleware/upload.middleware'); // Multer middleware 
  *         description: User not found
  */
 
-// Tier 1: Phone number and selfie verification (NGN 200,000 limit)
-router.post('/verify-phone-selfie', auth, kycController.verifyPhoneAndSelfie);
+// Tier 1: Phone + Selfie + BVN (Face Match)
+router.post('/verify-phone-selfie-bvn', auth, kycController.verifyPhoneSelfieBvn);
 
-// Tier 2: NIN/BVN, ID, and address verification (NGN 5,000,000 limit)
-router.post('/verify-bvn-or-nin-address', auth, kycController.verifyBvnOrNinAndAddress);
+// Tier 2: NIN, Driver’s License, Passport, or PVC
+router.post('/verify-government-id', auth, kycController.verifyAnyGovernmentId);
 
-// Tier 3: Address or Selfie Verification (Unlimited)
-router.post('/verify-address-or-selfie', auth, kycController.verifyAddressOrSelfie);
+// Tier 3: Address & Utility Bill
+router.post('/verify-address-utility-bill', auth, kycController.verifyAddressAndUtilityBill);
 
-// Tier 3: Upload KYC Document (ID card, etc.)
+// Upload KYC Document (optional/manual)
 router.post('/upload', auth, upload.single('document'), kycController.uploadKycDocument);
 
 // Get KYC Status and documents
