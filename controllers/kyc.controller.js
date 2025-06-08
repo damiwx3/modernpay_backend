@@ -38,7 +38,7 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
       kycApiResponse: selfieRes.data,
     });
     await db.User.update(
-      { kycLevel: 1, kycStatus: 'tier1_verified' },
+      { kycLevel: 1, kycStatus: 'tier1_verified', kycLimit: 500000 }, // Set Tier 1 limit
       { where: { id: req.user.id } }
     );
     res.status(200).json({ message: 'Tier 1 unlocked (phone, selfie, BVN verified)', phone: phoneRes.data, selfie: selfieRes.data });
@@ -87,7 +87,7 @@ exports.verifyAnyGovernmentId = async (req, res) => {
       kycApiResponse: response.data,
     });
     await db.User.update(
-      { kycLevel: 2, kycStatus: 'tier2_verified' },
+      { kycLevel: 2, kycStatus: 'tier2_verified', kycLimit: 10000000 }, // Set Tier 2 limit
       { where: { id: req.user.id } }
     );
     res.status(200).json({ message: 'Tier 2 unlocked (ID verified)', verification: response.data });
@@ -144,7 +144,7 @@ exports.verifyAddressAndUtilityBill = async (req, res) => {
       kycApiResponse: utilRes.data,
     });
     await db.User.update(
-      { kycLevel: 3, kycStatus: 'tier3_verified' },
+      { kycLevel: 3, kycStatus: 'tier3_verified', kycLimit: null }, // Set Tier 3 limit (unlimited)
       { where: { id: req.user.id } }
     );
     res.status(200).json({ message: 'Tier 3 unlocked (address & utility bill verified)', address: addrRes.data, utilityBill: utilRes.data });
