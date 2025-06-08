@@ -515,6 +515,12 @@ exports.youverifyWebhook = async (req, res) => {
   }
 
   const { reference, status, type, data } = req.body;
+
+  // ✅ Add this check:
+  if (!reference) {
+    console.error('❌ Youverify Webhook error: Missing reference in payload');
+    return res.status(400).json({ message: 'Missing reference in webhook payload' });
+  }
   try {
     // 1️⃣ Find the KYC document by externalReferenceId
     const kycDoc = await db.KYCDocument.findOne({ where: { externalReferenceId: reference } });
