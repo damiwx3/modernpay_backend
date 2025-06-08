@@ -10,6 +10,7 @@ const sendNotification = async (user, message, subject = 'ModernPay Notification
     // Email notification
     if (user.email) {
       await sendEmail({
+  from: 'ModernPay <noreply@modernpay.com>', // <-- Add this line
   to: user.email,
   subject,
   text: message,
