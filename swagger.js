@@ -10,8 +10,12 @@ const swaggerDefinition = {
   },
   servers: [
     {
-      url: 'http://localhost:5000', // Change to your deployed server URL
+      url: 'http://localhost:5000',
       description: 'Local Development Server',
+    },
+    {
+      url: 'https://modernpay-backend.onrender.com/',
+      description: 'Production Server',
     },
   ],
   components: {
@@ -30,13 +34,11 @@ const swaggerDefinition = {
   ]
 };
 
-// Options for the swagger docs
 const options = {
   swaggerDefinition,
-  apis: ['./routes/*.js'], // ✅ this scans for comments in all route files
+  apis: ['./routes/*.js'],
 };
 
-// Initialize swagger-jsdoc
 const swaggerSpec = swaggerJSDoc(options);
 
 module.exports = swaggerSpec;
