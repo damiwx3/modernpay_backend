@@ -10,6 +10,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     password: { type: DataTypes.STRING, allowNull: false },
     phoneNumber: { type: DataTypes.STRING, allowNull: true },
+    deviceToken: { type: DataTypes.STRING, allowNull: true }, // <-- Add here
     kycStatus: {
       type: DataTypes.ENUM('unverified', 'pending', 'approved', 'rejected'),
       defaultValue: 'unverified'
