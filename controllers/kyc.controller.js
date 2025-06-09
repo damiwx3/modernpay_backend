@@ -9,21 +9,33 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
     return res.status(400).json({ message: 'Phone, selfie image, and BVN are required' });
   }
   try {
-    // Add this log before the API call
-    console.log('Calling Youverify phone API');
-    const phoneRes = await axios.post(
-      'https://api.youverify.co/v2/api/identity/ng/phone',
-      { mobile: phone, isSubjectConsent: true },
-      { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
-    );
-    // Add this log after the API call
-    console.log('Phone API response:', phoneRes.data);
+    // 1. Phone verification (already present)
+console.log('Calling Youverify phone API');
+const phoneRes = await axios.post(
+  'https://api.youverify.co/v2/api/identity/ng/phone',
+  { mobile: phone, isSubjectConsent: true },
+  { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
+);
+console.log('Phone API response:', phoneRes.data);
 
-    if (phoneRes.data.status !== 'success') {
-      return res.status(400).json({ message: 'Phone verification failed', details: phoneRes.data });
-    }
-    // ...existing code...
-// 2. Face match with BVN
+if (phoneRes.data.status !== 'success') {
+  return res.status(400).json({ message: 'Phone verification failed', details: phoneRes.data });
+}
+
+// 2. BVN verification (add this)
+console.log('Calling Youverify BVN API');
+const bvnRes = await axios.post(
+  'https://api.youverify.co/v2/api/identity/ng/bvn',
+  { id: bvn, isSubjectConsent: true },
+  { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
+);
+console.log('BVN API response:', bvnRes.data);
+
+if (bvnRes.data.status !== 'success') {
+  return res.status(400).json({ message: 'BVN verification failed', details: bvnRes.data });
+}
+
+// 3. Face match with BVN (already present)
 console.log('Calling Youverify face-match API');
 const selfieRes = await axios.post(
   'https://api.youverify.co/v2/api/identity/ng/face-match',
