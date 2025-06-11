@@ -1,58 +1,75 @@
 const axios = require('axios');
 const db = require('../models');
+const cloudinary = require('../utils/cloudinary'); // If you use Cloudinary for image uploads
 
 // Tier 1: Phone + Selfie + BVN (Face Match)
 exports.verifyPhoneSelfieBvn = async (req, res) => {
-  console.log('KYC endpoint hit', req.body); 
-  const { phone, selfieImage, bvn } = req.body;
-  if (!phone || !selfieImage || !bvn) {
+  console.log('KYC endpoint hit', req.body);
+
+  const { phone, bvn } = req.body;
+  const selfieFile = req.file; // Multer puts the file here
+
+  if (!phone || !selfieFile || !bvn) {
     return res.status(400).json({ message: 'Phone, selfie image, and BVN are required' });
   }
+
   try {
-    // 1. Phone verification (already present)
-console.log('Calling Youverify phone API');
-const phoneRes = await axios.post(
-  'https://api.youverify.co/v2/api/identity/ng/phone',
-  { mobile: phone, isSubjectConsent: true },
-  { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
-);
-console.log('Phone API response:', phoneRes.data);
+    // 1. Upload selfie to Cloudinary (optional, if you want a URL)
+    let selfieUrl;
+    if (cloudinary && selfieFile) {
+      const uploadRes = await cloudinary.uploader.upload(selfieFile.path, {
+        folder: 'kyc_selfies'
+      });
+      selfieUrl = uploadRes.secure_url;
+    } else {
+      selfieUrl = selfieFile.path; // fallback to file path if not using cloudinary
+    }
 
-if (phoneRes.data.status !== 'success') {
-  return res.status(400).json({ message: 'Phone verification failed', details: phoneRes.data });
-}
+    // 2. Phone verification
+    console.log('Calling Youverify phone API');
+    const phoneRes = await axios.post(
+      'https://api.youverify.co/v2/api/identity/ng/phone',
+      { mobile: phone, isSubjectConsent: true },
+      { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
+    );
+    console.log('Phone API response:', phoneRes.data);
 
-// 2. BVN verification (add this)
-console.log('Calling Youverify BVN API');
-const bvnRes = await axios.post(
-  'https://api.youverify.co/v2/api/identity/ng/bvn',
-  { id: bvn, isSubjectConsent: true },
-  { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
-);
-console.log('BVN API response:', bvnRes.data);
+    if (phoneRes.data.status !== 'success') {
+      return res.status(400).json({ message: 'Phone verification failed', details: phoneRes.data });
+    }
 
-if (bvnRes.data.status !== 'success') {
-  return res.status(400).json({ message: 'BVN verification failed', details: bvnRes.data });
-}
+    // 3. BVN verification
+    console.log('Calling Youverify BVN API');
+    const bvnRes = await axios.post(
+      'https://api.youverify.co/v2/api/identity/ng/bvn',
+      { id: bvn, isSubjectConsent: true },
+      { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
+    );
+    console.log('BVN API response:', bvnRes.data);
 
-// 3. Face match with BVN (already present)
-console.log('Calling Youverify face-match API');
-const selfieRes = await axios.post(
-  'https://api.youverify.co/v2/api/identity/ng/face-match',
-  { bvn, selfie_image: selfieImage },
-  { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
-);
-console.log('Face-match API response:', selfieRes.data);
+    if (bvnRes.data.status !== 'success') {
+      return res.status(400).json({ message: 'BVN verification failed', details: bvnRes.data });
+    }
 
-if (selfieRes.data.status !== 'success') {
-  return res.status(400).json({ message: 'Selfie/Face match failed', details: selfieRes.data });
-}
-// ...rest of your code...
+    // 4. Face match with BVN
+    console.log('Calling Youverify face-match API');
+    const selfieRes = await axios.post(
+      'https://api.youverify.co/v2/api/identity/ng/face-match',
+      { bvn, selfie_image: selfieUrl },
+      { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
+    );
+    console.log('Face-match API response:', selfieRes.data);
+
+    if (selfieRes.data.status !== 'success') {
+      return res.status(400).json({ message: 'Selfie/Face match failed', details: selfieRes.data });
+    }
+
+    // Save KYC document
     await db.KYCDocument.create({
       userId: req.user.id,
       documentType: 'selfie',
       documentNumber: bvn,
-      selfieUrl: selfieImage,
+      selfieUrl: selfieUrl,
       faceMatchScore: selfieRes.data.data?.score || null,
       status: 'approved',
       submittedAt: new Date(),
@@ -60,10 +77,14 @@ if (selfieRes.data.status !== 'success') {
       kycApiResponse: selfieRes.data,
     });
     await db.User.update(
-      { kycLevel: 1, kycStatus: 'tier1_verified', kycLimit: 500000 }, // Set Tier 1 limit
+      { kycLevel: 1, kycStatus: 'tier1_verified', kycLimit: 500000 },
       { where: { id: req.user.id } }
     );
-    res.status(200).json({ message: 'Tier 1 unlocked (phone, selfie, BVN verified)', phone: phoneRes.data, selfie: selfieRes.data });
+    res.status(200).json({
+      message: 'Tier 1 unlocked (phone, selfie, BVN verified)',
+      phone: phoneRes.data,
+      selfie: selfieRes.data
+    });
   } catch (err) {
     console.error('Tier 1 KYC failed:', err.response?.data || err.message);
     res.status(500).json({ message: 'Tier 1 KYC failed', error: err.response?.data || err.message });
@@ -109,7 +130,7 @@ exports.verifyAnyGovernmentId = async (req, res) => {
       kycApiResponse: response.data,
     });
     await db.User.update(
-      { kycLevel: 2, kycStatus: 'tier2_verified', kycLimit: 10000000 }, // Set Tier 2 limit
+      { kycLevel: 2, kycStatus: 'tier2_verified', kycLimit: 10000000 },
       { where: { id: req.user.id } }
     );
     res.status(200).json({ message: 'Tier 2 unlocked (ID verified)', verification: response.data });
@@ -166,10 +187,14 @@ exports.verifyAddressAndUtilityBill = async (req, res) => {
       kycApiResponse: utilRes.data,
     });
     await db.User.update(
-      { kycLevel: 3, kycStatus: 'tier3_verified', kycLimit: null }, // Set Tier 3 limit (unlimited)
+      { kycLevel: 3, kycStatus: 'tier3_verified', kycLimit: null },
       { where: { id: req.user.id } }
     );
-    res.status(200).json({ message: 'Tier 3 unlocked (address & utility bill verified)', address: addrRes.data, utilityBill: utilRes.data });
+    res.status(200).json({
+      message: 'Tier 3 unlocked (address & utility bill verified)',
+      address: addrRes.data,
+      utilityBill: utilRes.data
+    });
   } catch (err) {
     console.error('Tier 3 KYC failed:', err.response?.data || err.message);
     res.status(500).json({ message: 'Tier 3 KYC failed', error: err.response?.data || err.message });
