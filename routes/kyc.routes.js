@@ -49,14 +49,14 @@ const upload = require('../middleware/upload.middleware'); // Multer middleware 
 // Tier 1: Phone + Selfie + BVN (Face Match)
 router.post('/verify-phone-selfie-bvn', auth, kycController.verifyPhoneSelfieBvn);
 
-// Tier 2: NIN, Driver’s License, Passport, or PVC
-router.post('/verify-government-id', auth, kycController.verifyAnyGovernmentId);
+// Tier 4: Government ID (NIN, Driver’s License, Passport, or PVC)
+router.post('/verify-government-id', auth, kycController.verifyGovernmentId);
 
-// Tier 3: Address & Utility Bill
-router.post('/verify-address-utility-bill', auth, kycController.verifyAddressAndUtilityBill);
+// Tier 5: Address & Utility Bill
+router.post('/verify-utility-bill', auth, kycController.verifyUtilityBill);
 
 // Upload KYC Document (optional/manual)
-//router.post('/upload', auth, upload.single('document'), kycController.uploadKycDocument);
+// router.post('/upload', auth, upload.single('document'), kycController.uploadKycDocument);
 
 // Get KYC Status and documents
 router.get('/status', auth, kycController.getKycStatus);
