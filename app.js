@@ -27,8 +27,8 @@ const notificationRoutes = require('./routes/notification.routes');
 
 // --- MIDDLEWARE: Place these at the very top, before any routes ---
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(express.json({ limit: '30mb' }));
+app.use(express.urlencoded({ limit: '30mb', extended: true }));
 // --- Maintenance and other middleware ---
 app.use(maintenanceCheck);
 app.use(maintenance);
