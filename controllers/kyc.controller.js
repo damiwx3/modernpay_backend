@@ -51,9 +51,9 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
       kycApiResponse: bvnRes.data,
     });
     await db.User.update(
-      { kycLevel: 1, kycStatus: 'tier1_verified', kycLimit: 500000 },
-      { where: { id: req.user.id } }
-    );
+  { kycLevel: 1, kycStatus: 'approved', kycLimit: 500000 }, // <-- use 'approved'
+  { where: { id: req.user.id } }
+);
     res.status(200).json({
       success: true,
       message: 'Tier 1 unlocked (phone and BVN verified)',
