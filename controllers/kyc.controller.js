@@ -24,15 +24,17 @@ if (phoneRes.data.status !== 'success') {
 
 // 2. BVN verification (add this)
 console.log('Calling Youverify BVN API');
-const bvnRes = await axios.post(
-  'https://api.youverify.co/v2/api/identity/ng/bvn',
-  { id: bvn, isSubjectConsent: true },
-  { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
-);
-console.log('BVN API response:', bvnRes.data);
-
-if (bvnRes.data.status !== 'success') {
-  return res.status(400).json({ message: 'BVN verification failed', details: bvnRes.data });
+try {
+  const bvnRes = await axios.post(
+    'https://api.youverify.co/v2/api/identity/ng/bvn',
+    { id: bvn, isSubjectConsent: true },
+    { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
+  );
+  console.log('BVN API response:', bvnRes.data);
+  // ...rest of your code...
+} catch (err) {
+  console.error('BVN verification failed:', err.response?.data || err.message, err.stack);
+  return res.status(500).json({ message: 'BVN verification failed', error: err.response?.data || err.message });
 }
 
 // 3. Face match with BVN (already present)
