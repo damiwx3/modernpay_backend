@@ -57,7 +57,7 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
     // 4. Face match with BVN
     console.log('Calling Youverify face-match API');
     const selfieRes = await axios.post(
-      'https://api.youverify.co/v2/api/identity/ng/bvn/face-match',
+      'https://api.youverify.co/v2/api/identity/compare-image',
       { bvn, selfie_image: selfieUrl },
       { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
     );
