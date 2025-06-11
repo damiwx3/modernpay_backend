@@ -1,64 +1,58 @@
 const axios = require('axios');
 const db = require('../models');
-//const axios = require('axios');
-const cloudinary = require('../utils/cloudinary');
 
-// Tier 1: Phone, Selfie & BVN (Face Match)
+// Tier 1: Phone + Selfie + BVN (Face Match)
 exports.verifyPhoneSelfieBvn = async (req, res) => {
+  console.log('KYC endpoint hit', req.body); 
+  const { phone, selfieImage, bvn } = req.body;
+  if (!phone || !selfieImage || !bvn) {
+    return res.status(400).json({ message: 'Phone, selfie image, and BVN are required' });
+  }
   try {
-    const { phone, bvn } = req.body;
-    if (!phone || !req.file || !bvn) {
-      return res.status(400).json({ message: 'Phone, selfie image, and BVN are required' });
-    }
+    // 1. Phone verification (already present)
+console.log('Calling Youverify phone API');
+const phoneRes = await axios.post(
+  'https://api.youverify.co/v2/api/identity/ng/phone',
+  { mobile: phone, isSubjectConsent: true },
+  { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
+);
+console.log('Phone API response:', phoneRes.data);
 
-    // 1. Upload selfie to Cloudinary using buffer
-    const uploadResult = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        { folder: 'kyc_selfies' },
-        (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
-        }
-      );
-      stream.end(req.file.buffer);
-    });
+if (phoneRes.data.status !== 'success') {
+  return res.status(400).json({ message: 'Phone verification failed', details: phoneRes.data });
+}
 
-    // 2. Phone verification
-    const phoneRes = await axios.post(
-      'https://api.youverify.co/v2/api/identity/ng/phone',
-      { mobile: phone, isSubjectConsent: true },
-      { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
-    );
-    if (phoneRes.data.message !== 'success') {
-      return res.status(400).json({ message: 'Phone verification failed', details: phoneRes.data });
-    }
+// 2. BVN verification (add this)
+console.log('Calling Youverify BVN API');
+const bvnRes = await axios.post(
+  'https://api.youverify.co/v2/api/identity/ng/bvn',
+  { id: bvn, isSubjectConsent: true },
+  { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
+);
+console.log('BVN API response:', bvnRes.data);
 
-    // 3. BVN verification
-    const bvnRes = await axios.post(
-      'https://api.youverify.co/v2/api/identity/ng/bvn',
-      { id: bvn, isSubjectConsent: true },
-      { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
-    );
-    if (bvnRes.data.message !== 'success') {
-      return res.status(400).json({ message: 'BVN verification failed', details: bvnRes.data });
-    }
+if (bvnRes.data.status !== 'success') {
+  return res.status(400).json({ message: 'BVN verification failed', details: bvnRes.data });
+}
 
-    // 4. Face match (using Cloudinary URL)
-    const selfieRes = await axios.post(
-      'https://api.youverify.co/v2/api/identity/ng/face-match',
-      { bvn, selfie_image: uploadResult.secure_url },
-      { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
-    );
-    if (selfieRes.data.status !== 'success') {
-      return res.status(400).json({ message: 'Selfie/Face match failed', details: selfieRes.data });
-    }
+// 3. Face match with BVN (already present)
+console.log('Calling Youverify face-match API');
+const selfieRes = await axios.post(
+  'https://api.youverify.co/v2/api/identity/ng/face-match',
+  { bvn, selfie_image: selfieImage },
+  { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
+);
+console.log('Face-match API response:', selfieRes.data);
 
-    // Save to DB
+if (selfieRes.data.status !== 'success') {
+  return res.status(400).json({ message: 'Selfie/Face match failed', details: selfieRes.data });
+}
+// ...rest of your code...
     await db.KYCDocument.create({
       userId: req.user.id,
       documentType: 'selfie',
       documentNumber: bvn,
-      selfieUrl: uploadResult.secure_url,
+      selfieUrl: selfieImage,
       faceMatchScore: selfieRes.data.data?.score || null,
       status: 'approved',
       submittedAt: new Date(),
@@ -66,47 +60,133 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
       kycApiResponse: selfieRes.data,
     });
     await db.User.update(
-      { kycLevel: 1, kycStatus: 'tier1_verified', kycLimit: 500000 },
+      { kycLevel: 1, kycStatus: 'tier1_verified', kycLimit: 500000 }, // Set Tier 1 limit
       { where: { id: req.user.id } }
     );
-    res.status(200).json({
-      message: 'Tier 1 unlocked (phone, selfie, BVN verified)',
-      phone: phoneRes.data,
-      bvn: bvnRes.data,
-      selfie: selfieRes.data
-    });
+    res.status(200).json({ message: 'Tier 1 unlocked (phone, selfie, BVN verified)', phone: phoneRes.data, selfie: selfieRes.data });
   } catch (err) {
+    console.error('Tier 1 KYC failed:', err.response?.data || err.message);
     res.status(500).json({ message: 'Tier 1 KYC failed', error: err.response?.data || err.message });
   }
 };
-// Tier 5: Utility Bill Verification
-exports.verifyUtilityBill = async (req, res) => {
-  const { document, documentType } = req.body;
-  if (!document || !documentType) {
-    return res.status(400).json({ message: 'Utility bill document and type are required' });
+
+// Tier 2: NIN card, National ID card, Driver’s License, Passport, or PVC
+exports.verifyAnyGovernmentId = async (req, res) => {
+  const { nin, driversLicense, passport, pvc } = req.body;
+  if (!nin && !driversLicense && !passport && !pvc) {
+    return res.status(400).json({ message: 'Provide NIN, Driver’s License, Passport, or PVC' });
+  }
+  let url, payload, docType, docNumber;
+  if (nin) {
+    url = 'https://api.youverify.co/v2/api/identity/ng/nin';
+    payload = { id: nin, isSubjectConsent: true };
+    docType = 'nin'; docNumber = nin;
+  } else if (driversLicense) {
+    url = 'https://api.youverify.co/v2/api/identity/ng/drivers-license';
+    payload = { id: driversLicense, isSubjectConsent: true };
+    docType = 'drivers_license'; docNumber = driversLicense;
+  } else if (passport) {
+    url = 'https://api.youverify.co/v2/api/identity/ng/passport';
+    payload = { id: passport, isSubjectConsent: true };
+    docType = 'passport'; docNumber = passport;
+  } else if (pvc) {
+    url = 'https://api.youverify.co/v2/api/identity/ng/pvc';
+    payload = { id: pvc, isSubjectConsent: true };
+    docType = 'pvc'; docNumber = pvc;
   }
   try {
-    console.log('About to call Youverify utility bill API');
-    const billRes = await axios.post(
-      'https://api.youverify.co/v2/api/identity/ng/utility-bill',
-      { document, documentType, isSubjectConsent: true },
-      { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
-    );
-    console.log('Utility bill API response:', billRes.data);
-    if (billRes.data.status !== 'success') {
-      console.log('Utility bill verification failed');
-      return res.status(400).json({ message: 'Utility bill verification failed', details: billRes.data });
+    const response = await axios.post(url, payload, { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } });
+    if (response.data.status !== 'success') {
+      return res.status(400).json({ message: 'ID verification failed', details: response.data });
     }
-    // Save to DB or update user as needed
-    console.log('Tier 5 KYC completed successfully');
-    res.status(200).json({ message: 'Tier 5 unlocked (utility bill verified)', bill: billRes.data });
+    await db.KYCDocument.create({
+      userId: req.user.id,
+      documentType: docType,
+      documentNumber: docNumber,
+      status: 'approved',
+      submittedAt: new Date(),
+      externalReferenceId: response.data.data?.reference || null,
+      kycApiResponse: response.data,
+    });
+    await db.User.update(
+      { kycLevel: 2, kycStatus: 'tier2_verified', kycLimit: 10000000 }, // Set Tier 2 limit
+      { where: { id: req.user.id } }
+    );
+    res.status(200).json({ message: 'Tier 2 unlocked (ID verified)', verification: response.data });
   } catch (err) {
-    console.error('Tier 5 KYC failed:', err.response?.data || err.message, err.stack);
-    res.status(500).json({ message: 'Tier 5 KYC failed', error: err.response?.data || err.message });
+    console.error('Tier 2 KYC failed:', err.response?.data || err.message);
+    res.status(500).json({ message: 'Tier 2 KYC failed', error: err.response?.data || err.message });
   }
 };
 
-// KYC Status (not implemented)
+// Tier 3: Address & Utility Bill
+exports.verifyAddressAndUtilityBill = async (req, res) => {
+  const { address, utilityBillImage } = req.body;
+  if (!address || !utilityBillImage) {
+    return res.status(400).json({ message: 'Address and utility bill image are required' });
+  }
+  try {
+    // 1. Address verification
+    const addrRes = await axios.post(
+      'https://api.youverify.co/v2/api/identity/ng/address',
+      { address },
+      { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
+    );
+    if (addrRes.data.status !== 'success') {
+      return res.status(400).json({ message: 'Address verification failed', details: addrRes.data });
+    }
+    // 2. Utility bill verification
+    const utilRes = await axios.post(
+      'https://api.youverify.co/v2/api/identity/ng/utility-bill',
+      { address, utility_bill_image: utilityBillImage },
+      { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
+    );
+    if (utilRes.data.status !== 'success') {
+      return res.status(400).json({ message: 'Utility bill verification failed', details: utilRes.data });
+    }
+    // Save both as KYC documents
+    await db.KYCDocument.create({
+      userId: req.user.id,
+      documentType: 'address',
+      documentNumber: null,
+      documentUrl: null,
+      status: 'approved',
+      submittedAt: new Date(),
+      externalReferenceId: addrRes.data.data?.reference || null,
+      kycApiResponse: addrRes.data,
+    });
+    await db.KYCDocument.create({
+      userId: req.user.id,
+      documentType: 'utility_bill',
+      documentNumber: null,
+      documentUrl: utilityBillImage,
+      status: 'approved',
+      submittedAt: new Date(),
+      externalReferenceId: utilRes.data.data?.reference || null,
+      kycApiResponse: utilRes.data,
+    });
+    await db.User.update(
+      { kycLevel: 3, kycStatus: 'tier3_verified', kycLimit: null }, // Set Tier 3 limit (unlimited)
+      { where: { id: req.user.id } }
+    );
+    res.status(200).json({ message: 'Tier 3 unlocked (address & utility bill verified)', address: addrRes.data, utilityBill: utilRes.data });
+  } catch (err) {
+    console.error('Tier 3 KYC failed:', err.response?.data || err.message);
+    res.status(500).json({ message: 'Tier 3 KYC failed', error: err.response?.data || err.message });
+  }
+};
+
+// Get KYC status
 exports.getKycStatus = async (req, res) => {
-  res.status(200).json({ message: 'KYC status endpoint not yet implemented.' });
+  const user = await db.User.findByPk(req.user.id, {
+    attributes: ['kycLevel', 'kycStatus', 'kycLimit']
+  });
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+  res.status(200).json({
+    kycLevel: user.kycLevel,
+    kycStatus: user.kycStatus,
+    kycLimit: user.kycLimit
+  });
 };
