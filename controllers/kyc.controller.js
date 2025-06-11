@@ -49,7 +49,7 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
     console.log('BVN API response:', bvnRes.data);
 
     const validBvnStatuses = ['success', 'found'];
-if (!validBvnStatuses.includes(bvnRes.data.status)) {
+if (!validBvnStatuses.includes(bvnRes.data.data.status)) {
   return res.status(400).json({ success: false, message: 'BVN verification failed', details: bvnRes.data });
 }
 
