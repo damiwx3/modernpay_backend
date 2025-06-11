@@ -558,7 +558,8 @@ exports.youverifyWebhook = async (req, res) => {
     if (
       finalStatus === 'completed' ||
       finalStatus === 'approved' ||
-      finalStatus === 'success'
+      finalStatus === 'success' ||
+      finalStatus === 'found' // <-- Add this line
     ) {
       const user = await db.User.findByPk(kycDoc.userId);
       if (user) {
