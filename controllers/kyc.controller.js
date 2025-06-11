@@ -4,17 +4,18 @@ const cloudinary = require('../utils/cloudinary'); // If you use Cloudinary for 
 
 // Tier 1: Phone + Selfie + BVN (Face Match)
 exports.verifyPhoneSelfieBvn = async (req, res) => {
+  // Debug log for incoming request
   console.log('KYC endpoint hit', req.body, req.file);
 
   const { phone, bvn } = req.body;
-  const selfieFile = req.file; // Multer puts the file here
+  const selfieFile = req.file;
 
   if (!phone || !selfieFile || !bvn) {
     return res.status(400).json({ message: 'Phone, selfie image, and BVN are required' });
   }
 
   try {
-    // 1. Upload selfie to Cloudinary (optional, if you want a URL)
+    // 1. Upload selfie to Cloudinary (optional)
     let selfieUrl;
     if (cloudinary && selfieFile) {
       const uploadRes = await cloudinary.uploader.upload(selfieFile.path, {
@@ -22,7 +23,7 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
       });
       selfieUrl = uploadRes.secure_url;
     } else {
-      selfieUrl = selfieFile.path; // fallback to file path if not using cloudinary
+      selfieUrl = selfieFile.path;
     }
 
     // 2. Phone verification
