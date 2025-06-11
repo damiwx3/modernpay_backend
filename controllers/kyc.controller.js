@@ -72,6 +72,7 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
 };
 
 // Tier 2: NIN card, National ID card, Driver’s License, Passport, or PVC
+// Tier 2: NIN card, National ID card, Driver’s License, Passport, or PVC
 exports.verifyAnyGovernmentId = async (req, res) => {
   const { nin, driversLicense, passport, pvc } = req.body;
   if (!nin && !driversLicense && !passport && !pvc) {
@@ -110,7 +111,7 @@ exports.verifyAnyGovernmentId = async (req, res) => {
       kycApiResponse: response.data,
     });
     await db.User.update(
-      { kycLevel: 2, kycStatus: 'tier2_verified', kycLimit: 10000000 },
+      { kycLevel: 2, kycStatus: 'approved', kycLimit: 10000000 }, // <-- use valid ENUM value
       { where: { id: req.user.id } }
     );
     res.status(200).json({ success: true, message: 'Tier 2 unlocked (ID verified)', verification: response.data });
@@ -120,6 +121,7 @@ exports.verifyAnyGovernmentId = async (req, res) => {
   }
 };
 
+// Tier 3: Address & Utility Bill
 // Tier 3: Address & Utility Bill
 exports.verifyAddressAndUtilityBill = async (req, res) => {
   const { address, utilityBillImage } = req.body;
@@ -167,7 +169,7 @@ exports.verifyAddressAndUtilityBill = async (req, res) => {
       kycApiResponse: utilRes.data,
     });
     await db.User.update(
-      { kycLevel: 3, kycStatus: 'tier3_verified', kycLimit: null },
+      { kycLevel: 3, kycStatus: 'approved', kycLimit: unlimited }, // <-- use valid ENUM value
       { where: { id: req.user.id } }
     );
     res.status(200).json({
@@ -181,7 +183,6 @@ exports.verifyAddressAndUtilityBill = async (req, res) => {
     res.status(500).json({ success: false, message: 'Tier 3 KYC failed', error: err.response?.data || err.message });
   }
 };
-
 // Get KYC status
 exports.getKycStatus = async (req, res) => {
   const user = await db.User.findByPk(req.user.id, {
