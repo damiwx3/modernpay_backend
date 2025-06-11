@@ -47,7 +47,12 @@ const upload = require('../middleware/upload.middleware'); // Multer middleware 
  */
 
 // Tier 1: Phone + Selfie + BVN (Face Match)
-router.post('/verify-phone-selfie-bvn', auth, kycController.verifyPhoneSelfieBvn);
+router.post(
+  '/verify-phone-selfie-bvn',
+  auth,
+  upload.single('selfieImage'), // <-- Add Multer here
+  kycController.verifyPhoneSelfieBvn
+);
 
 // Tier 2: NIN, Driver’s License, Passport, or PVC
 router.post('/verify-government-id', auth, kycController.verifyAnyGovernmentId);
