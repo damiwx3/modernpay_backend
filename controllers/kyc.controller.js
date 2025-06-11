@@ -17,7 +17,6 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
       { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
     );
     console.log('Phone API response:', phoneRes.data);
-    // FIX: Check the correct field for success
     if (phoneRes.data.message !== 'success') {
       console.log('Phone verification failed');
       return res.status(400).json({ message: 'Phone verification failed', details: phoneRes.data });
@@ -31,7 +30,8 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
       { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
     );
     console.log('BVN API response:', bvnRes.data);
-    if (bvnRes.data.status !== 'success') {
+    // FIX: Check the correct field for success
+    if (bvnRes.data.message !== 'success') {
       console.log('BVN verification failed');
       return res.status(400).json({ message: 'BVN verification failed', details: bvnRes.data });
     }
@@ -78,7 +78,6 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
     res.status(500).json({ message: 'Tier 1 KYC failed', error: err.response?.data || err.message });
   }
 };
-
 // Tier 4: Government ID Verification
 exports.verifyGovernmentId = async (req, res) => {
   const { idNumber, idType } = req.body;
