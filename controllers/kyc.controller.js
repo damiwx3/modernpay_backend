@@ -4,100 +4,67 @@ const cloudinary = require('../utils/cloudinary'); // If you use Cloudinary for 
 
 // Tier 1: Phone + Selfie + BVN (Face Match)
 exports.verifyPhoneSelfieBvn = async (req, res) => {
-  console.log('KYC endpoint hit', req.body, req.file);
+  console.log('KYC endpoint hit', req.body);
 
   const { phone, bvn } = req.body;
-  const selfieFile = req.file;
 
-  if (!phone || !selfieFile || !bvn) {
-    return res.status(400).json({ success: false, message: 'Phone, selfie image, and BVN are required' });
+  if (!phone || !bvn) {
+    return res.status(400).json({ success: false, message: 'Phone and BVN are required' });
   }
 
   try {
-    // Upload selfie to Cloudinary
-    let selfieUrl;
-    if (cloudinary && selfieFile) {
-      const uploadRes = await cloudinary.uploader.upload(selfieFile.path, {
-        folder: 'kyc_selfies'
-      });
-      selfieUrl = uploadRes.secure_url;
-    } else {
-      selfieUrl = selfieFile.path;
-    }
-
     // 1. Phone verification
+    console.log('Calling Youverify phone API');
     const phoneRes = await axios.post(
       'https://api.youverify.co/v2/api/identity/ng/phone',
       { mobile: phone, isSubjectConsent: true },
       { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
     );
+    console.log('Phone API response:', phoneRes.data);
 
     if (!phoneRes.data.success || phoneRes.data.statusCode !== 200) {
       return res.status(400).json({ success: false, message: 'Phone verification failed', details: phoneRes.data });
     }
 
     // 2. BVN verification
+    console.log('Calling Youverify BVN API');
     const bvnRes = await axios.post(
       'https://api.youverify.co/v2/api/identity/ng/bvn',
       { id: bvn, isSubjectConsent: true },
       { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
     );
+    console.log('BVN API response:', bvnRes.data);
 
     const validBvnStatuses = ['success', 'found'];
     if (!validBvnStatuses.includes(bvnRes.data.data.status)) {
       return res.status(400).json({ success: false, message: 'BVN verification failed', details: bvnRes.data });
     }
 
-    // 3. BVN Facial Match (✅ updated endpoint and payload)
-    const faceMatchRes = await axios.post(
-      'https://api.youverify.co/v2/api/identity/bvn/facial-matching',
-      {
-        id: bvn,
-        isSubjectConsent: true,
-        validations: {
-          selfie: {
-            image: selfieUrl
-          }
-        },
-        premiumBVN: true
-      },
-      { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
-    );
-
-    if (faceMatchRes.data.status !== 'success') {
-      return res.status(400).json({ success: false, message: 'Face match failed', details: faceMatchRes.data });
-    }
-
-    // Save KYC document
+    // Save KYC document (no selfie)
     await db.KYCDocument.create({
       userId: req.user.id,
-      documentType: 'selfie',
+      documentType: 'bvn',
       documentNumber: bvn,
-      selfieUrl: selfieUrl,
-      faceMatchScore: faceMatchRes.data.data?.validations?.selfie?.selfieVerification?.confidenceLevel || null,
       status: 'approved',
       submittedAt: new Date(),
-      externalReferenceId: faceMatchRes.data.data?.reference || null,
-      kycApiResponse: faceMatchRes.data,
+      externalReferenceId: bvnRes.data.data?.id || null,
+      kycApiResponse: bvnRes.data,
     });
-
     await db.User.update(
       { kycLevel: 1, kycStatus: 'tier1_verified', kycLimit: 500000 },
       { where: { id: req.user.id } }
     );
-
     res.status(200).json({
       success: true,
-      message: 'Tier 1 unlocked (phone, selfie, BVN verified)',
+      message: 'Tier 1 unlocked (phone and BVN verified)',
       phone: phoneRes.data,
-      selfie: faceMatchRes.data
+      bvn: bvnRes.data
     });
-
   } catch (err) {
     console.error('Tier 1 KYC failed:', err.response?.data || err.message, err.config?.url);
-    res.status(500).json({
-      success: false,
-      message: 'Tier 1 KYC failed',
+    res.status(500).json({ 
+      success: false, 
+      message: 'Tier 1 KYC failed', 
       error: err.response?.data || err.message,
       url: err.config?.url
     });
