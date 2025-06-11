@@ -50,7 +50,7 @@ const upload = require('../middleware/upload.middleware'); // Multer middleware 
 router.post(
   '/verify-phone-selfie-bvn',
   auth,
-  upload.single('selfieImage'), // <-- Add Multer here
+  //upload.single('selfieImage'), // <-- Add Multer here
   kycController.verifyPhoneSelfieBvn
 );
 
