@@ -17,7 +17,8 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
       { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
     );
     console.log('Phone API response:', phoneRes.data);
-    if (phoneRes.data.status !== 'success') {
+    // FIX: Check the correct field for success
+    if (phoneRes.data.message !== 'success') {
       console.log('Phone verification failed');
       return res.status(400).json({ message: 'Phone verification failed', details: phoneRes.data });
     }
