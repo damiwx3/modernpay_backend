@@ -48,9 +48,10 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
     );
     console.log('BVN API response:', bvnRes.data);
 
-    if (bvnRes.data.status !== 'success') {
-      return res.status(400).json({ success: false, message: 'BVN verification failed', details: bvnRes.data });
-    }
+    const validBvnStatuses = ['success', 'found'];
+if (!validBvnStatuses.includes(bvnRes.data.status)) {
+  return res.status(400).json({ success: false, message: 'BVN verification failed', details: bvnRes.data });
+}
 
     // 4. Face match with BVN
     console.log('Calling Youverify face-match API');
