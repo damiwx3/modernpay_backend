@@ -15,6 +15,7 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
   }
 
   try {
+    // ...existing code...
     // 1. Upload selfie to Cloudinary (optional)
     let selfieUrl;
     if (cloudinary && selfieFile) {
@@ -48,7 +49,6 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
     );
     console.log('BVN API response:', bvnRes.data);
 
-    // FIX: Check status inside bvnRes.data.data.status
     const validBvnStatuses = ['success', 'found'];
     if (!validBvnStatuses.includes(bvnRes.data.data.status)) {
       return res.status(400).json({ success: false, message: 'BVN verification failed', details: bvnRes.data });
@@ -90,8 +90,13 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
       selfie: selfieRes.data
     });
   } catch (err) {
-    console.error('Tier 1 KYC failed:', err.response?.data || err.message);
-    res.status(500).json({ success: false, message: 'Tier 1 KYC failed', error: err.response?.data || err.message });
+    console.error('Tier 1 KYC failed:', err.response?.data || err.message, err.config?.url);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Tier 1 KYC failed', 
+      error: err.response?.data || err.message,
+      url: err.config?.url // Add this line for debugging
+    });
   }
 };
 
