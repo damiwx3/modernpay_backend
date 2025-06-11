@@ -169,7 +169,7 @@ exports.verifyAddressAndUtilityBill = async (req, res) => {
       kycApiResponse: utilRes.data,
     });
     await db.User.update(
-      { kycLevel: 3, kycStatus: 'approved', kycLimit: unlimited }, // <-- use valid ENUM value
+      { kycLevel: 3, kycStatus: 'approved', kycLimit: 50000000 }, // <-- use valid ENUM value
       { where: { id: req.user.id } }
     );
     res.status(200).json({
