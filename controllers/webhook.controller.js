@@ -561,7 +561,7 @@ exports.youverifyWebhook = async (req, res) => {
       const user = await db.User.findByPk(kycDoc.userId);
       if (user) {
         // Optionally update user KYC status/level
-        user.kycStatus = 'verified';
+        user.kycStatus = 'approved';
         await user.save();
 
         // Prepare notification message
