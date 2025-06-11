@@ -4,7 +4,7 @@ const cloudinary = require('../utils/cloudinary'); // If you use Cloudinary for 
 
 // Tier 1: Phone + Selfie + BVN (Face Match)
 exports.verifyPhoneSelfieBvn = async (req, res) => {
-  console.log('KYC endpoint hit', req.body);
+  console.log('KYC endpoint hit', req.body, req.file);
 
   const { phone, bvn } = req.body;
   const selfieFile = req.file; // Multer puts the file here
