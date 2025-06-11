@@ -11,7 +11,7 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
   const selfieFile = req.file;
 
   if (!phone || !selfieFile || !bvn) {
-    return res.status(400).json({ message: 'Phone, selfie image, and BVN are required' });
+    return res.status(400).json({ success: false, message: 'Phone, selfie image, and BVN are required' });
   }
 
   try {
@@ -36,7 +36,7 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
     console.log('Phone API response:', phoneRes.data);
 
     if (phoneRes.data.status !== 'success') {
-      return res.status(400).json({ message: 'Phone verification failed', details: phoneRes.data });
+      return res.status(400).json({ success: false, message: 'Phone verification failed', details: phoneRes.data });
     }
 
     // 3. BVN verification
@@ -49,7 +49,7 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
     console.log('BVN API response:', bvnRes.data);
 
     if (bvnRes.data.status !== 'success') {
-      return res.status(400).json({ message: 'BVN verification failed', details: bvnRes.data });
+      return res.status(400).json({ success: false, message: 'BVN verification failed', details: bvnRes.data });
     }
 
     // 4. Face match with BVN
@@ -62,7 +62,7 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
     console.log('Face-match API response:', selfieRes.data);
 
     if (selfieRes.data.status !== 'success') {
-      return res.status(400).json({ message: 'Selfie/Face match failed', details: selfieRes.data });
+      return res.status(400).json({ success: false, message: 'Selfie/Face match failed', details: selfieRes.data });
     }
 
     // Save KYC document
@@ -82,13 +82,14 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
       { where: { id: req.user.id } }
     );
     res.status(200).json({
+      success: true,
       message: 'Tier 1 unlocked (phone, selfie, BVN verified)',
       phone: phoneRes.data,
       selfie: selfieRes.data
     });
   } catch (err) {
     console.error('Tier 1 KYC failed:', err.response?.data || err.message);
-    res.status(500).json({ message: 'Tier 1 KYC failed', error: err.response?.data || err.message });
+    res.status(500).json({ success: false, message: 'Tier 1 KYC failed', error: err.response?.data || err.message });
   }
 };
 
@@ -96,7 +97,7 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
 exports.verifyAnyGovernmentId = async (req, res) => {
   const { nin, driversLicense, passport, pvc } = req.body;
   if (!nin && !driversLicense && !passport && !pvc) {
-    return res.status(400).json({ message: 'Provide NIN, Driver’s License, Passport, or PVC' });
+    return res.status(400).json({ success: false, message: 'Provide NIN, Driver’s License, Passport, or PVC' });
   }
   let url, payload, docType, docNumber;
   if (nin) {
@@ -119,7 +120,7 @@ exports.verifyAnyGovernmentId = async (req, res) => {
   try {
     const response = await axios.post(url, payload, { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } });
     if (response.data.status !== 'success') {
-      return res.status(400).json({ message: 'ID verification failed', details: response.data });
+      return res.status(400).json({ success: false, message: 'ID verification failed', details: response.data });
     }
     await db.KYCDocument.create({
       userId: req.user.id,
@@ -134,10 +135,10 @@ exports.verifyAnyGovernmentId = async (req, res) => {
       { kycLevel: 2, kycStatus: 'tier2_verified', kycLimit: 10000000 },
       { where: { id: req.user.id } }
     );
-    res.status(200).json({ message: 'Tier 2 unlocked (ID verified)', verification: response.data });
+    res.status(200).json({ success: true, message: 'Tier 2 unlocked (ID verified)', verification: response.data });
   } catch (err) {
     console.error('Tier 2 KYC failed:', err.response?.data || err.message);
-    res.status(500).json({ message: 'Tier 2 KYC failed', error: err.response?.data || err.message });
+    res.status(500).json({ success: false, message: 'Tier 2 KYC failed', error: err.response?.data || err.message });
   }
 };
 
@@ -145,7 +146,7 @@ exports.verifyAnyGovernmentId = async (req, res) => {
 exports.verifyAddressAndUtilityBill = async (req, res) => {
   const { address, utilityBillImage } = req.body;
   if (!address || !utilityBillImage) {
-    return res.status(400).json({ message: 'Address and utility bill image are required' });
+    return res.status(400).json({ success: false, message: 'Address and utility bill image are required' });
   }
   try {
     // 1. Address verification
@@ -155,7 +156,7 @@ exports.verifyAddressAndUtilityBill = async (req, res) => {
       { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
     );
     if (addrRes.data.status !== 'success') {
-      return res.status(400).json({ message: 'Address verification failed', details: addrRes.data });
+      return res.status(400).json({ success: false, message: 'Address verification failed', details: addrRes.data });
     }
     // 2. Utility bill verification
     const utilRes = await axios.post(
@@ -164,7 +165,7 @@ exports.verifyAddressAndUtilityBill = async (req, res) => {
       { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
     );
     if (utilRes.data.status !== 'success') {
-      return res.status(400).json({ message: 'Utility bill verification failed', details: utilRes.data });
+      return res.status(400).json({ success: false, message: 'Utility bill verification failed', details: utilRes.data });
     }
     // Save both as KYC documents
     await db.KYCDocument.create({
@@ -192,13 +193,14 @@ exports.verifyAddressAndUtilityBill = async (req, res) => {
       { where: { id: req.user.id } }
     );
     res.status(200).json({
+      success: true,
       message: 'Tier 3 unlocked (address & utility bill verified)',
       address: addrRes.data,
       utilityBill: utilRes.data
     });
   } catch (err) {
     console.error('Tier 3 KYC failed:', err.response?.data || err.message);
-    res.status(500).json({ message: 'Tier 3 KYC failed', error: err.response?.data || err.message });
+    res.status(500).json({ success: false, message: 'Tier 3 KYC failed', error: err.response?.data || err.message });
   }
 };
 
@@ -208,9 +210,10 @@ exports.getKycStatus = async (req, res) => {
     attributes: ['kycLevel', 'kycStatus', 'kycLimit']
   });
   if (!user) {
-    return res.status(404).json({ message: 'User not found' });
+    return res.status(404).json({ success: false, message: 'User not found' });
   }
   res.status(200).json({
+    success: true,
     kycLevel: user.kycLevel,
     kycStatus: user.kycStatus,
     kycLimit: user.kycLimit
