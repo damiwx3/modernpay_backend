@@ -35,7 +35,7 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
     );
     console.log('Phone API response:', phoneRes.data);
 
-    if (phoneRes.data.status !== 'success') {
+    if (!phoneRes.data.success || phoneRes.data.statusCode !== 200) {
       return res.status(400).json({ success: false, message: 'Phone verification failed', details: phoneRes.data });
     }
 
