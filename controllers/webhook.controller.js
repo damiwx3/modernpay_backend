@@ -556,24 +556,24 @@ exports.youverifyWebhook = async (req, res) => {
 
     // If verified, update user and notify
     if (
-      finalStatus === 'completed' ||
-      finalStatus === 'approved' ||
-      finalStatus === 'success' ||
-      finalStatus === 'found' // <-- Add this line
-    ) {
-      const user = await db.User.findByPk(kycDoc.userId);
-      if (user) {
-        user.kycStatus = 'approved';
-        await user.save();
+  finalStatus === 'completed' ||
+  finalStatus === 'approved' ||
+  finalStatus === 'success' ||
+  finalStatus === 'found'
+) {
+  const user = await db.User.findByPk(kycDoc.userId);
+  if (user && user.kycStatus !== 'approved') { // Only notify if not already approved
+    user.kycStatus = 'approved';
+    await user.save();
 
-        const notifyMsg = 'Congratulations! Your identity has been verified. You now have full access to ModernPay features.';
-        const notifyTitle = 'Identity Verified';
+    const notifyMsg = 'Congratulations! Your identity has been verified. You now have full access to ModernPay features.';
+    const notifyTitle = 'Identity Verified';
 
-        try { await sendNotification(user, notifyMsg, notifyTitle); } catch (e) { console.error('Push notification error:', e.message); }
-        try { await sendEmail({ to: user.email, subject: notifyTitle, text: notifyMsg }); } catch (e) { console.error('Email error:', e.message); }
-        try { if (user.phoneNumber) await sendSms(user.phoneNumber, notifyMsg); } catch (e) { console.error('SMS error:', e.message); }
-      }
-    }
+    try { await sendNotification(user, notifyMsg, notifyTitle); } catch (e) { console.error('Push notification error:', e.message); }
+    try { await sendEmail({ to: user.email, subject: notifyTitle, text: notifyMsg }); } catch (e) { console.error('Email error:', e.message); }
+    try { if (user.phoneNumber) await sendSms(user.phoneNumber, notifyMsg); } catch (e) { console.error('SMS error:', e.message); }
+  }
+}
 
     console.log('✅ Youverify webhook processed:', { ref, status: finalStatus, type: finalType, event });
     res.status(200).json({ received: true });
