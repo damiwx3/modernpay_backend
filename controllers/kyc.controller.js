@@ -122,3 +122,7 @@ exports.verifyUtilityBill = async (req, res) => {
     res.status(500).json({ message: 'Tier 5 KYC failed', error: err.response?.data || err.message });
   }
 };
+// filepath: c:\Users\Dell\Documents\final bank\controllers\kyc.controller.js
+exports.getKycStatus = async (req, res) => {
+  res.status(200).json({ message: 'KYC status endpoint not yet implemented.' });
+};
