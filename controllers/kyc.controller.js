@@ -4,7 +4,6 @@ const cloudinary = require('../utils/cloudinary'); // If you use Cloudinary for 
 
 // Tier 1: Phone + Selfie + BVN (Face Match)
 exports.verifyPhoneSelfieBvn = async (req, res) => {
-  // Debug log for incoming request
   console.log('KYC endpoint hit', req.body, req.file);
 
   const { phone, bvn } = req.body;
@@ -15,8 +14,7 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
   }
 
   try {
-    // ...existing code...
-    // 1. Upload selfie to Cloudinary (optional)
+    // Upload selfie to Cloudinary
     let selfieUrl;
     if (cloudinary && selfieFile) {
       const uploadRes = await cloudinary.uploader.upload(selfieFile.path, {
@@ -27,44 +25,47 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
       selfieUrl = selfieFile.path;
     }
 
-    // 2. Phone verification
-    console.log('Calling Youverify phone API');
+    // 1. Phone verification
     const phoneRes = await axios.post(
       'https://api.youverify.co/v2/api/identity/ng/phone',
       { mobile: phone, isSubjectConsent: true },
       { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
     );
-    console.log('Phone API response:', phoneRes.data);
 
     if (!phoneRes.data.success || phoneRes.data.statusCode !== 200) {
       return res.status(400).json({ success: false, message: 'Phone verification failed', details: phoneRes.data });
     }
 
-    // 3. BVN verification
-    console.log('Calling Youverify BVN API');
+    // 2. BVN verification
     const bvnRes = await axios.post(
       'https://api.youverify.co/v2/api/identity/ng/bvn',
       { id: bvn, isSubjectConsent: true },
       { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
     );
-    console.log('BVN API response:', bvnRes.data);
 
     const validBvnStatuses = ['success', 'found'];
     if (!validBvnStatuses.includes(bvnRes.data.data.status)) {
       return res.status(400).json({ success: false, message: 'BVN verification failed', details: bvnRes.data });
     }
 
-    // 4. Face match with BVN
-    console.log('Calling Youverify face-match API');
-    const selfieRes = await axios.post(
-      'https://api.youverify.co/v2/api/identity/compare-image',
-      { bvn, selfie_image: selfieUrl },
+    // 3. BVN Facial Match (✅ updated endpoint and payload)
+    const faceMatchRes = await axios.post(
+      'https://api.youverify.co/v2/api/identity/bvn/facial-matching',
+      {
+        id: bvn,
+        isSubjectConsent: true,
+        validations: {
+          selfie: {
+            image: selfieUrl
+          }
+        },
+        premiumBVN: true
+      },
       { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
     );
-    console.log('Face-match API response:', selfieRes.data);
 
-    if (selfieRes.data.status !== 'success') {
-      return res.status(400).json({ success: false, message: 'Selfie/Face match failed', details: selfieRes.data });
+    if (faceMatchRes.data.status !== 'success') {
+      return res.status(400).json({ success: false, message: 'Face match failed', details: faceMatchRes.data });
     }
 
     // Save KYC document
@@ -73,29 +74,32 @@ exports.verifyPhoneSelfieBvn = async (req, res) => {
       documentType: 'selfie',
       documentNumber: bvn,
       selfieUrl: selfieUrl,
-      faceMatchScore: selfieRes.data.data?.score || null,
+      faceMatchScore: faceMatchRes.data.data?.validations?.selfie?.selfieVerification?.confidenceLevel || null,
       status: 'approved',
       submittedAt: new Date(),
-      externalReferenceId: selfieRes.data.data?.reference || null,
-      kycApiResponse: selfieRes.data,
+      externalReferenceId: faceMatchRes.data.data?.reference || null,
+      kycApiResponse: faceMatchRes.data,
     });
+
     await db.User.update(
       { kycLevel: 1, kycStatus: 'tier1_verified', kycLimit: 500000 },
       { where: { id: req.user.id } }
     );
+
     res.status(200).json({
       success: true,
       message: 'Tier 1 unlocked (phone, selfie, BVN verified)',
       phone: phoneRes.data,
-      selfie: selfieRes.data
+      selfie: faceMatchRes.data
     });
+
   } catch (err) {
     console.error('Tier 1 KYC failed:', err.response?.data || err.message, err.config?.url);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Tier 1 KYC failed', 
+    res.status(500).json({
+      success: false,
+      message: 'Tier 1 KYC failed',
       error: err.response?.data || err.message,
-      url: err.config?.url // Add this line for debugging
+      url: err.config?.url
     });
   }
 };
