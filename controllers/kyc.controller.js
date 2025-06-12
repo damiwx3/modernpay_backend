@@ -134,25 +134,25 @@ exports.verifyAddressAndUtilityBill = async (req, res) => {
   try {
     // 1. Address verification
     const addrRes = await axios.post(
-  'https://api.youverify.co/v2/api/identity/ng/verify-address',
-  { address },
-  { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
-);
+      'https://api.youverify.co/api/v2/identity/ng/address',
+      { address, isSubjectConsent: true },
+      { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
+    );
     const validStatuses = ['success', 'found', 'completed', 'approved'];
-const addressStatus = addrRes.data.status || addrRes.data.data?.status;
-if (!validStatuses.includes(addressStatus)) {
-  return res.status(400).json({ success: false, message: 'Address verification failed', details: addrRes.data });
-}
+    const addressStatus = addrRes.data.status || addrRes.data.data?.status;
+    if (!validStatuses.includes(addressStatus)) {
+      return res.status(400).json({ success: false, message: 'Address verification failed', details: addrRes.data });
+    }
     // 2. Utility bill verification
     const utilRes = await axios.post(
-  'https://api.youverify.co/v2/api/identity/ng/verify-utility-bill',
-  { address, utility_bill_image: utilityBillImage },
-  { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
-);
+      'https://api.youverify.co/api/v2/identity/ng/utility-bill',
+      { address, utility_bill_image: utilityBillImage, isSubjectConsent: true },
+      { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
+    );
     const utilityStatus = utilRes.data.status || utilRes.data.data?.status;
-if (!validStatuses.includes(utilityStatus)) {
-  return res.status(400).json({ success: false, message: 'Utility bill verification failed', details: utilRes.data });
-}
+    if (!validStatuses.includes(utilityStatus)) {
+      return res.status(400).json({ success: false, message: 'Utility bill verification failed', details: utilRes.data });
+    }
     // Save both as KYC documents
     await db.KYCDocument.create({
       userId: req.user.id,
