@@ -134,10 +134,10 @@ exports.verifyAddressAndUtilityBill = async (req, res) => {
   try {
     // 1. Address verification
     const addrRes = await axios.post(
-      'https://api.youverify.co/v2/api/identity/ng/address',
-      { address },
-      { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
-    );
+  'https://api.youverify.co/v2/api/identity/ng/verify-address',
+  { address },
+  { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
+);
     const validStatuses = ['success', 'found', 'completed', 'approved'];
 const addressStatus = addrRes.data.status || addrRes.data.data?.status;
 if (!validStatuses.includes(addressStatus)) {
@@ -145,10 +145,10 @@ if (!validStatuses.includes(addressStatus)) {
 }
     // 2. Utility bill verification
     const utilRes = await axios.post(
-      'https://api.youverify.co/v2/api/identity/ng/utility-bill',
-      { address, utility_bill_image: utilityBillImage },
-      { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
-    );
+  'https://api.youverify.co/v2/api/identity/ng/verify-utility-bill',
+  { address, utility_bill_image: utilityBillImage },
+  { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
+);
     const utilityStatus = utilRes.data.status || utilRes.data.data?.status;
 if (!validStatuses.includes(utilityStatus)) {
   return res.status(400).json({ success: false, message: 'Utility bill verification failed', details: utilRes.data });
