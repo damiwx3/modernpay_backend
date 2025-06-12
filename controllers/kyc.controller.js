@@ -134,7 +134,7 @@ exports.verifyAddressAndUtilityBill = async (req, res) => {
   try {
     // 1. Address verification
     const addrRes = await axios.post(
-      'https://api.youverify.co/api/v2/identity/ng/address',
+      'https://api.youverify.co/v2/api/identity/ng/verify-address', // <-- CORRECT
       { address, isSubjectConsent: true },
       { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
     );
@@ -145,7 +145,7 @@ exports.verifyAddressAndUtilityBill = async (req, res) => {
     }
     // 2. Utility bill verification
     const utilRes = await axios.post(
-      'https://api.youverify.co/api/v2/identity/ng/utility-bill',
+      'https://api.youverify.co/v2/api/identity/ng/verify-utility-bill', // <-- CORRECT
       { address, utility_bill_image: utilityBillImage, isSubjectConsent: true },
       { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
     );
