@@ -137,18 +137,21 @@ exports.verifyAddressAndUtilityBill = async (req, res) => {
       { address },
       { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
     );
-    if (addrRes.data.status !== 'success') {
-      return res.status(400).json({ success: false, message: 'Address verification failed', details: addrRes.data });
-    }
+    const validStatuses = ['success', 'found', 'completed', 'approved'];
+const addressStatus = addrRes.data.status || addrRes.data.data?.status;
+if (!validStatuses.includes(addressStatus)) {
+  return res.status(400).json({ success: false, message: 'Address verification failed', details: addrRes.data });
+}
     // 2. Utility bill verification
     const utilRes = await axios.post(
       'https://api.youverify.co/v2/api/identity/ng/utility-bill',
       { address, utility_bill_image: utilityBillImage },
       { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } }
     );
-    if (utilRes.data.status !== 'success') {
-      return res.status(400).json({ success: false, message: 'Utility bill verification failed', details: utilRes.data });
-    }
+    const utilityStatus = utilRes.data.status || utilRes.data.data?.status;
+if (!validStatuses.includes(utilityStatus)) {
+  return res.status(400).json({ success: false, message: 'Utility bill verification failed', details: utilRes.data });
+}
     // Save both as KYC documents
     await db.KYCDocument.create({
       userId: req.user.id,
