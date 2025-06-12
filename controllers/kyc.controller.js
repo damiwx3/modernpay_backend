@@ -126,6 +126,7 @@ if (!validStatuses.includes(status)) {
 // Tier 3: Address & Utility Bill
 // Tier 3: Address & Utility Bill
 exports.verifyAddressAndUtilityBill = async (req, res) => {
+  console.log('Received Tier 3 KYC:', req.body); // Add this line
   const { address, utilityBillImage } = req.body;
   if (!address || !utilityBillImage) {
     return res.status(400).json({ success: false, message: 'Address and utility bill image are required' });
