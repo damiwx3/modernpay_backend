@@ -98,9 +98,10 @@ exports.verifyAnyGovernmentId = async (req, res) => {
   }
   try {
     const response = await axios.post(url, payload, { headers: { token: process.env.YOUVERIFY_PUBLIC_KEY } });
-    if (response.data.status !== 'success') {
-      return res.status(400).json({ success: false, message: 'ID verification failed', details: response.data });
-    }
+    const validStatuses = ['success', 'found', 'completed', 'approved'];
+if (!validStatuses.includes(response.data.status)) {
+  return res.status(400).json({ success: false, message: 'ID verification failed', details: response.data });
+}
     await db.KYCDocument.create({
       userId: req.user.id,
       documentType: docType,
