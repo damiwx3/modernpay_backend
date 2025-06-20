@@ -1,31 +1,37 @@
 module.exports = (sequelize, DataTypes) => {
-  const KYCDocument = sequelize.define('KYCDocument', {
-    userId: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-    },
-    documentUrl: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    documentType: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
+  const KYCDocument = sequelize.define("KYCDocument", {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+
+    userId: { type: DataTypes.INTEGER, allowNull: false },
+
+    documentType: { type: DataTypes.STRING, allowNull: false }, // e.g. 'nin', 'bvn', 'dl'
+
+    documentNumber: { type: DataTypes.STRING, allowNull: false }, // e.g. NIN number
+
+    documentUrl: { type: DataTypes.STRING }, // Optional: For passport, utility bill, etc.
+
+    selfieUrl: { type: DataTypes.STRING }, // Optional: For face match
+
+    faceMatchScore: { type: DataTypes.FLOAT }, // e.g., 95.5%
+
     status: {
       type: DataTypes.STRING,
-      defaultValue: 'pending',
+      defaultValue: "pending", // 'pending', 'approved', 'rejected', 'in_review'
     },
-    rejectionReason: {
-      type: DataTypes.STRING,
-    },
-    submittedAt: {
-      type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW,
-    },
+
+    submittedAt: { type: DataTypes.DATE },
+
+    rejectionReason: { type: DataTypes.STRING },
+
+    externalReferenceId: { type: DataTypes.STRING }, // YouVerify ref
+
+    kycApiResponse: { type: DataTypes.JSON }, // Full JSON response for logs
+
+  }, {
+    timestamps: true,
   });
 
-  KYCDocument.associate = function(models) {
+  KYCDocument.associate = (models) => {
     KYCDocument.belongsTo(models.User, { foreignKey: 'userId' });
   };
 

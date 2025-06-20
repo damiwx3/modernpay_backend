@@ -10,15 +10,25 @@ module.exports = (sequelize, DataTypes) => {
     },
     password: { type: DataTypes.STRING, allowNull: false },
     phoneNumber: { type: DataTypes.STRING, allowNull: true },
+    deviceToken: { type: DataTypes.STRING, allowNull: true },
+    
+    // ✅ Add this field
+    method: { type: DataTypes.STRING, allowNull: true }, // login method: e.g., 'google', 'email'
+
     kycStatus: {
       type: DataTypes.ENUM('unverified', 'pending', 'approved', 'rejected'),
       defaultValue: 'unverified'
     },
-    kycLevel: { type: DataTypes.INTEGER, defaultValue: 1 }, // For tiered KYC
-    bvn: { type: DataTypes.STRING },                        // For BVN storage
-    address: { type: DataTypes.STRING },                    // For address (Tier 4)
-    selfieUrl: { type: DataTypes.STRING },                  // For selfie (Tier 4)
-    isActive: { type: DataTypes.BOOLEAN, defaultValue: true }
+    kycLevel: { type: DataTypes.INTEGER, defaultValue: 1 },
+    kycLimit: { type: DataTypes.BIGINT, allowNull: true },
+    bvn: { type: DataTypes.STRING },
+    address: { type: DataTypes.STRING },
+    selfieUrl: { type: DataTypes.STRING },
+    isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
+    transactionPin: { type: DataTypes.STRING, allowNull: true },
+    twoFactorEnabled: { type: DataTypes.BOOLEAN, defaultValue: false },
+    faceIdEnabled: { type: DataTypes.BOOLEAN, defaultValue: false }
   });
+
   return User;
 };

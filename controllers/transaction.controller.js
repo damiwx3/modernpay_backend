@@ -3,7 +3,7 @@ const PDFDocument = require('pdfkit');
 const { Parser } = require('json2csv');
 const moment = require('moment');
 
-// In transaction.controller.js
+// Get user transactions
 exports.getUserTransactions = async (req, res) => {
   try {
     const { month, year } = req.query;
@@ -21,27 +21,43 @@ exports.getUserTransactions = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
-    res.status(200).json({ transactions });
+    res.status(200).json({ data: transactions });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch transactions', error: err.message });
   }
 };
 
-// ✅ Create a manual transaction (for admin/testing/demo)
+// Create a manual transaction (for admin/testing/demo)
 exports.createTransaction = async (req, res) => {
   try {
-    const { amount, type, description, status } = req.body;
+    const {
+      amount,
+      type,
+      description,
+      status,
+      category,
+      senderName,
+      recipientName,
+      recipientAccount
+    } = req.body;
 
     if (!amount || !type || isNaN(amount)) {
       return res.status(400).json({ message: 'Amount (numeric) and type are required.' });
     }
 
+    // Use senderName from body, or fallback to user's name, or "You"
+    const resolvedSenderName = senderName || req.user.name || 'You';
+
     const txn = await db.Transaction.create({
       userId: req.user.id,
       amount: parseFloat(amount),
-      type: type.toLowerCase(), // debit or credit
+      type: type.toLowerCase(),
       description: description || 'Manual transaction',
-      status: status || 'pending', // Optional: pending, success, failed
+      status: status || 'pending',
+      category: category || null,
+      senderName: resolvedSenderName,
+      recipientName: recipientName || null,
+      recipientAccount: recipientAccount || null,
     });
 
     res.status(201).json({ message: 'Transaction created successfully', txn });
@@ -50,7 +66,8 @@ exports.createTransaction = async (req, res) => {
   }
 };
 
-// ✅ Export transactions as PDF or CSV
+
+// Export transactions as PDF or CSV
 exports.exportTransactions = async (req, res) => {
   try {
     const { type = 'pdf', month, year } = req.query;
@@ -60,7 +77,8 @@ exports.exportTransactions = async (req, res) => {
       return res.status(400).json({ message: 'Month and year are required.' });
     }
 
-    const start = moment(`${year}-${month}-01`).startOf('month');
+    const paddedMonth = String(month).padStart(2, '0');
+    const start = moment(`${year}-${paddedMonth}-01`).startOf('month');
     const end = moment(start).endOf('month');
 
     const transactions = await db.Transaction.findAll({
@@ -71,8 +89,19 @@ exports.exportTransactions = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
+    // CSV Export
     if (type === 'csv') {
-      const fields = ['type', 'amount', 'description', 'status', 'createdAt'];
+      const fields = [
+        'type',
+        'amount',
+        'description',
+        'category',
+        'status',
+        'createdAt',
+        'senderName',
+        'recipientName',
+        'recipientAccount'
+      ];
       const parser = new Parser({ fields });
       const csv = parser.parse(transactions.map(t => t.toJSON()));
       res.header('Content-Type', 'text/csv');
@@ -92,6 +121,13 @@ exports.exportTransactions = async (req, res) => {
       doc.fontSize(12).text(
         `${txn.createdAt.toISOString().slice(0, 10)} - ${txn.type.toUpperCase()} - ₦${txn.amount} - ${txn.description}`
       );
+      doc.fontSize(11).text(
+        `Sender: ${txn.senderName || 'You'} (ModernPay)`
+      );
+      doc.fontSize(11).text(
+        `Recipient: ${txn.recipientName || ''} (${txn.recipientAccount || ''})`
+      );
+      doc.moveDown();
     });
 
     doc.end();

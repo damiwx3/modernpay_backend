@@ -38,3 +38,5 @@ swagger.json
 # Backup or archive
 *.zip
 *.tar.gz
+config/firebase-android.json
+config/firebase-ios.json

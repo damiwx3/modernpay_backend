@@ -15,19 +15,41 @@ exports.claimCashback = async (req, res) => {
   const campaignId = req.params.campaignId;
   const userId = req.user.id;
 
+  const t = await db.sequelize.transaction();
   try {
-    const campaign = await db.Campaign.findByPk(campaignId);
+    const campaign = await db.Campaign.findByPk(campaignId, { transaction: t });
     if (!campaign || !campaign.active) {
+      await t.rollback();
       return res.status(404).json({ message: 'Campaign not available' });
+    }
+
+    // Check campaign date validity
+    const now = new Date();
+    if (campaign.startDate && campaign.startDate > now || campaign.endDate && campaign.endDate < now) {
+      await t.rollback();
+      return res.status(400).json({ message: 'Campaign not active.' });
     }
 
     const cashbackAmount = campaign.reward || 500;
 
-    const wallet = await db.Wallet.findOne({ where: { userId } });
-    if (!wallet) return res.status(404).json({ message: 'Wallet not found' });
+    // Prevent double claim
+    const alreadyClaimed = await db.Transaction.findOne({
+      where: { userId, description: `Cashback reward`, amount: cashbackAmount },
+      transaction: t
+    });
+    if (alreadyClaimed) {
+      await t.rollback();
+      return res.status(400).json({ message: 'Cashback already claimed.' });
+    }
+
+    const wallet = await db.Wallet.findOne({ where: { userId }, transaction: t });
+    if (!wallet) {
+      await t.rollback();
+      return res.status(404).json({ message: 'Wallet not found' });
+    }
 
     wallet.balance += cashbackAmount;
-    await wallet.save();
+    await wallet.save({ transaction: t });
 
     await db.Transaction.create({
       userId,
@@ -35,11 +57,12 @@ exports.claimCashback = async (req, res) => {
       amount: cashbackAmount,
       description: 'Cashback reward',
       status: 'success',
-    });
+    }, { transaction: t });
 
-    // FIX: Use template literal for the message
+    await t.commit();
     res.status(200).json({ message: `${cashbackAmount} cashback awarded.` });
   } catch (err) {
+    await t.rollback();
     res.status(500).json({ message: 'Failed to reward cashback', error: err.message });
   }
 };
@@ -49,12 +72,26 @@ exports.giveReferralBonus = async (req, res) => {
   const userId = req.user.id;
   const bonus = 1000;
 
+  const t = await db.sequelize.transaction();
   try {
-    const wallet = await db.Wallet.findOne({ where: { userId } });
-    if (!wallet) return res.status(404).json({ message: 'Wallet not found' });
+    // Prevent double claim
+    const alreadyClaimed = await db.Transaction.findOne({
+      where: { userId, description: 'Referral bonus', amount: bonus },
+      transaction: t
+    });
+    if (alreadyClaimed) {
+      await t.rollback();
+      return res.status(400).json({ message: 'Referral bonus already claimed.' });
+    }
+
+    const wallet = await db.Wallet.findOne({ where: { userId }, transaction: t });
+    if (!wallet) {
+      await t.rollback();
+      return res.status(404).json({ message: 'Wallet not found' });
+    }
 
     wallet.balance += bonus;
-    await wallet.save();
+    await wallet.save({ transaction: t });
 
     await db.Transaction.create({
       userId,
@@ -62,10 +99,12 @@ exports.giveReferralBonus = async (req, res) => {
       amount: bonus,
       description: 'Referral bonus',
       status: 'success',
-    });
+    }, { transaction: t });
 
+    await t.commit();
     res.status(200).json({ message: 'Referral bonus awarded.' });
   } catch (err) {
+    await t.rollback();
     res.status(500).json({ message: 'Referral bonus failed', error: err.message });
   }
 };
@@ -87,10 +126,18 @@ exports.getLoyalty = async (req, res) => {
   }
 };
 
-// ✅ Admin creates campaign
+// ✅ Admin creates campaign (with basic validation)
 exports.createCampaign = async (req, res) => {
   try {
     const { title, reward, type, startDate, endDate } = req.body;
+
+    // Basic validation
+    if (!title || !reward || !type || !startDate || !endDate) {
+      return res.status(400).json({ message: 'All fields are required.' });
+    }
+    if (new Date(startDate) >= new Date(endDate)) {
+      return res.status(400).json({ message: 'Start date must be before end date.' });
+    }
 
     const newCampaign = await db.Campaign.create({
       title,

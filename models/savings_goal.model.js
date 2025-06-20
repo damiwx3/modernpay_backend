@@ -3,15 +3,17 @@ module.exports = (sequelize, DataTypes) => {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     userId: { type: DataTypes.INTEGER, allowNull: false },
     title: { type: DataTypes.STRING, allowNull: false },
-    targetAmount: { type: DataTypes.FLOAT, allowNull: false },
-    savedAmount: { type: DataTypes.FLOAT, defaultValue: 0 },
-    deadline: { type: DataTypes.DATE },
-    status: { type: DataTypes.STRING, defaultValue: 'active' }, // active, completed, cancelled
-    completed: { type: DataTypes.BOOLEAN, defaultValue: false } // for marking as completed
+    targetAmount: { type: DataTypes.DECIMAL(12, 2), allowNull: false },
+    savedAmount: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0.00 },
+    deadline: { type: DataTypes.DATE, allowNull: true },
+    completed: { type: DataTypes.BOOLEAN, defaultValue: false }
+  }, {
+    timestamps: true
   });
 
-  SavingsGoal.associate = function(models) {
+  SavingsGoal.associate = (models) => {
     SavingsGoal.belongsTo(models.User, { foreignKey: 'userId' });
+    // Optionally: SavingsGoal.hasMany(models.SavingsTransaction, { foreignKey: 'goalId' });
   };
 
   return SavingsGoal;

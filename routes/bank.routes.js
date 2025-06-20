@@ -27,6 +27,7 @@ const auth = require('../middleware/auth.middleware');
 router.get('/list', auth, controller.getBankList);
 
 /**
+ /**
  * @swagger
  * /api/bank/verify:
  *   post:
@@ -42,14 +43,10 @@ router.get('/list', auth, controller.getBankList);
  *             type: object
  *             required:
  *               - account_number
- *               - bank_code
  *             properties:
  *               account_number:
  *                 type: string
  *                 example: "0123456789"
- *               bank_code:
- *                 type: string
- *                 example: "058"
  *     responses:
  *       200:
  *         description: Account verified
@@ -59,5 +56,6 @@ router.get('/list', auth, controller.getBankList);
  *         description: Internal error
  */
 router.post('/verify', auth, controller.verifyAccountNumber);
+
 
 module.exports = router;

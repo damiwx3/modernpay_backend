@@ -17,7 +17,6 @@ const scheduleContributions = () => {
       let totalAutoPaid = 0;
       let totalReminders = 0;
 
-      // Fetch all active cycles due today
       const dueCycles = await db.ContributionCycle.findAll({
         where: {
           startDate: { [Op.lte]: today },
@@ -27,8 +26,10 @@ const scheduleContributions = () => {
       });
 
       for (const cycle of dueCycles) {
+        if (cycle.status === 'closed') continue;
+
         const group = cycle.ContributionGroup;
-        const amount = group.amountPerMember || 1000;
+        const amount = parseFloat(group.amountPerMember) || 1000;
 
         console.log(`🔄 Group: ${group.name} (Cycle #${cycle.cycleNumber})`);
 
@@ -47,12 +48,10 @@ const scheduleContributions = () => {
 
             let status = 'pending';
 
-            if (wallet && wallet.balance >= amount) {
-              // Deduct from wallet
-              wallet.balance -= amount;
+            if (wallet && parseFloat(wallet.balance) >= amount) {
+              wallet.balance = parseFloat(wallet.balance) - amount;
               await wallet.save();
 
-              // Log transaction
               await db.Transaction.create({
                 userId: user.id,
                 amount,
@@ -67,21 +66,21 @@ const scheduleContributions = () => {
             } else {
               const msg = `Hi ${user.fullName}, your ₦${amount} contribution for "${group.name}" is pending.`;
 
-              // Send SMS
-              if (user.phoneNumber) {
-                await sendSms(user.phoneNumber, msg);
-              }
-
-              // Send Email
-              if (user.email) {
-                await sendEmail(user.email, 'Contribution Reminder', msg);
-              }
+              if (user.phoneNumber) await sendSms(user.phoneNumber, msg);
+              if (user.email) await sendEmail({ to: user.email, subject: 'Contribution Reminder', text: msg });
 
               totalReminders++;
               console.log(`📨 Reminder sent to ${user.email || user.phoneNumber}`);
+
+              // Log missed payment
+              await db.MissedContribution.create({
+                userId: user.id,
+                cycleId: cycle.id,
+                reason: 'Insufficient wallet balance',
+                status: 'missed'
+              });
             }
 
-            // Record payment status
             await db.ContributionPayment.create({
               memberId: member.id,
               cycleId: cycle.id,
@@ -93,11 +92,51 @@ const scheduleContributions = () => {
             console.log(`✅ Payment recorded: ${user.email} - ${status}`);
           }
         }
+
+        const paidMembers = await db.ContributionPayment.count({
+          where: { cycleId: cycle.id, status: 'paid' }
+        });
+
+        if (cycle.cycleNumber && members.length > 0 && paidMembers === members.length) {
+          const winnerIndex = (cycle.cycleNumber - 1) % members.length;
+          const winner = members[winnerIndex];
+          const payoutAmount = amount * members.length;
+
+          const winnerWallet = await db.Wallet.findOne({ where: { userId: winner.userId } });
+          winnerWallet.balance = parseFloat(winnerWallet.balance) + payoutAmount;
+          await winnerWallet.save();
+
+          await db.Transaction.create({
+            userId: winner.userId,
+            amount: payoutAmount,
+            type: 'credit',
+            description: `Payout for "${group.name}" (Cycle #${cycle.cycleNumber})`
+          });
+
+          await db.PayoutOrder.create({
+            cycleId: cycle.id,
+            userId: winner.userId,
+            amount: payoutAmount,
+            paidAt: new Date(),
+            status: 'completed'
+          });
+
+          const winnerUser = await db.User.findByPk(winner.userId);
+          await sendEmail({
+            to: winnerUser.email,
+            subject: '🎉 You received a payout!',
+            text: `Hi ${winnerUser.fullName}, you’ve received ₦${payoutAmount} as payout for "${group.name}" (Cycle #${cycle.cycleNumber}).`
+          });
+
+          cycle.status = 'closed';
+          await cycle.save();
+
+          console.log(`🏆 Payout of ₦${payoutAmount} credited to user ${winner.userId}`);
+        }
       }
 
       console.log('✅ Contribution Scheduler completed.\n');
 
-      // Admin summary
       const summary = `
 📅 Daily Contribution Report (${today})
 ------------------------------------------
@@ -106,9 +145,13 @@ const scheduleContributions = () => {
 📨 Reminders Sent: ${totalReminders}
       `;
 
-      const adminEmails = ['admin1@modernpay.com', 'admin2@modernpay.com'];
+      const adminEmails = ['admin@modernstarfilms.com', 'babaalawda@gmail.com'];
       for (const email of adminEmails) {
-        await sendEmail(email, 'Daily Contribution Summary', summary);
+        await sendEmail({
+          to: email,
+          subject: 'Daily Contribution Summary',
+          text: summary
+        });
       }
 
     } catch (err) {

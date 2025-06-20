@@ -23,7 +23,13 @@ exports.generateMonthlyStatement = async (req, res) => {
     res.setHeader('Content-Type', 'application/pdf');
     doc.pipe(res);
 
-    doc.fontSize(16).text(`Monthly Statement - ${moment().format('MMMM YYYY')}`, { align: 'center' });
+    // Add user/account info to the header
+    doc.fontSize(18).text(`Monthly Statement - ${moment().format('MMMM YYYY')}`, { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(12).text(`Name: ${user.fullName || ''}`);
+    doc.text(`Email: ${user.email || ''}`);
+    doc.text(`Account ID: ${user.id}`);
+    doc.text(`Generated: ${moment().format('YYYY-MM-DD HH:mm:ss')}`);
     doc.moveDown();
 
     transactions.forEach(txn => {

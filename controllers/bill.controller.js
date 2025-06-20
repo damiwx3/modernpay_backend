@@ -1,200 +1,241 @@
 const db = require('../models');
-const axios = require('axios');
+const vtpassAxios = require('../utils/vtpass');
 
-const FLW_BASE = 'https://api.flutterwave.com/v3';
-const HEADERS = {
-  Authorization: `Bearer ${process.env.FLW_SECRET_KEY}`,
-  'Content-Type': 'application/json'
-};
+// 1. List all VTPass services
+let cachedServices = null;
+let lastFetchTime = 0;
 
-// List available bill categories from Flutterwave
+// In getCategories
 exports.getCategories = async (req, res) => {
   try {
-    const flutterRes = await axios.get(`${FLW_BASE}/bill-categories`, { headers: HEADERS });
-    res.status(200).json({ categories: flutterRes.data.data });
+    const now = Date.now();
+    if (!cachedServices || now - lastFetchTime > 10 * 60 * 1000) {
+      const vtpassRes = await vtpassAxios.get('/service-categories');
+      console.log('VTPass /service-categories:', vtpassRes.data); // <-- Add this line
+      cachedServices = vtpassRes.data.content;
+      lastFetchTime = now;
+    }
+    res.status(200).json({ categories: cachedServices });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch categories', error: err.message });
+    console.error('VTPass error (getCategories):', err.response?.data || err.message);
+    if (cachedServices) {
+      res.status(200).json({ categories: cachedServices, warning: 'Serving cached data' });
+    } else {
+      res.status(500).json({ message: 'Failed to fetch categories', error: err.message });
+    }
   }
 };
 
-// Airtime for Nigeria only (MTN, GLO, Airtel, 9mobile)
+// 2. Get Airtime categories (filter from /services)
 exports.getAirtimeCategories = async (req, res) => {
   try {
-    const flutterRes = await axios.get(`${FLW_BASE}/bill-categories`, { headers: HEADERS });
-    const allowed = ['MTN', 'GLO', 'AIRTEL', '9MOBILE'];
-    const airtime = flutterRes.data.data.filter(
-      cat =>
-        cat.country === 'NG' &&
-        cat.biller_code &&
-        cat.biller_code.toUpperCase().includes('AIRTIME') &&
-        allowed.some(net => cat.name.toUpperCase().includes(net))
-    );
-    res.status(200).json({ categories: airtime });
+    const vtpassRes = await vtpassAxios.get('/services?identifier=airtime');
+    if (!Array.isArray(vtpassRes.data.content)) {
+      return res.status(500).json({ message: 'VTPass /services error', error: vtpassRes.data });
+    }
+    const mapped = vtpassRes.data.content.map(item => ({
+      code: item.serviceID,
+      name: item.name,
+      minAmount: item.minimium_amount,
+      maxAmount: item.maximum_amount,
+      fee: item.convinience_fee,
+      type: item.product_type,
+      image: item.image,
+    }));
+    res.json({ categories: mapped });
   } catch (err) {
+    console.error('VTPass error (getAirtimeCategories):', err.response?.data || err.message);
     res.status(500).json({ message: 'Failed to fetch airtime categories', error: err.message });
   }
 };
 
-// Data for Nigeria only (MTN, GLO, Airtel, 9mobile)
+// 3. Get Data categories (filter from /services)
 exports.getDataCategories = async (req, res) => {
   try {
-    const flutterRes = await axios.get(`${FLW_BASE}/bill-categories`, { headers: HEADERS });
-    const allowed = ['MTN', 'GLO', 'AIRTEL', '9MOBILE'];
-    const data = flutterRes.data.data.filter(
-      cat =>
-        cat.country === 'NG' &&
-        cat.biller_code &&
-        cat.biller_code.toUpperCase().includes('DATA') &&
-        allowed.some(net => cat.name.toUpperCase().includes(net))
-    );
-    res.status(200).json({ categories: data });
+    const vtpassRes = await vtpassAxios.get('/services?identifier=data');
+    if (!Array.isArray(vtpassRes.data.content)) {
+      return res.status(500).json({ message: 'VTPass /services error', error: vtpassRes.data });
+    }
+    const mapped = vtpassRes.data.content.map(item => ({
+      ...item,
+      biller_code: item.serviceID,
+    }));
+    res.json({ categories: mapped });
   } catch (err) {
+    console.error('VTPass error (getDataCategories):', err.response?.data || err.message);
     res.status(500).json({ message: 'Failed to fetch data categories', error: err.message });
   }
 };
 
-// Other Nigerian bills (excluding airtime/data)
-exports.getNigerianBills = async (req, res) => {
-  try {
-    const flutterRes = await axios.get(`${FLW_BASE}/bill-categories`, { headers: HEADERS });
-    const bills = flutterRes.data.data.filter(
-      cat =>
-        cat.country === 'NG' &&
-        !(cat.biller_code && (cat.biller_code.toUpperCase().includes('AIRTIME') || cat.biller_code.toUpperCase().includes('DATA')))
-    );
-    res.status(200).json({ categories: bills });
-  } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch Nigerian bills', error: err.message });
-  }
-};
-
-// All other bills (not Nigerian or not airtime/data)
-exports.getOtherBills = async (req, res) => {
-  try {
-    const flutterRes = await axios.get(`${FLW_BASE}/bill-categories`, { headers: HEADERS });
-    const bills = flutterRes.data.data.filter(
-      cat =>
-        cat.country !== 'NG' ||
-        (
-          cat.biller_code &&
-          !cat.biller_code.toUpperCase().includes('AIRTIME') &&
-          !cat.biller_code.toUpperCase().includes('DATA')
-        )
-    );
-    res.status(200).json({ categories: bills });
-  } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch other bills', error: err.message });
-  }
-};
-
-// ... (keep your other existing functions: validateCustomer, payBill, getHistory, getBundles)
-
-// Validate customer (smartcard, phone, meter, etc.)
+// 4. Validate customer (e.g. smartcard, meter, etc.)
 exports.validateCustomer = async (req, res) => {
-  const { serviceType, customer } = req.body;
-
-  if (!serviceType || !customer) {
-    return res.status(400).json({ message: 'Service type and customer number are required' });
+  const { serviceID, billersCode, type } = req.body;
+  if (!serviceID || !billersCode) {
+    return res.status(400).json({ message: 'serviceID and billersCode are required' });
   }
-
   try {
-    const response = await axios.post(
-      `${FLW_BASE}/bill-items/validate`,
-      {
-        item_code: serviceType,
-        code: customer,
-        customer: customer
-      },
-      { headers: HEADERS }
-    );
-
-    const result = response.data;
-
-    if (result.status === 'success') {
-      return res.status(200).json({ message: result.message, data: result.data });
-    } else {
-      return res.status(400).json({ message: result.message || 'Validation failed' });
-    }
+    const response = await vtpassAxios.post('/merchant-verify', {
+      serviceID,
+      billersCode,
+      type
+    });
+    res.json(response.data);
   } catch (err) {
-    return res.status(500).json({ message: 'Validation error', error: err.message });
+    console.error('VTPass error (validateCustomer):', err.response?.data || err.message);
+    res.status(500).json({ message: 'VTPass validation failed', error: err.message });
   }
 };
 
-// Pay a bill (Airtime, Data, Electricity, TV, etc.)
+// 5. Pay a bill (Airtime, Data, Electricity, TV, etc.)
 exports.payBill = async (req, res) => {
-  const { serviceType, amount, customer } = req.body;
-
-  if (!serviceType || !amount || !customer) {
-    return res.status(400).json({ message: 'Service type, amount, and customer number are required' });
+  const { serviceID, billersCode, variation_code, amount, phone } = req.body;
+  if (!serviceID || !billersCode || !amount || !phone) {
+    return res.status(400).json({ message: 'Missing required fields' });
   }
-
   try {
-    const reference = `BILL-${Date.now()}`;
-
-    // Flutterwave request
+    const request_id = `BILL-${Date.now()}`;
+    // Build payload
     const payload = {
-      country: "NG",
-      customer,
+      request_id,
+      serviceID,
+      billersCode,
       amount,
-      recurrence: "ONCE",
-      type: serviceType,
-      reference
+      phone
     };
+    // Only add variation_code if present (for data, TV, etc.)
+    if (variation_code) {
+      payload.variation_code = variation_code;
+    }
+    // Debug: log payload
+    console.log('VTPass PAY payload:', payload);
 
-    const flwRes = await axios.post(`${FLW_BASE}/bills`, payload, { headers: HEADERS });
+    const response = await vtpassAxios.post('/pay', payload);
+    // Debug: log VTPass response
+    console.log('VTPass response:', response.data);
 
-    const response = flwRes.data;
-    const status = response.status === 'success' ? 'success' : 'failed';
-
-    // Save record
     await db.BillPayment.create({
       userId: req.user.id,
-      serviceType,
+      serviceType: serviceID,
       amount,
-      reference,
-      status
+      reference: request_id,
+      status: response.data.code === '000' ? 'success' : 'failed',
+      customer: billersCode,
+      responseData: response.data,
+      paidAt: response.data.code === '000' ? new Date() : null
     });
 
     res.status(201).json({
-      message: response.message,
-      status,
-      data: response.data
+      message: response.data.response_description,
+      status: response.data.code === '000' ? 'success' : 'failed',
+      data: response.data,
+      reference: request_id
     });
-
   } catch (err) {
-    res.status(500).json({ message: 'Bill payment failed', error: err.message });
+    console.error('VTPass error (payBill):', err.response?.data || err.message);
+    res.status(500).json({ message: 'VTPass payment failed', error: err.message });
   }
 };
 
-// Fetch user bill history
+// 6. Fetch user bill history
 exports.getHistory = async (req, res) => {
   try {
     const history = await db.BillPayment.findAll({
       where: { userId: req.user.id },
       order: [['createdAt', 'DESC']]
     });
-
     res.status(200).json({ history });
   } catch (err) {
+    console.error('VTPass error (getHistory):', err.response?.data || err.message);
     res.status(500).json({ message: 'Failed to fetch history', error: err.message });
   }
 };
 
-// Get bundles (for data, TV, etc.)
+// 7. Get bundles/variations for a service
 exports.getBundles = async (req, res) => {
-  const billerCode = req.params.billerCode;
-
-  if (!billerCode) {
-    return res.status(400).json({ message: 'Biller code is required' });
+  const serviceID = req.params.serviceID || req.query.serviceID;
+  if (!serviceID) {
+    return res.status(400).json({ message: 'serviceID is required' });
   }
-
   try {
-    const response = await axios.get(`${FLW_BASE}/bill-items?biller_code=${billerCode}`, {
-      headers: HEADERS,
+    const response = await vtpassAxios.get(`/service-variations?serviceID=${serviceID}`);
+    res.status(200).json({ bundles: response.data.content.variations });
+  } catch (err) {
+    console.error('VTPass error (getBundles):', err.response?.data || err.message);
+    res.status(500).json({ message: 'Failed to load bundles', error: err.message });
+  }
+};
+
+// 8. Purchase MTN VTU Airtime
+exports.purchaseMtnVtu = async (req, res) => {
+  const { amount, phone } = req.body;
+  if (!amount || !phone) {
+    return res.status(400).json({ message: 'amount and phone are required' });
+  }
+  try {
+    const request_id = `MTNVTU-${Date.now()}`;
+    const payload = {
+      request_id,
+      serviceID: 'mtn',
+      amount,
+      phone,
+      billersCode: phone // Required by VTPass for airtime!
+    };
+    // Debug: log payload
+    console.log('VTPass PAY payload:', payload);
+
+    const response = await vtpassAxios.post('/pay', payload);
+    // Debug: log VTPass response
+    console.log('VTPass response:', response.data);
+
+    await db.BillPayment.create({
+      userId: req.user.id,
+      serviceType: 'mtn',
+      amount,
+      reference: request_id,
+      status: response.data.code === '000' ? 'success' : 'failed',
+      customer: phone,
+      responseData: response.data,
+      paidAt: response.data.code === '000' ? new Date() : null
     });
 
-    res.status(200).json({ bundles: response.data.data });
+    res.status(201).json({
+      message: response.data.response_description,
+      status: response.data.code === '000' ? 'success' : 'failed',
+      data: response.data,
+      reference: request_id
+    });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to load bundles', error: err.message });
+    console.error('VTPass error (purchaseMtnVtu):', err.response?.data || err.message);
+    res.status(500).json({ message: 'MTN VTU purchase failed', error: err.message });
+  }
+};
+
+// 9. Query VTU Transaction Status
+exports.queryVtuStatus = async (req, res) => {
+  const { request_id } = req.body;
+  if (!request_id) {
+    return res.status(400).json({ message: 'request_id is required' });
+  }
+  try {
+    const payload = { request_id };
+    const response = await vtpassAxios.post('/requery', payload);
+    res.status(200).json(response.data);
+  } catch (err) {
+    console.error('VTPass error (queryVtuStatus):', err.response?.data || err.message);
+    res.status(500).json({ message: 'Failed to query VTU status', error: err.message });
+  }
+};
+// Add this to bill.controller.js
+exports.getServicesByCategory = async (req, res) => {
+  const { identifier } = req.query;
+  if (!identifier) {
+    return res.status(400).json({ message: 'identifier is required' });
+  }
+  try {
+    const vtpassRes = await vtpassAxios.get(`/services?identifier=${identifier}`);
+    console.log(`VTPass /services?identifier=${identifier}:`, vtpassRes.data); // <-- Add this line
+    res.status(200).json({ services: vtpassRes.data.content });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch services', error: err.message });
   }
 };

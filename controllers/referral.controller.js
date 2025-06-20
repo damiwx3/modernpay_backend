@@ -30,6 +30,10 @@ exports.applyReferralCode = async (req, res) => {
   try {
     const { referrerId } = req.body;
 
+    if (referrerId === req.user.id) {
+      return res.status(400).json({ message: 'You cannot refer yourself' });
+    }
+
     const existing = await db.Referral.findOne({
       where: { referredId: req.user.id }
     });

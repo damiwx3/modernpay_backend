@@ -10,13 +10,18 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const sendEmail = async (to, subject, text) => {
+const sendEmail = async ({ to, subject, text, html, from }) => {
+  if (!to) {
+    console.error('❌ No recipient email address provided to sendEmail');
+    return;
+  }
   try {
     const mailOptions = {
-      from: `"ModernPay Admin" <${process.env.EMAIL_USER}>`,
+      from: from || `"ModernPay" <${process.env.EMAIL_USER}>`, // Use custom from if provided
       to,
       subject,
       text,
+      html,
     };
 
     const info = await transporter.sendMail(mailOptions);

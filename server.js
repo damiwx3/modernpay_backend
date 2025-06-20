@@ -1,4 +1,3 @@
-// server.js
 require('dotenv').config();
 
 const app = require('./app');
@@ -12,14 +11,16 @@ const startServer = async () => {
     await db.sequelize.authenticate();
     console.log('✅ Database connected successfully.');
 
-    await db.sequelize.sync(); // You can use { alter: true } or { force: true } during dev
+    // Safe for development: use alter in dev, no change in production
+    const isDev = process.env.NODE_ENV !== 'production';
+    await db.sequelize.sync(isDev ? { alter: true } : {});
     console.log('🔁 Models synchronized.');
 
     app.listen(PORT, () => {
       console.log(`🚀 Server is running at http://localhost:${PORT}`);
     });
 
-    // Start background jobs (like daily payouts, contributions, etc.)
+    // Start daily contribution job
     startContributionJob();
 
   } catch (error) {

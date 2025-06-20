@@ -1,16 +1,14 @@
 module.exports = (sequelize, DataTypes) => {
-  const ContributionMember = sequelize.define("ContributionMember", {
-    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    userId: { type: DataTypes.INTEGER, allowNull: false },
-    groupId: { type: DataTypes.INTEGER, allowNull: false },
-    joinedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
-    role: { type: DataTypes.STRING, defaultValue: 'member' }
+  const ContributionMember = sequelize.define('ContributionMember', {
+    groupId: DataTypes.INTEGER,
+    userId: DataTypes.INTEGER,
+    isAdmin: DataTypes.BOOLEAN,
+    joinedAt: DataTypes.DATE
   });
 
-  ContributionMember.associate = (models) => {
-    ContributionMember.belongsTo(models.User, { foreignKey: 'userId' });
+  ContributionMember.associate = function(models) {
     ContributionMember.belongsTo(models.ContributionGroup, { foreignKey: 'groupId' });
-    ContributionMember.hasMany(models.ContributionPayment, { foreignKey: 'memberId' });
+    ContributionMember.belongsTo(models.User, { foreignKey: 'userId' });
   };
 
   return ContributionMember;

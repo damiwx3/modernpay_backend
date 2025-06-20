@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/user.controller');
 const authMiddleware = require('../middleware/auth.middleware');
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' }); // You can customize storage as needed
 
 /**
  * @swagger
@@ -40,7 +42,7 @@ router.get('/profile', authMiddleware, userController.getProfile);
  *       401:
  *         description: Unauthorized
  */
-router.put('/profile', authMiddleware, userController.updateProfile);
+router.put('/profile', authMiddleware, upload.single('selfie'), userController.updateProfile);
 
 /**
  * @swagger
@@ -64,5 +66,43 @@ router.put('/profile', authMiddleware, userController.updateProfile);
  *         description: User not found
  */
 router.get('/:id', authMiddleware, userController.getUserById);
+
+/**
+ * @swagger
+ * /api/users/verify-account:
+ *   post:
+ *     summary: Verify a user's account number (for internal wallet transfers)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - accountNumber
+ *             properties:
+ *               accountNumber:
+ *                 type: string
+ *                 description: The account number to verify
+ *     responses:
+ *       200:
+ *         description: Returns the user's name
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 name:
+ *                   type: string
+ *                   description: The user's full name
+ *       400:
+ *         description: Account number is required
+ *       404:
+ *         description: Account not found
+ */
+router.post('/verify-account', authMiddleware, userController.verifyAccount);
 
 module.exports = router;

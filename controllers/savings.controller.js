@@ -10,7 +10,8 @@ exports.createGoal = async (req, res) => {
       title,
       targetAmount,
       savedAmount: 0,
-      deadline
+      deadline,
+      completed: false
     });
 
     res.status(201).json({ message: 'Savings goal created', goal });
@@ -101,6 +102,9 @@ exports.completeGoal = async (req, res) => {
 exports.depositToGoal = async (req, res) => {
   try {
     const { goalId, amount } = req.body;
+    if (!amount || isNaN(amount) || amount <= 0) {
+      return res.status(400).json({ message: 'Invalid deposit amount' });
+    }
 
     const wallet = await db.Wallet.findOne({ where: { userId: req.user.id } });
     const goal = await db.SavingsGoal.findByPk(goalId);
@@ -109,15 +113,18 @@ exports.depositToGoal = async (req, res) => {
       return res.status(404).json({ message: 'Savings goal not found' });
     }
 
-    if (wallet.balance < amount) {
+    if (parseFloat(wallet.balance) < parseFloat(amount)) {
       return res.status(400).json({ message: 'Insufficient wallet balance' });
     }
 
-    wallet.balance -= amount;
+    wallet.balance = parseFloat(wallet.balance) - parseFloat(amount);
     await wallet.save();
 
-    goal.savedAmount += parseFloat(amount);
+    goal.savedAmount = parseFloat(goal.savedAmount) + parseFloat(amount);
     await goal.save();
+
+    // Optional: Log transaction
+    // await db.SavingsTransaction.create({ userId: req.user.id, goalId, type: 'deposit', amount });
 
     res.status(200).json({ message: 'Deposit successful', newSaved: goal.savedAmount });
   } catch (err) {
@@ -129,6 +136,9 @@ exports.depositToGoal = async (req, res) => {
 exports.withdrawFromGoal = async (req, res) => {
   try {
     const { goalId, amount } = req.body;
+    if (!amount || isNaN(amount) || amount <= 0) {
+      return res.status(400).json({ message: 'Invalid withdrawal amount' });
+    }
 
     const wallet = await db.Wallet.findOne({ where: { userId: req.user.id } });
     const goal = await db.SavingsGoal.findByPk(goalId);
@@ -137,15 +147,18 @@ exports.withdrawFromGoal = async (req, res) => {
       return res.status(404).json({ message: 'Savings goal not found' });
     }
 
-    if (goal.savedAmount < amount) {
+    if (parseFloat(goal.savedAmount) < parseFloat(amount)) {
       return res.status(400).json({ message: 'Insufficient savings' });
     }
 
-    goal.savedAmount -= amount;
+    goal.savedAmount = parseFloat(goal.savedAmount) - parseFloat(amount);
     await goal.save();
 
-    wallet.balance += parseFloat(amount);
+    wallet.balance = parseFloat(wallet.balance) + parseFloat(amount);
     await wallet.save();
+
+    // Optional: Log transaction
+    // await db.SavingsTransaction.create({ userId: req.user.id, goalId, type: 'withdraw', amount });
 
     res.status(200).json({ message: 'Withdrawal successful', newWalletBalance: wallet.balance });
   } catch (err) {

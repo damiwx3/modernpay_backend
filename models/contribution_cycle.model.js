@@ -1,10 +1,18 @@
 module.exports = (sequelize, DataTypes) => {
-  const ContributionCycle = sequelize.define("ContributionCycle", {
-    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    groupId: { type: DataTypes.INTEGER, allowNull: false },
-    cycleNumber: { type: DataTypes.INTEGER },
-    startDate: { type: DataTypes.DATE },
-    endDate: { type: DataTypes.DATE }
+  const ContributionCycle = sequelize.define('ContributionCycle', {
+    groupId: DataTypes.INTEGER,
+    cycleNumber: DataTypes.INTEGER,
+    startDate: DataTypes.DATEONLY,
+    endDate: DataTypes.DATEONLY,
+    amount: DataTypes.FLOAT,
+    status: DataTypes.STRING
   });
+
+  ContributionCycle.associate = function(models) {
+    ContributionCycle.belongsTo(models.ContributionGroup, { foreignKey: 'groupId' });
+    ContributionCycle.hasMany(models.ContributionPayment, { foreignKey: 'cycleId' });
+    ContributionCycle.hasMany(models.MissedContribution, { foreignKey: 'cycleId' });
+  };
+
   return ContributionCycle;
 };

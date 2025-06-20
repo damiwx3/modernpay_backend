@@ -56,6 +56,7 @@ fs.readdirSync(__dirname)
 // ✅ Explicitly register AdminUser model
 db.AdminUser = require('./admin_user.model')(sequelize, DataTypes);
 db.BillPayment = require('./bill_payment.model.js')(sequelize, Sequelize.DataTypes);
+db.VirtualAccount = require('./virtualaccount.model')(sequelize, DataTypes); // <-- ADD THIS LINE
 
 db.NotificationLog = require('./notification_log.model')(sequelize, DataTypes);
 db.NotificationLog.belongsTo(db.User, { foreignKey: 'userId' });
@@ -102,20 +103,30 @@ db.Ticket.belongsTo(db.User, { foreignKey: 'userId' });
 db.User.hasMany(db.ServiceLog, { foreignKey: 'userId' });
 db.ServiceLog.belongsTo(db.User, { foreignKey: 'userId' });
 
-db.User.hasMany(db.ContributionMember, { foreignKey: 'userId' });
-db.ContributionMember.belongsTo(db.User, { foreignKey: 'userId' });
+// Contribution System Relationships
+db.ContributionGroup.hasMany(db.ContributionCycle, { foreignKey: 'groupId' });
+db.ContributionCycle.belongsTo(db.ContributionGroup, { foreignKey: 'groupId' });
 
 db.ContributionGroup.hasMany(db.ContributionMember, { foreignKey: 'groupId' });
 db.ContributionMember.belongsTo(db.ContributionGroup, { foreignKey: 'groupId' });
 
-db.ContributionGroup.hasMany(db.ContributionCycle, { foreignKey: 'groupId' });
-db.ContributionCycle.belongsTo(db.ContributionGroup, { foreignKey: 'groupId' });
+db.User.hasMany(db.ContributionMember, { foreignKey: 'userId' });
+db.ContributionMember.belongsTo(db.User, { foreignKey: 'userId' });
 
 db.ContributionCycle.hasMany(db.ContributionPayment, { foreignKey: 'cycleId' });
 db.ContributionPayment.belongsTo(db.ContributionCycle, { foreignKey: 'cycleId' });
 
 db.ContributionMember.hasMany(db.ContributionPayment, { foreignKey: 'memberId' });
 db.ContributionPayment.belongsTo(db.ContributionMember, { foreignKey: 'memberId' });
+
+db.ContributionCycle.hasMany(db.MissedContribution, { foreignKey: 'cycleId' });
+db.MissedContribution.belongsTo(db.ContributionCycle, { foreignKey: 'cycleId' });
+
+db.User.hasMany(db.MissedContribution, { foreignKey: 'userId' });
+db.MissedContribution.belongsTo(db.User, { foreignKey: 'userId' });
+
+db.PayoutOrder.belongsTo(db.ContributionCycle, { foreignKey: 'cycleId' });
+db.PayoutOrder.belongsTo(db.User, { foreignKey: 'userId' });
 
 db.Referral.belongsTo(db.User, { as: 'Referrer', foreignKey: 'referrerId' });
 db.Referral.belongsTo(db.User, { as: 'Referred', foreignKey: 'referredId' });
@@ -125,10 +136,14 @@ db.TransactionDispute.belongsTo(db.User, { foreignKey: 'userId' });
 
 db.WebhookLog.belongsTo(db.User, { foreignKey: 'userId' });
 db.User.hasMany(db.WebhookLog, { foreignKey: 'userId' });
-
+db.KYCDocument = require('./kyc_document.model.js')(sequelize, Sequelize.DataTypes);
 
 db.AuditLog.belongsTo(db.User, { foreignKey: 'userId' });
-
+db.User.hasMany(db.KYCDocument, { foreignKey: 'userId' });
+db.KYCDocument.belongsTo(db.User, { foreignKey: 'userId' });
+db.SavingsGoal = require('./savings_goal.model.js')(sequelize, Sequelize.DataTypes);
+db.User.hasMany(db.SavingsGoal, { foreignKey: 'userId' });
+db.SavingsGoal.belongsTo(db.User, { foreignKey: 'userId' });
 
 
 // ==========================
