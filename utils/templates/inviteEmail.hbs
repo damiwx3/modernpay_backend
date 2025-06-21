@@ -1,0 +1,22 @@
+<div style="font-family: Arial, sans-serif; max-width: 500px; margin: auto; border: 1px solid #eee; border-radius: 8px; padding: 24px; background: #fafcff;">
+  <img src="https://modernpayfinance.com/logo.png" alt="ModernPay Logo" style="height:40px; margin-bottom: 16px;">
+  <h2 style="color: #337ab7;">You're Invited to Join <span style="color:#5cb85c;">{{groupName}}</span>!</h2>
+  <p style="font-size:1.1em;">Hello,</p>
+  <p style="font-size:1.1em;">
+    You have been invited to join the group <b>{{groupName}}</b> on <b>ModernPay</b>.
+  </p>
+  {{#if description}}
+    <p style="color:#888;">{{description}}</p>
+  {{/if}}
+  <p style="font-size:1.1em;">
+    <b>Amount per member:</b> <span style="color:#337ab7;">{{amountPerMember}}</span>
+  </p>
+  <div style="margin: 24px 0;">
+    <a href="{{inviteLink}}" style="background: #5cb85c; color: #fff; padding: 12px 24px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size:1.1em;">
+      Accept Invite
+    </a>
+  </div>
+  <p style="font-size:0.95em; color:#888;">If you did not expect this invitation, you can safely ignore this email.</p>
+  <hr style="margin: 24px 0;">
+  <p style="font-size:0.95em; color:#888;">Best regards,<br/>The ModernPay Team</p>
+</div>

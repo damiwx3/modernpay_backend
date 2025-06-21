@@ -1,17 +1,35 @@
 module.exports = (sequelize, DataTypes) => {
   const MissedContribution = sequelize.define('MissedContribution', {
-    userId: DataTypes.INTEGER,
-    cycleId: DataTypes.INTEGER,
-    reason: DataTypes.STRING,
-    status: {
+    id: { 
+      type: DataTypes.INTEGER, 
+      primaryKey: true, 
+      autoIncrement: true },
+    memberId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    userId: { 
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    cycleId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    reason: {
       type: DataTypes.STRING,
-      defaultValue: 'missed'
-    }
+      allowNull: true,
+    },
+    missedAt: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW,
+    },
   });
 
-  MissedContribution.associate = function(models) {
-    MissedContribution.belongsTo(models.User, { foreignKey: 'userId' });
+  MissedContribution.associate = models => {
+    MissedContribution.belongsTo(models.ContributionMember, { foreignKey: 'memberId' });
     MissedContribution.belongsTo(models.ContributionCycle, { foreignKey: 'cycleId' });
+    MissedContribution.belongsTo(models.User, { foreignKey: 'userId' }); // <-- Add this
   };
 
   return MissedContribution;

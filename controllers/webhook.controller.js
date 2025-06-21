@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const sendNotification = require('../utils/sendNotification');
 const sendEmail = require('../utils/sendEmail');
 const sendSms = require('../utils/sendSms');
+const { renderTemplate } = require('../utils/notificationTemplates');
 const { Op } = require('sequelize');
 
 // Paystack webhook handler
@@ -19,6 +20,10 @@ exports.paystackWebhook = async (req, res) => {
   const event = req.body;
   let webhookLogId = null;
   let user = null;
+
+  // Helpers
+  const maskAccount = (acc) => acc ? acc.slice(0, 3) + '**' + acc.slice(-3) : '***';
+  const formatNaira = (num) => 'NGN' + Number(num).toLocaleString('en-NG', { minimumFractionDigits: 2 });
 
   try {
     // Log Webhook (initial, may update later)
@@ -60,7 +65,7 @@ exports.paystackWebhook = async (req, res) => {
         ? `Transfer Recieved From ${senderName}`
         : 'ModernPay wallet funding';
 
-       await db.Transaction.create({
+      await db.Transaction.create({
         userId: wallet.userId,
         type: 'credit',
         amount: parseFloat(amount),
@@ -74,57 +79,31 @@ exports.paystackWebhook = async (req, res) => {
         category: 'wallet_funding'
       });
 
-      console.log('Wallet balance before:', wallet.balance, 'Amount:', amount);
-console.log('Type of wallet.balance:', typeof wallet.balance, 'Value:', wallet.balance);
-console.log('Type of amount:', typeof amount, 'Value:', amount);
+      if (wallet.balance == null || isNaN(wallet.balance)) wallet.balance = 0;
+      wallet.balance = Number(wallet.balance) + Number(amount);
+      await wallet.save();
 
-if (wallet.balance == null || isNaN(wallet.balance)) wallet.balance = 0;
-wallet.balance = Number(wallet.balance) + Number(amount);
-
-await wallet.save();
-console.log('Wallet balance after:', wallet.balance);
-      // Double-check balance in DB
-      const freshWallet = await db.Wallet.findOne({ where: { userId: user.id } });
-      console.log('Wallet balance in DB:', freshWallet.balance);
-
-      // Update WebhookLog with userId
       await db.WebhookLog.update({ userId: user.id }, { where: { id: webhookLogId } });
 
-      // Log user data before notification
-      console.log('User for notification:', {
-        id: user.id,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
-        deviceToken: user.deviceToken
-      });
-
-      // Notify user and update notificationSent
-      // Format/mask account number (adjust field as needed)
-const maskAccount = (acc) => acc ? acc.slice(0, 3) + '**' + acc.slice(-3) : '***';
-const formatNaira = (num) => 'NGN' + Number(num).toLocaleString('en-NG', {minimumFractionDigits: 2});
-const maskedAcc = maskAccount(wallet.accountNumber || wallet.account_number || '');
-
-// Compose alert message
-const alertMsg =
-  `Credit\n` +
-  `Amt:${formatNaira(amount)}\n` +
-  `Acc:${maskedAcc}\n` +
-  `Desc:${reference}/ToModernPay/From/${senderName || 'Sender'}\n` +
-  `Date:${new Date().toLocaleDateString('en-GB')}\n` +
-  `Avail Bal:${formatNaira(wallet.balance)}\n`;
-
-try {
-  await sendNotification(
-    user,
-    alertMsg,
-    'Wallet Credit'
-  );
-  await db.WebhookLog.update({ notificationSent: true }, { where: { id: webhookLogId } });
-} catch (notifyErr) {
-  await db.WebhookLog.update({ errorMessage: notifyErr.message }, { where: { id: webhookLogId } });
-  console.error('Notification error:', notifyErr.message);
-}
-
+      // Notify user with template
+      try {
+        await sendNotification(
+          user,
+          '',
+          'Wallet Funded',
+          null,
+          'walletFunded',
+          {
+            amount: formatNaira(amount),
+            date: new Date().toLocaleDateString('en-GB'),
+            balance: formatNaira(wallet.balance)
+          }
+        );
+        await db.WebhookLog.update({ notificationSent: true }, { where: { id: webhookLogId } });
+      } catch (notifyErr) {
+        await db.WebhookLog.update({ errorMessage: notifyErr.message }, { where: { id: webhookLogId } });
+        console.error('Notification error:', notifyErr.message);
+      }
       console.log(`✅ Paystack wallet funded: ₦${amount} for ${email}`);
     }
 
@@ -144,8 +123,11 @@ try {
           if (user) {
             await sendNotification(
               user,
-              `Your wallet funding attempt failed. Reference: ${event.data.reference}`,
-              'Wallet Funding Failed'
+              '',
+              'Wallet Funding Failed',
+              null,
+              'walletFundingFailed',
+              { reference: event.data.reference }
             );
             await db.WebhookLog.update(
               { userId: user.id, notificationSent: true },
@@ -161,54 +143,46 @@ try {
     }
 
     // 3️⃣ Handle transfer.success
-    // ...existing code...
-
-// 3️⃣ Handle transfer.success
-if (
-  event.event === 'transfer.success' &&
-  event.data.reference
-) {
-  await db.Transaction.update(
-    { status: 'success' },
-    { where: { reference: event.data.reference } }
-  );
-  // --- Debit Notification Block START ---
-  const tx = await db.Transaction.findOne({ where: { reference: event.data.reference } });
-  if (tx) {
-    user = await db.User.findOne({ where: { id: tx.userId } });
-    const wallet = await db.Wallet.findOne({ where: { userId: user.id } });
-    if (user && wallet) {
-      const maskAccount = (acc) => acc ? acc.slice(0, 3) + '**' + acc.slice(-3) : '***';
-      const formatNaira = (num) => 'NGN' + Number(num).toLocaleString('en-NG', {minimumFractionDigits: 2});
-      const maskedAcc = maskAccount(wallet.accountNumber || wallet.account_number || '');
-      // Use recipientName or recipient_account for recipient info
-      const recipientInfo = tx.recipientName || tx.recipient_account || 'Recipient';
-      const recipientBank = tx.recipientBank || '';
-      const alertMsg =
-        `Debit\n` +
-        `Amt:${formatNaira(tx.amount)}\n` +
-        `Acc:${maskedAcc}\n` +
-        `Desc:${tx.reference}/${recipientInfo}${recipientBank ? '/' + recipientBank : ''}\n` +
-        `Date:${new Date().toLocaleDateString('en-GB')}\n` +
-        `Avail Bal:${formatNaira(wallet.balance)}\n`;
-      try {
-        await sendNotification(
-          user,
-          alertMsg,
-          'Wallet Debit'
-        );
-        await db.WebhookLog.update({ notificationSent: true }, { where: { id: webhookLogId } });
-      } catch (notifyErr) {
-        await db.WebhookLog.update({ errorMessage: notifyErr.message }, { where: { id: webhookLogId } });
-        console.error('Notification error:', notifyErr.message);
+    if (
+      event.event === 'transfer.success' &&
+      event.data.reference
+    ) {
+      await db.Transaction.update(
+        { status: 'success' },
+        { where: { reference: event.data.reference } }
+      );
+      const tx = await db.Transaction.findOne({ where: { reference: event.data.reference } });
+      if (tx) {
+        user = await db.User.findOne({ where: { id: tx.userId } });
+        const wallet = await db.Wallet.findOne({ where: { userId: user.id } });
+        if (user && wallet) {
+          const maskedAcc = maskAccount(wallet.accountNumber || wallet.account_number || '');
+          const recipientInfo = tx.recipientName || tx.recipient_account || 'Recipient';
+          const recipientBank = tx.recipientBank || '';
+          try {
+            await sendNotification(
+              user,
+              '',
+              'Wallet Debit',
+              null,
+              'walletDebit',
+              {
+                amount: formatNaira(tx.amount),
+                account: maskedAcc,
+                recipient: recipientInfo,
+                date: new Date().toLocaleDateString('en-GB'),
+                balance: formatNaira(wallet.balance)
+              }
+            );
+            await db.WebhookLog.update({ notificationSent: true }, { where: { id: webhookLogId } });
+          } catch (notifyErr) {
+            await db.WebhookLog.update({ errorMessage: notifyErr.message }, { where: { id: webhookLogId } });
+            console.error('Notification error:', notifyErr.message);
+          }
+        }
       }
+      console.log(`✅ Paystack transfer successful for reference: ${event.data.reference}`);
     }
-  }
-  // --- Debit Notification Block END ---
-  console.log(`✅ Paystack transfer successful for reference: ${event.data.reference}`);
-}
-
-// ...existing code...
 
     // 4️⃣ Handle transfer.failed (notify user)
     if (
@@ -226,8 +200,11 @@ if (
           if (user) {
             await sendNotification(
               user,
-              `Your transfer attempt failed. Reference: ${event.data.reference}`,
-              'Transfer Failed'
+              '',
+              'Transfer Failed',
+              null,
+              'walletTransferFailed',
+              { reference: event.data.reference }
             );
             await db.WebhookLog.update(
               { userId: user.id, notificationSent: true },
@@ -258,8 +235,11 @@ if (
           if (user) {
             await sendNotification(
               user,
-              `A transfer was reversed. Reference: ${event.data.reference}`,
-              'Transfer Reversed'
+              '',
+              'Transfer Reversed',
+              null,
+              'walletTransferReversed',
+              { reference: event.data.reference }
             );
             await db.WebhookLog.update(
               { userId: user.id, notificationSent: true },
@@ -332,57 +312,31 @@ if (
             category: 'wallet_funding'
           });
 
-          console.log('Wallet balance before:', wallet.balance, 'Amount:', amount);
-console.log('Type of wallet.balance:', typeof wallet.balance, 'Value:', wallet.balance);
-console.log('Type of amount:', typeof amount, 'Value:', amount);
+          if (wallet.balance == null || isNaN(wallet.balance)) wallet.balance = 0;
+          wallet.balance = Number(wallet.balance) + Number(amount);
+          await wallet.save();
 
-if (wallet.balance == null || isNaN(wallet.balance)) wallet.balance = 0;
-wallet.balance = Number(wallet.balance) + Number(amount);
-
-await wallet.save();
-console.log('Wallet balance after:', wallet.balance);
-          // Double-check balance in DB
-          const freshWallet = await db.Wallet.findOne({ where: { userId: user.id } });
-          console.log('Wallet balance in DB:', freshWallet.balance);
-
-          // Update WebhookLog with userId
           await db.WebhookLog.update({ userId: user.id }, { where: { id: webhookLogId } });
 
-          // Log user data before notification
-          console.log('User for notification:', {
-            id: user.id,
-            email: user.email,
-            phoneNumber: user.phoneNumber,
-            deviceToken: user.deviceToken
-          });
-
-          // Notify user and update notificationSent
-          // Format/mask account number (adjust field as needed)
-const maskAccount = (acc) => acc ? acc.slice(0, 3) + '**' + acc.slice(-3) : '***';
-const formatNaira = (num) => 'NGN' + Number(num).toLocaleString('en-NG', {minimumFractionDigits: 2});
-const maskedAcc = maskAccount(wallet.accountNumber || wallet.account_number || '');
-
-// Compose alert message
-const alertMsg =
-  `Credit\n` +
-  `Amt:${formatNaira(amount)}\n` +
-  `Acc:${maskedAcc}\n` +
-  `Desc:${reference}/ToModernPay/from/${senderName || 'Sender'}\n` +
-  `Date:${new Date().toLocaleDateString('en-GB')}\n` +
-  `Avail Bal:${formatNaira(wallet.balance)}\n`;
-
-try {
-  await sendNotification(
-    user,
-    alertMsg,
-    'Wallet Credit'
-  );
-  await db.WebhookLog.update({ notificationSent: true }, { where: { id: webhookLogId } });
-} catch (notifyErr) {
-  await db.WebhookLog.update({ errorMessage: notifyErr.message }, { where: { id: webhookLogId } });
-  console.error('Notification error:', notifyErr.message);
-}
-
+          // Notify user with template
+          try {
+            await sendNotification(
+              user,
+              '',
+              'Wallet Funded',
+              null,
+              'walletFunded',
+              {
+                amount: formatNaira(amount),
+                date: new Date().toLocaleDateString('en-GB'),
+                balance: formatNaira(wallet.balance)
+              }
+            );
+            await db.WebhookLog.update({ notificationSent: true }, { where: { id: webhookLogId } });
+          } catch (notifyErr) {
+            await db.WebhookLog.update({ errorMessage: notifyErr.message }, { where: { id: webhookLogId } });
+            console.error('Notification error:', notifyErr.message);
+          }
           console.log(`✅ Virtual account funded: ₦${amount} for user ${user.email}`);
         }
       }
@@ -457,28 +411,26 @@ exports.vtpassWebhook = async (req, res) => {
     bill.paidAt = newStatus === 'success' ? new Date() : null;
     await bill.save();
 
-    // 7️⃣ Notify user about bill payment status (with extra details)
+    // 7️⃣ Notify user about bill payment status (with template)
     try {
       const user = await db.User.findOne({ where: { id: bill.userId } });
       if (user) {
-        let notifyMsg, notifyTitle;
         let details = '';
         if (bill.phone) details += `Phone: ${bill.phone}. `;
         if (bill.meterNumber) details += `Meter: ${bill.meterNumber}. `;
-        if (newStatus === 'success') {
-          notifyTitle = 'Bill Payment Successful';
-          notifyMsg = `Your bill payment (${bill.type || 'service'}) of ₦${bill.amount} was successful. ${details}Reference: ${reference}`;
-        } else {
-          notifyTitle = 'Bill Payment Failed';
-          notifyMsg = `Your bill payment (${bill.type || 'service'}) of ₦${bill.amount} failed. ${details}Reference: ${reference}`;
-        }
-        console.log('User for notification:', {
-          id: user.id,
-          email: user.email,
-          phoneNumber: user.phoneNumber,
-          deviceToken: user.deviceToken
-        });
-        await sendNotification(user, notifyMsg, notifyTitle);
+        await sendNotification(
+          user,
+          '',
+          newStatus === 'success' ? 'Bill Payment Successful' : 'Bill Payment Failed',
+          null,
+          newStatus === 'success' ? 'billPaymentSuccess' : 'billPaymentFailed',
+          {
+            amount: bill.amount,
+            type: bill.type,
+            reference,
+            details
+          }
+        );
         await db.WebhookLog.update(
           { userId: user.id, notificationSent: true },
           { where: { id: webhookLogId } }
@@ -498,6 +450,7 @@ exports.vtpassWebhook = async (req, res) => {
     res.status(500).json({ message: 'Internal webhook error' });
   }
 };
+
 // Youverify webhook handler
 exports.youverifyWebhook = async (req, res) => {
   const signature = req.headers['x-youverify-signature'];
@@ -556,24 +509,36 @@ exports.youverifyWebhook = async (req, res) => {
 
     // If verified, update user and notify
     if (
-  finalStatus === 'completed' ||
-  finalStatus === 'approved' ||
-  finalStatus === 'success' ||
-  finalStatus === 'found'
-) {
-  const user = await db.User.findByPk(kycDoc.userId);
-  if (user && user.kycStatus !== 'approved') { // Only notify if not already approved
-    user.kycStatus = 'approved';
-    await user.save();
+      finalStatus === 'completed' ||
+      finalStatus === 'approved' ||
+      finalStatus === 'success' ||
+      finalStatus === 'found'
+    ) {
+      const user = await db.User.findByPk(kycDoc.userId);
+      if (user && user.kycStatus !== 'approved') { // Only notify if not already approved
+        user.kycStatus = 'approved';
+        await user.save();
 
-    const notifyMsg = 'Congratulations! Your identity has been verified. You now have full access to ModernPay features.';
-    const notifyTitle = 'Identity Verified';
-
-    try { await sendNotification(user, notifyMsg, notifyTitle); } catch (e) { console.error('Push notification error:', e.message); }
-    try { await sendEmail({ to: user.email, subject: notifyTitle, text: notifyMsg }); } catch (e) { console.error('Email error:', e.message); }
-    try { if (user.phoneNumber) await sendSms(user.phoneNumber, notifyMsg); } catch (e) { console.error('SMS error:', e.message); }
-  }
-}
+        try {
+          await sendNotification(
+            user,
+            '',
+            'Identity Verified',
+            null,
+            'kycVerified',
+            {}
+          );
+          await sendEmail({
+            to: user.email,
+            subject: 'Identity Verified',
+            html: renderTemplate('kycVerified', {})
+          });
+          if (user.phoneNumber) await sendSms(user.phoneNumber, 'Congratulations! Your identity has been verified. You now have full access to ModernPay features.');
+        } catch (e) {
+          console.error('Notification error (Youverify):', e.message);
+        }
+      }
+    }
 
     console.log('✅ Youverify webhook processed:', { ref, status: finalStatus, type: finalType, event });
     res.status(200).json({ received: true });

@@ -1,18 +1,39 @@
 module.exports = (sequelize, DataTypes) => {
   const ContributionPayment = sequelize.define('ContributionPayment', {
-    memberId: DataTypes.INTEGER,
-    cycleId: DataTypes.INTEGER,
-    userId: DataTypes.INTEGER,
-    amount: DataTypes.FLOAT,
-    status: DataTypes.STRING,
-    paidAt: DataTypes.DATE,
-    txRef: DataTypes.STRING,
-    isAutoPaid: DataTypes.BOOLEAN
+    memberId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    cycleId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    userId: {
+      type: DataTypes.INTEGER,
+      allowNull: true, // Optional, for direct user reference
+    },
+    amount: {
+      type: DataTypes.FLOAT,
+      allowNull: false,
+    },
+    paidAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    status: {
+      type: DataTypes.STRING,
+      defaultValue: 'pending',
+    },
+    penalty: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
   });
 
-  ContributionPayment.associate = function(models) {
-    ContributionPayment.belongsTo(models.ContributionCycle, { foreignKey: 'cycleId' });
+  ContributionPayment.associate = models => {
     ContributionPayment.belongsTo(models.ContributionMember, { foreignKey: 'memberId' });
+    ContributionPayment.belongsTo(models.ContributionCycle, { foreignKey: 'cycleId' });
+    ContributionPayment.belongsTo(models.User, { foreignKey: 'userId' });
   };
 
   return ContributionPayment;

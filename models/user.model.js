@@ -19,6 +19,17 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.ENUM('unverified', 'pending', 'approved', 'rejected'),
       defaultValue: 'unverified'
     },
+    // ...existing code...
+notificationPreferences: {
+  type: DataTypes.JSON,
+  allowNull: true,
+  defaultValue: {
+    email: true,
+    sms: false,
+    push: true,
+    inApp: true
+  }
+},
     kycLevel: { type: DataTypes.INTEGER, defaultValue: 1 },
     kycLimit: { type: DataTypes.BIGINT, allowNull: true },
     bvn: { type: DataTypes.STRING },

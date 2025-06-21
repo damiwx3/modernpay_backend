@@ -4,6 +4,7 @@ const logger = require('../utils/logger');
 const axios = require('axios');
 const bcrypt = require('bcryptjs');
 const sendNotification = require('../utils/sendNotification');
+const { renderTemplate } = require('../utils/notificationTemplates');
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
@@ -15,6 +16,10 @@ function logWalletAction(userId, action, details) {
 async function checkRateLimitOrFraud(userId, action) {
   // Example: throw new Error('Too many requests');
 }
+
+// Format helpers
+const maskAccount = (acc) => acc ? acc.slice(0, 3) + '**' + acc.slice(-3) : '***';
+const formatNaira = (num) => 'NGN' + Number(num).toLocaleString('en-NG', { minimumFractionDigits: 2 });
 
 // 📘 Get Wallet Balance & Account Info
 exports.getBalance = async (req, res) => {
@@ -59,7 +64,7 @@ exports.fundWallet = async (req, res) => {
       'https://api.paystack.co/transaction/initialize',
       {
         email: user.email,
-        amount: Math.round(value * 100), // Paystack expects amount in kobo
+        amount: Math.round(value * 100),
         callback_url: "https://modernpay-backend.onrender.com/approve-transfer",
         metadata: {
           userId: user.id,
@@ -88,6 +93,7 @@ exports.fundWallet = async (req, res) => {
     res.status(500).json({ message: 'Failed to initialize payment', error: err.response?.data || err.message });
   }
 };
+
 // 🔁 Transfer to another user via account number
 exports.transferFunds = async (req, res) => {
   if (!req.user || !req.user.id) {
@@ -116,13 +122,11 @@ exports.transferFunds = async (req, res) => {
     const senderUser = await db.User.findOne({ where: { id: req.user.id } });
     const recipientUser = await db.User.findOne({ where: { id: recipientWallet.userId } });
 
-    // ...existing code...
     senderWallet.balance = parseFloat(senderWallet.balance) - value;
     recipientWallet.balance = parseFloat(recipientWallet.balance) + value;
     await senderWallet.save({ transaction: t });
     await recipientWallet.save({ transaction: t });
 
-    // ...existing code...
     await db.Transaction.bulkCreate([
       {
         userId: req.user.id,
@@ -174,33 +178,39 @@ exports.transferFunds = async (req, res) => {
       },
     ], { transaction: t });
 
-    // Format helpers
-    const maskAccount = (acc) => acc ? acc.slice(0, 3) + '**' + acc.slice(-3) : '***';
-    const formatNaira = (num) => 'NGN' + Number(num).toLocaleString('en-NG', {minimumFractionDigits: 2});
-
-    // Debit notification for sender
+    // Debit notification for sender (with template)
     const senderMaskedAcc = maskAccount(senderWallet.accountNumber || '');
-    const debitMsg =
-      `Debit\n` +
-      `Amt:${formatNaira(value)}\n` +
-      `Acc:${senderMaskedAcc}\n` +
-      `Desc:Wallet/Transfer/${recipientUser.fullName || recipientUser.name || recipientUser.email}\n` +
-      `Date:${new Date().toLocaleDateString('en-GB')}\n` +
-      `Avail Bal:${formatNaira(senderWallet.balance)}\n`;
+    await sendNotification(
+      senderUser,
+      '',
+      'Wallet Debit',
+      null,
+      'walletDebit',
+      {
+        amount: formatNaira(value),
+        account: senderMaskedAcc,
+        recipient: recipientUser.fullName || recipientUser.name || recipientUser.email,
+        date: new Date().toLocaleDateString('en-GB'),
+        balance: formatNaira(senderWallet.balance)
+      }
+    );
 
-    await sendNotification(senderUser, debitMsg, 'Wallet Debit');
-
-    // Credit notification for recipient
+    // Credit notification for recipient (with template)
     const recipientMaskedAcc = maskAccount(recipientWallet.accountNumber || '');
-    const creditMsg =
-      `Credit\n` +
-      `Amt:${formatNaira(value)}\n` +
-      `Acc:${recipientMaskedAcc}\n` +
-      `Desc:Wallet/Transfer/${senderUser.fullName || senderUser.name || senderUser.email}\n` +
-      `Date:${new Date().toLocaleDateString('en-GB')}\n` +
-      `Avail Bal:${formatNaira(recipientWallet.balance)}\n`;
-
-    await sendNotification(recipientUser, creditMsg, 'Wallet Credit');
+    await sendNotification(
+      recipientUser,
+      '',
+      'Wallet Credit',
+      null,
+      'walletCredit',
+      {
+        amount: formatNaira(value),
+        account: recipientMaskedAcc,
+        sender: senderUser.fullName || senderUser.name || senderUser.email,
+        date: new Date().toLocaleDateString('en-GB'),
+        balance: formatNaira(recipientWallet.balance)
+      }
+    );
 
     await t.commit();
 
@@ -298,6 +308,22 @@ exports.transferToBank = async (req, res) => {
         recipientAccount: accountNumber,
         bankName: recipientRes.data.data.details?.bank_name || null,
       });
+
+      // Notify user with template
+      await sendNotification(
+        user,
+        '',
+        'Wallet Debit',
+        null,
+        'walletDebit',
+        {
+          amount: formatNaira(value),
+          account: maskAccount(wallet.accountNumber || ''),
+          recipient: recipientRes.data.data.details?.account_name || 'Recipient',
+          date: new Date().toLocaleDateString('en-GB'),
+          balance: formatNaira(wallet.balance)
+        }
+      );
 
       logWalletAction(req.user.id, 'transferToBank', { bankCode, accountNumber, amount: value });
       return res.status(200).json({ message: 'Bank transfer initiated', transfer: transferRes.data.data });
@@ -404,12 +430,27 @@ exports.createVirtualAccount = async (req, res) => {
       { where: { userId: user.id } }
     );
 
+    // Notify user about virtual account creation (optional template)
+     await sendNotification(
+      user,
+      '',
+      'Virtual Account Created',
+       null,
+      'virtualAccountCreated',
+       {
+         accountNumber: savedAccount.accountNumber,
+         bankName: savedAccount.bankName,
+         accountName: savedAccount.accountName
+       }
+     );
+
     res.status(200).json({ message: 'Virtual account created', account: savedAccount });
   } catch (err) {
     console.error('Create virtual account error:', err.response?.data || err.message);
     res.status(500).json({ message: 'Failed to create virtual account', error: err.response?.data || err.message });
   }
 };
+
 exports.getSupportedDedicatedBanks = async (req, res) => {
   try {
     const response = await axios.get('https://api.paystack.co/bank?type=dedicated_account', {
@@ -422,6 +463,7 @@ exports.getSupportedDedicatedBanks = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch dedicated banks', error: err.response?.data || err.message });
   }
 };
+
 // 🔒 Set Transaction PIN
 exports.setTransactionPin = async (req, res) => {
   if (!req.user || !req.user.id) {
@@ -450,15 +492,16 @@ exports.getTransactionByReference = async (req, res) => {
     return res.status(400).json({ message: 'Reference is required' });
   }
   try {
-    const transaction = await db.Transaction.findOne({ where: { reference }, raw: true }); // <-- Add raw: true
+    const transaction = await db.Transaction.findOne({ where: { reference }, raw: true });
     if (!transaction) {
       return res.status(404).json({ message: 'Transaction not found' });
     }
-    res.status(200).json(transaction); // <-- Return plain object, not { transaction }
+    res.status(200).json(transaction);
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch transaction', error: err.message });
   }
 };
+
 exports.getTransactions = async (req, res) => {
   try {
     const transactions = await db.Transaction.findAll({ where: { userId: req.user.id }, order: [['createdAt', 'DESC']] });
@@ -467,6 +510,7 @@ exports.getTransactions = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch transactions', error: err.message });
   }
 };
+
 // 👤 Get User by Account Number (for recipient verification)
 exports.getUserByAccountNumber = async (req, res) => {
   const { accountNumber } = req.params;

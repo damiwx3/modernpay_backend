@@ -23,6 +23,7 @@ exports.getMissedContributions = async (req, res) => {
 
     res.status(200).json({ missedContributions: filtered });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };

@@ -1,11 +1,32 @@
 module.exports = (sequelize, DataTypes) => {
   const ContributionCycle = sequelize.define('ContributionCycle', {
-    groupId: DataTypes.INTEGER,
-    cycleNumber: DataTypes.INTEGER,
-    startDate: DataTypes.DATEONLY,
-    endDate: DataTypes.DATEONLY,
-    amount: DataTypes.FLOAT,
-    status: DataTypes.STRING
+    groupId: {
+      type: DataTypes.INTEGER,
+      allowNull: false
+    },
+    cycleNumber: {
+      type: DataTypes.INTEGER,
+      allowNull: false
+    },
+    startDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: false
+    },
+    endDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: true
+    },
+    amount: {
+      type: DataTypes.FLOAT,
+      allowNull: false
+    },
+    status: {
+      type: DataTypes.ENUM('open', 'closed'),
+      allowNull: false,
+      defaultValue: 'open'
+    }
+  }, {
+    timestamps: true
   });
 
   ContributionCycle.associate = function(models) {

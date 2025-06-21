@@ -20,14 +20,13 @@ const scheduleContributions = () => {
       const dueCycles = await db.ContributionCycle.findAll({
         where: {
           startDate: { [Op.lte]: today },
-          endDate: { [Op.gte]: today }
+          endDate: { [Op.gte]: today },
+          status: 'open' // Only process open cycles
         },
         include: [{ model: db.ContributionGroup }]
       });
 
       for (const cycle of dueCycles) {
-        if (cycle.status === 'closed') continue;
-
         const group = cycle.ContributionGroup;
         const amount = parseFloat(group.amountPerMember) || 1000;
 
@@ -72,12 +71,13 @@ const scheduleContributions = () => {
               totalReminders++;
               console.log(`📨 Reminder sent to ${user.email || user.phoneNumber}`);
 
-              // Log missed payment
+              // Log missed payment with userId and memberId
               await db.MissedContribution.create({
+                memberId: member.id,
                 userId: user.id,
                 cycleId: cycle.id,
                 reason: 'Insufficient wallet balance',
-                status: 'missed'
+                missedAt: new Date()
               });
             }
 

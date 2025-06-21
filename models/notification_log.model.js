@@ -12,8 +12,12 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: true,
     },
+    deviceToken: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
     channel: {
-      type: DataTypes.ENUM('email', 'sms'),
+      type: DataTypes.ENUM('email', 'sms', 'push'),
       allowNull: false,
     },
     subject: {
@@ -27,7 +31,13 @@ module.exports = (sequelize, DataTypes) => {
     status: {
       type: DataTypes.STRING,
       defaultValue: 'sent',
+    },
+    error: {
+      type: DataTypes.TEXT,
+      allowNull: true,
     }
+  }, {
+    timestamps: true
   });
 
   return NotificationLog;

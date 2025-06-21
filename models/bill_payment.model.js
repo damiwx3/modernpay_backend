@@ -7,7 +7,7 @@ module.exports = (sequelize, DataTypes) => {
     reference: { type: DataTypes.STRING, unique: true },
     status: { type: DataTypes.STRING, defaultValue: 'pending' },
     customer: { type: DataTypes.STRING }, // e.g. phone, meter, smartcard, etc.
-    responseData: { type: DataTypes.JSON }, // store Flutterwave response or extra info
+    responseData: { type: DataTypes.JSON }, // store VTpass response or extra info
     paidAt: { type: DataTypes.DATE } // when payment was completed
   });
 
