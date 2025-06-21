@@ -1,6 +1,6 @@
 const db = require('../models');
 const { Op } = require('sequelize');
-const sendNotification = require('../utils/sendNotification');
+const { sendNotification } = require('../utils/sendNotification');
 const sendEmail = require('../utils/sendEmail');
 const sendSms = require('../utils/sendSms');
 const sendPush = require('../utils/sendPush');

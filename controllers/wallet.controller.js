@@ -3,7 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const logger = require('../utils/logger');
 const axios = require('axios');
 const bcrypt = require('bcryptjs');
-const sendNotification = require('../utils/sendNotification');
+const { sendNotification } = require('../utils/sendNotification');
 const { renderTemplate } = require('../utils/notificationTemplates');
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
