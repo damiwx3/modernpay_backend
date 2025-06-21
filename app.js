@@ -36,6 +36,7 @@ app.use(checkMaintenance);
 
 // --- ROUTES ---
 app.use('/api/disputes', disputeRoutes);
+app.use('/api/disputes', require('./routes/dispute.routes'));
 app.use('/api/contacts', userContactRoutes);
 app.use('/api/contributions', contributionRoutes);
 app.use('/api/missed-contributions', require('./routes/missed_contribution.routes'));
@@ -49,12 +50,15 @@ app.use('/api/wallets', walletRoutes);
 app.use('/api/contribution-cycles', contributionCycleRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/webhook', require('./routes/webhook.routes'));
+app.use('/api/activities', require('./routes/activity.routes'));
 //app.use('/', require('./routes/webhook.routes'));
 app.use('/api/virtual-cards', require('./routes/virtual_card.routes'));
 app.use('/api/system', require('./routes/system.routes'));
 app.use('/api/wallets', require('./routes/transaction.routes'));
 app.use('/api/security', securityRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/notifications', require('./routes/notification.routes'));
+app.use('/api/members', require('./routes/member.routes'));
 //app.use('/api/transactions', require('./routes/transaction.routes'));
 app.use('/api/bills', require('./routes/bill.routes'));
 app.use('/uploads', express.static('uploads'));

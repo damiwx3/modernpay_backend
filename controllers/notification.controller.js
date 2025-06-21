@@ -89,7 +89,18 @@ exports.deleteAllNotifications = async (req, res) => {
     res.status(500).json({ message: 'Failed to delete all notifications' });
   }
 };
-
+exports.getUserNotifications = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const notifications = await db.Notification.findAll({
+      where: { userId },
+      order: [['createdAt', 'DESC']]
+    });
+    res.json({ notifications });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
 // 8. Create/send a notification (for system use, now with push support)
 exports.createNotification = async (req, res) => {
   try {

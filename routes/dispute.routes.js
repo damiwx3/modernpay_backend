@@ -118,5 +118,7 @@ router.post('/:id/resolve', auth, controller.resolveDispute);
  *         description: Dispute updated
  */
 router.patch('/:id', auth, controller.updateDispute);
+router.get('/', auth, controller.getUserDisputes);
+router.post('/', auth, controller.createDispute);
 
 module.exports = router;

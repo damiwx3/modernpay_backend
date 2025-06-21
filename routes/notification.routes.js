@@ -68,5 +68,6 @@ router.post('/mark-read', controller.markAllRead);
  *         description: Notification marked as read
  */
 router.post('/:id/mark-read', controller.markOneRead);
+router.get('/', auth, controller.getUserNotifications);
 
 module.exports = router;

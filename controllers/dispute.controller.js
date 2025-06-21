@@ -91,3 +91,27 @@ exports.updateDispute = async (req, res) => {
     res.status(500).json({ message: 'Failed to update dispute', error: err.message });
   }
 };
+exports.getUserDisputes = async (req, res) => {
+  try {
+    const disputes = await db.Dispute.findAll({
+      where: { userId: req.user.id },
+      order: [['createdAt', 'DESC']]
+    });
+    res.json({ disputes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.createDispute = async (req, res) => {
+  try {
+    const dispute = await db.Dispute.create({
+      userId: req.user.id,
+      reason: req.body.reason,
+      status: 'Open'
+    });
+    res.json(dispute);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
