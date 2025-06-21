@@ -85,6 +85,26 @@ exports.makeContribution = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+exports.getCyclePayments = async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Fetch all payments for this cycle, including user info if available
+    const payments = await db.ContributionPayment.findAll({
+      where: { cycleId: id },
+      include: [
+        {
+          model: db.User,
+          as: 'user',
+          attributes: ['id', 'fullName', 'email', 'profileImage']
+        }
+      ],
+      order: [['paidAt', 'DESC']]
+    });
+    res.status(200).json({ payments });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
 
 exports.closeCycle = async (req, res) => {
   try {

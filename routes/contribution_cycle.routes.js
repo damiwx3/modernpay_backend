@@ -18,5 +18,6 @@ router.post('/:id/contribute', auth, controller.makeContribution);
 
 // Close a cycle and trigger payout
 router.post('/:id/close', auth, controller.closeCycle);
+router.get('/:id/payments', auth, controller.getCyclePayments);
 
 module.exports = router;

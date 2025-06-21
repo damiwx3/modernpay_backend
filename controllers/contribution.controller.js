@@ -16,7 +16,7 @@ function calculateEndDate(startDate, frequency) {
   return date;
 }
 
-// ✅ Create a new contribution group
+// Create a new contribution group
 exports.createGroup = async (req, res) => {
   try {
     const {
@@ -62,13 +62,13 @@ exports.createGroup = async (req, res) => {
       joinedAt: new Date()
     });
 
-    res.status(201).json({ group });
+    return res.status(201).json({ group });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 };
 
-// ✅ Join a group by ID (via URL param)
+// Join a group by ID (via URL param)
 exports.joinGroup = async (req, res) => {
   try {
     const groupId = req.params.groupId;
@@ -83,7 +83,7 @@ exports.joinGroup = async (req, res) => {
     }
 
     const group = await db.ContributionGroup.findByPk(groupId);
-    if (!group) return res.status(404).json({ message: 'Sorry, this group does not exist.' }); // Improved message
+    if (!group) return res.status(404).json({ message: 'Sorry, this group does not exist.' });
 
     const memberCount = await db.ContributionMember.count({ where: { groupId } });
     if (group.maxMembers && memberCount >= group.maxMembers) {
@@ -109,13 +109,13 @@ exports.joinGroup = async (req, res) => {
       { groupName: group.name, memberName: req.user.fullName }
     );
 
-    res.status(200).json({ message: 'Successfully joined the group' });
+    return res.status(200).json({ message: 'Successfully joined the group' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 };
 
-// ✅ Get all groups user belongs to
+// Get all groups user belongs to
 exports.getUserGroups = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -124,31 +124,31 @@ exports.getUserGroups = async (req, res) => {
     const groupIds = memberships.map(m => m.groupId);
     const groups = await db.ContributionGroup.findAll({ where: { id: groupIds } });
 
-    res.status(200).json({ groups });
+    return res.status(200).json({ groups });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 };
 
-// ✅ Get single group details
+// Get single group details
 exports.getGroupDetails = async (req, res) => {
   try {
     const { id } = req.params;
     const group = await db.ContributionGroup.findByPk(id);
-    if (!group) return res.status(404).json({ message: 'Sorry, this group does not exist.' }); // Improved message
+    if (!group) return res.status(404).json({ message: 'Sorry, this group does not exist.' });
 
     const members = await db.ContributionMember.findAll({
       where: { groupId: id },
       include: [{ model: db.User, attributes: ['id', 'fullName', 'email'] }]
     });
 
-    res.status(200).json({ group, members });
+    return res.status(200).json({ group, members });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 };
 
-// ✅ Invite to group (by email or userId), using template
+// Invite to group (by email or userId), using template
 exports.inviteToGroup = async (req, res) => {
   try {
     const { groupId } = req.params;
@@ -156,13 +156,13 @@ exports.inviteToGroup = async (req, res) => {
     if (!email && !invitedUserId) return res.status(400).json({ message: 'Email or invitedUserId is required' });
 
     const group = await db.ContributionGroup.findByPk(groupId);
-    if (!group) return res.status(404).json({ message: 'Sorry, this group does not exist.' }); // Improved message
+    if (!group) return res.status(404).json({ message: 'Sorry, this group does not exist.' });
 
     const where = invitedUserId ? { groupId, invitedUserId } : { groupId, email };
     const existing = await db.ContributionInvite.findOne({ where });
     if (existing) return res.status(409).json({ message: 'User already invited' });
 
-    const invite = await db.ContributionInvite.create({
+    await db.ContributionInvite.create({
       groupId,
       invitedBy: req.user.id,
       invitedUserId: invitedUserId || null,
@@ -203,14 +203,14 @@ exports.inviteToGroup = async (req, res) => {
       }
     }
 
-    res.json({ success: true, message: 'Invite sent' });
+    return res.json({ success: true, message: 'Invite sent' });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 };
 
-// ✅ Leave group
+// Leave group
 exports.leaveGroup = async (req, res) => {
   try {
     const { groupId } = req.params;
@@ -219,36 +219,36 @@ exports.leaveGroup = async (req, res) => {
     const member = await db.ContributionMember.findOne({ where: { groupId, userId } });
     if (!member) return res.status(404).json({ message: 'You are not a member of this group' });
 
-    if (member.isAdmin) return res.status(403).json({ message: 'Admins cannot leave the group. Please assign another admin before leaving.' }); // Improved message
+    if (member.isAdmin) return res.status(403).json({ message: 'Admins cannot leave the group. Please assign another admin before leaving.' });
 
     await member.destroy();
 
-    res.json({ success: true, message: 'You have left the group' });
+    return res.json({ success: true, message: 'You have left the group' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 };
 
-// ✅ Update group
+// Update group
 exports.updateGroup = async (req, res) => {
   try {
     const { groupId } = req.params;
     const updates = req.body;
 
     const group = await db.ContributionGroup.findByPk(groupId);
-    if (!group) return res.status(404).json({ message: 'Sorry, this group does not exist.' }); // Improved message
+    if (!group) return res.status(404).json({ message: 'Sorry, this group does not exist.' });
 
-    if (group.createdBy !== req.user.id) return res.status(403).json({ message: 'Only the group creator can perform this action.' }); // Improved message
+    if (group.createdBy !== req.user.id) return res.status(403).json({ message: 'Only the group creator can perform this action.' });
 
     await group.update(updates);
 
-    res.json({ success: true, message: 'Group updated', group });
+    return res.json({ success: true, message: 'Group updated', group });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 };
 
-// ✅ Payout history
+// Payout history
 exports.payoutHistory = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -259,13 +259,13 @@ exports.payoutHistory = async (req, res) => {
       ],
       order: [['paidAt', 'DESC']]
     });
-    res.json({ success: true, payouts });
+    return res.json({ success: true, payouts });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 };
 
-// ✅ Advanced Scheduler with templates and bulk user fetch
+// Advanced Scheduler with templates and bulk user fetch
 exports.runScheduler = async (req, res) => {
   try {
     const groups = await db.ContributionGroup.findAll({ where: { status: 'active' } });
@@ -301,7 +301,7 @@ exports.runScheduler = async (req, res) => {
           if (unpaidMemberIds.includes(member.id)) {
             missedContributions.push({
               memberId: member.id,
-              userId: member.userId, // Add userId for easier queries
+              userId: member.userId,
               cycleId: cycle.id,
               reason: 'Missed payment deadline',
               missedAt: now
@@ -431,17 +431,17 @@ exports.runScheduler = async (req, res) => {
       text: summaryMsg.replace(/<br>/g, '\n')
     });
 
-    res.json({
+    return res.json({
       success: true,
       message: `Scheduler ran. Closed ${processed} cycle(s), started ${newCycles} new cycle(s), marked ${missedPayments} missed payment(s).`
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 };
 
-// ✅ Add contribution contact
+// Add contribution contact
 exports.addContributionContact = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -457,9 +457,9 @@ exports.addContributionContact = async (req, res) => {
       addedAt: new Date()
     });
 
-    res.json({ success: true, contact });
+    return res.json({ success: true, contact });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 };

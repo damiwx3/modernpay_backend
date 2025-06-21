@@ -31,9 +31,9 @@ module.exports = (sequelize, DataTypes) => {
   });
 
   ContributionPayment.associate = models => {
-    ContributionPayment.belongsTo(models.ContributionMember, { foreignKey: 'memberId' });
-    ContributionPayment.belongsTo(models.ContributionCycle, { foreignKey: 'cycleId' });
-    ContributionPayment.belongsTo(models.User, { foreignKey: 'userId' });
+    ContributionPayment.belongsTo(models.User, { foreignKey: 'userId', as: 'user' });
+ContributionPayment.belongsTo(models.ContributionMember, { foreignKey: 'memberId' });
+ContributionPayment.belongsTo(models.ContributionCycle, { foreignKey: 'cycleId' });
   };
 
   return ContributionPayment;
