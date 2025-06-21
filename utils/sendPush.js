@@ -1,12 +1,5 @@
+const { androidApp } = require('../config/firebase');
 const admin = require('firebase-admin');
-
-// Initialize Firebase Admin only once in your app!
-if (!admin.apps.length) {
-  const serviceAccount = require('../config/firebase-android.json');
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-  });
-}
 
 /**
  * Send a push notification via FCM.
@@ -23,19 +16,18 @@ const sendPush = async (deviceToken, title, body, customData = {}) => {
       body
     },
     data: {
-      // Example custom fields:
       type: customData.type || 'general',
       transactionId: customData.transactionId || '',
       amount: customData.amount || '',
       reference: customData.reference || '',
       screen: customData.screen || '',
-      // Add any other custom fields you want here
-      ...customData // This allows you to pass any extra fields dynamically
+      ...customData
     }
   };
 
   try {
-    const response = await admin.messaging().send(message);
+    // Use the named app instance for messaging
+    const response = await admin.messaging(androidApp).send(message);
     console.log('✅ Push notification sent:', response);
     return response;
   } catch (error) {
