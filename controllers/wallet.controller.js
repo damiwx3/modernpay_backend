@@ -7,7 +7,9 @@ const { sendNotification } = require('../utils/sendNotification');
 const { renderTemplate } = require('../utils/notificationTemplates');
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+const SQUAD_SECRET_KEY = process.env.SQUAD_SECRET_KEY;
 
+// Helper: Log wallet actions
 function logWalletAction(userId, action, details) {
   logger.info({ userId, action, ...details });
 }
@@ -20,6 +22,45 @@ async function checkRateLimitOrFraud(userId, action) {
 // Format helpers
 const maskAccount = (acc) => acc ? acc.slice(0, 3) + '**' + acc.slice(-3) : '***';
 const formatNaira = (num) => 'NGN' + Number(num).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+
+// --- SQUAD VIRTUAL ACCOUNT CREATION ---
+async function createSquadVirtualAccount({
+  customer_identifier,
+  first_name,
+  last_name,
+  middle_name,
+  mobile_num,
+  dob,
+  address,
+  gender,
+  bvn,
+  beneficiary_account,
+  email
+}) {
+  const squadRes = await axios.post(
+    'https://sandbox-api-d.squadco.com/virtual-account',
+    {
+      customer_identifier,
+      first_name,
+      last_name,
+      middle_name,
+      mobile_num,
+      dob,
+      address,
+      gender,
+      bvn,
+      beneficiary_account,
+      email
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${SQUAD_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+  return squadRes.data;
+}
 
 // 📘 Get Wallet Balance & Account Info
 exports.getBalance = async (req, res) => {
@@ -339,39 +380,80 @@ exports.transferToBank = async (req, res) => {
   }
 };
 
-// 🏦 Create Virtual Account using Paystack
+// 🏦 Create Virtual Account using Paystack or Squad
 exports.createVirtualAccount = async (req, res) => {
   console.log('createVirtualAccount called', req.body);
-  const { email, firstName, lastName, preferred_bank, phone } = req.body;
+  // Accept all possible fields for both Paystack and Squad
+  const {
+    email,
+    firstName,
+    lastName,
+    middleName,
+    preferred_bank,
+    phone,
+    dob,
+    address,
+    gender,
+    bvn,
+    beneficiary_account,
+    provider = 'paystack'
+  } = req.body;
   try {
     // 1. Check if user exists in your DB
     const user = await db.User.findOne({ where: { email } });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // 2. Check if user already has a virtual account
-    const existingAccount = await db.VirtualAccount.findOne({ where: { userId: user.id } });
+    // 2. Check if user already has a virtual account for this provider
+    const existingAccount = await db.VirtualAccount.findOne({ where: { userId: user.id, provider } });
     if (existingAccount) {
       return res.status(200).json({ message: 'Virtual account already exists', account: existingAccount });
     }
 
-    // 3. Validate preferred bank
-    const supportedBanksRes = await axios.get('https://api.paystack.co/bank?type=dedicated_account', {
-      headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` }
-    });
-    const supportedBanks = supportedBanksRes.data.data.map(b => b.slug);
-    if (!supportedBanks.includes(preferred_bank)) {
-      return res.status(400).json({ message: 'Selected bank is not supported for virtual accounts.' });
-    }
+    let savedAccount;
 
-    // 4. Create or fetch Paystack customer
-    let customerCode = user.paystackCustomerCode;
-    if (!customerCode) {
-      const customerRes = await axios.post(
-        'https://api.paystack.co/customer',
+    if (provider === 'paystack') {
+      // 3. Validate preferred bank
+      const supportedBanksRes = await axios.get('https://api.paystack.co/bank?type=dedicated_account', {
+        headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` }
+      });
+      const supportedBanks = supportedBanksRes.data.data.map(b => b.slug);
+      if (!supportedBanks.includes(preferred_bank)) {
+        return res.status(400).json({ message: 'Selected bank is not supported for virtual accounts.' });
+      }
+
+      // 4. Create or fetch Paystack customer
+      let customerCode = user.paystackCustomerCode;
+      if (!customerCode) {
+        const customerRes = await axios.post(
+          'https://api.paystack.co/customer',
+          {
+            email,
+            first_name: firstName,
+            last_name: lastName,
+            phone,
+            bvn, // <-- add this if available
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        customerCode = customerRes.data.data.customer_code;
+        user.paystackCustomerCode = customerCode;
+        await user.save();
+      }
+
+      // 5. Create virtual account via Paystack
+      const response = await axios.post(
+        'https://api.paystack.co/dedicated_account',
         {
-          email,
+          customer: customerCode,
+          preferred_bank: preferred_bank,
           first_name: firstName,
           last_name: lastName,
+          bvn,
           phone,
         },
         {
@@ -381,68 +463,92 @@ exports.createVirtualAccount = async (req, res) => {
           },
         }
       );
-      customerCode = customerRes.data.data.customer_code;
-      user.paystackCustomerCode = customerCode;
-      await user.save();
-    }
+      // 6. Store returned account details in your DB
+      const accountData = response.data.data;
+      savedAccount = await db.VirtualAccount.create({
+        userId: user.id,
+        accountNumber: accountData.account_number,
+        bankName: accountData.bank.name,
+        bankId: accountData.bank.id,
+        accountName: accountData.account_name,
+        paystackCustomerCode:
+          typeof accountData.customer === 'string'
+            ? accountData.customer
+            : accountData.customer?.customer_code || user.paystackCustomerCode,
+        paystackAccountId: accountData.id,
+        raw: accountData,
+        provider: 'paystack'
+      });
 
-    // 5. Create virtual account via Paystack
-    const response = await axios.post(
-      'https://api.paystack.co/dedicated_account',
-      {
-        customer: customerCode,
-        preferred_bank: preferred_bank,
+      // 7. Update user's wallet with the new virtual account number and bank name
+      await db.Wallet.update(
+        {
+          accountNumber: savedAccount.accountNumber,
+          bankName: savedAccount.bankName,
+          accountName: savedAccount.accountName
+        },
+        { where: { userId: user.id } }
+      );
+    } else if (provider === 'squad') {
+      // --- SQUAD LOGIC ---
+      // Validate required Squad fields
+      if (
+        !firstName || !lastName || !phone || !dob || !address ||
+        !gender || !bvn || !beneficiary_account
+      ) {
+        return res.status(400).json({ message: 'Missing required fields for Squad virtual account.' });
+      }
+      const squadData = await createSquadVirtualAccount({
+        customer_identifier: user.id.toString(),
         first_name: firstName,
         last_name: lastName,
-        phone,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-          'Content-Type': 'application/json',
-        },
+        middle_name: middleName,
+        mobile_num: phone,
+        dob,
+        address,
+        gender,
+        bvn,
+        beneficiary_account,
+        email
+      });
+      if (!squadData || !squadData.data) {
+        return res.status(500).json({ message: 'Failed to create Squad virtual account', error: squadData });
       }
-    );
+      savedAccount = await db.VirtualAccount.create({
+        userId: user.id,
+        accountNumber: squadData.data.virtual_account_number,
+        bankName: squadData.data.bank_code, // You may want to map code to name
+        bankId: squadData.data.bank_code,
+        accountName: `${squadData.data.first_name} ${squadData.data.last_name}`,
+        raw: squadData,
+        provider: 'squad'
+      });
+      // Optionally update wallet/account info as with Paystack
+      await db.Wallet.update(
+        {
+          accountNumber: savedAccount.accountNumber,
+          bankName: savedAccount.bankName,
+          accountName: savedAccount.accountName
+        },
+        { where: { userId: user.id } }
+      );
+    } else {
+      return res.status(400).json({ message: 'Invalid provider' });
+    }
 
-    // 6. Store returned account details in your DB
-    const accountData = response.data.data;
-    const savedAccount = await db.VirtualAccount.create({
-      userId: user.id,
-      accountNumber: accountData.account_number,
-      bankName: accountData.bank.name,
-      bankId: accountData.bank.id,
-      accountName: accountData.account_name,
-      paystackCustomerCode:
-        typeof accountData.customer === 'string'
-          ? accountData.customer
-          : accountData.customer?.customer_code || user.paystackCustomerCode,
-      paystackAccountId: accountData.id,
-      raw: accountData,
-    });
-
-    // 7. Update user's wallet with the new virtual account number and bank name
-    await db.Wallet.update(
+    // Notify user about virtual account creation (optional template)
+    await sendNotification(
+      user,
+      '',
+      'Virtual Account Created',
+      null,
+      'virtualAccountCreated',
       {
         accountNumber: savedAccount.accountNumber,
         bankName: savedAccount.bankName,
         accountName: savedAccount.accountName
-      },
-      { where: { userId: user.id } }
+      }
     );
-
-    // Notify user about virtual account creation (optional template)
-     await sendNotification(
-      user,
-      '',
-      'Virtual Account Created',
-       null,
-      'virtualAccountCreated',
-       {
-         accountNumber: savedAccount.accountNumber,
-         bankName: savedAccount.bankName,
-         accountName: savedAccount.accountName
-       }
-     );
 
     res.status(200).json({ message: 'Virtual account created', account: savedAccount });
   } catch (err) {

@@ -547,3 +547,119 @@ exports.youverifyWebhook = async (req, res) => {
     res.status(500).json({ message: 'Internal webhook error' });
   }
 };
+
+exports.squadWebhook = async (req, res) => {
+  // 1️⃣ Optional: Verify Squad signature
+  const signature = req.headers['x-squad-signature'];
+  const secret = process.env.SQUAD_SECRET_KEY;
+  if (signature && secret) {
+    const computed = require('crypto')
+      .createHmac('sha256', secret)
+      .update(JSON.stringify(req.body))
+      .digest('hex');
+    if (computed !== signature) {
+      return res.status(401).send('Invalid Squad signature');
+    }
+  }
+
+  const event = req.body;
+  let webhookLogId = null;
+  let user = null;
+
+  // Helpers
+  const maskAccount = (acc) => acc ? acc.slice(0, 3) + '**' + acc.slice(-3) : '***';
+  const formatNaira = (num) => 'NGN' + Number(num).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+
+  try {
+    // Log the webhook event
+    let webhookLog = await db.WebhookLog.create({
+      event: event.event_type || event.event || 'squad',
+      reference: event.reference || event.transaction_reference,
+      status: event.status || 'received',
+      payload: event,
+    });
+    webhookLogId = webhookLog.id;
+
+    // Handle virtual account credit
+    const evt = event.event_type || event.event;
+    if (
+      evt === 'virtual_account_transaction' &&
+      event.status === 'successful' &&
+      event.amount && event.account_number
+    ) {
+      const reference = event.reference || event.transaction_reference;
+      // Squad sometimes sends amount in kobo, sometimes in naira (check for decimals)
+      let amount = Number(event.amount);
+      if (amount > 100000) amount = amount / 100; // likely kobo
+      const accountNumber = event.account_number;
+
+      // Find the virtual account
+      const virtualAccount = await db.VirtualAccount.findOne({
+        where: { accountNumber, provider: 'squad' }
+      });
+      if (virtualAccount) {
+        user = await db.User.findOne({ where: { id: virtualAccount.userId } });
+        const wallet = await db.Wallet.findOne({ where: { userId: user.id } });
+
+        // Prevent duplicate credit
+        const exists = await db.Transaction.findOne({ where: { reference } });
+        if (!exists) {
+          let description = 'Squad virtual account funding';
+
+          await db.Transaction.create({
+            userId: wallet.userId,
+            type: 'credit',
+            amount: parseFloat(amount),
+            reference: reference,
+            description: description,
+            status: 'success',
+            senderName: event.sender_name || null,
+            senderBank: event.sender_bank || null,
+            recipientName: user.fullName || null,
+            recipientBank: null,
+            category: 'wallet_funding'
+          });
+
+          if (wallet.balance == null || isNaN(wallet.balance)) wallet.balance = 0;
+          wallet.balance = Number(wallet.balance) + Number(amount);
+          await wallet.save();
+
+          await db.WebhookLog.update({ userId: user.id }, { where: { id: webhookLogId } });
+
+          // Notify user
+          try {
+            await sendNotification(
+              user,
+              '',
+              'Wallet Funded',
+              null,
+              'walletFunded',
+              {
+                amount: formatNaira(amount),
+                date: new Date().toLocaleDateString('en-GB'),
+                balance: formatNaira(wallet.balance)
+              }
+            );
+            await db.WebhookLog.update({ notificationSent: true }, { where: { id: webhookLogId } });
+          } catch (notifyErr) {
+            await db.WebhookLog.update({ errorMessage: notifyErr.message }, { where: { id: webhookLogId } });
+            console.error('Notification error:', notifyErr.message);
+          }
+          console.log(`✅ Squad virtual account funded: ₦${amount} for user ${user.email}`);
+        }
+      }
+    } else {
+      console.log('Unhandled Squad event:', evt, event.status);
+    }
+
+    // Always return 200 to avoid retries
+    res.status(200).send('Squad webhook received');
+  } catch (err) {
+    if (webhookLogId) {
+      await db.WebhookLog.update({ errorMessage: err.message }, { where: { id: webhookLogId } });
+    }
+    console.error('❌ Squad Webhook error:', err.message);
+    // Still return 200 to avoid retries
+    res.status(200).send('Squad webhook error handled');
+  }
+};

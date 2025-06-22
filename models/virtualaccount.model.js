@@ -36,6 +36,11 @@ module.exports = (sequelize, DataTypes) => {
     raw: {
       type: DataTypes.JSONB,
       allowNull: true
+    },
+    provider: { // <-- Add this field
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'paystack'
     }
   }, {
     tableName: 'VirtualAccounts',

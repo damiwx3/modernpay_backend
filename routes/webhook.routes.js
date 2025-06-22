@@ -85,6 +85,7 @@ router.post('/paystack', webhookController.paystackWebhook);
  *         description: Internal webhook error
  */
 router.post('/vtpass', webhookController.vtpassWebhook);
+router.post('/squad', webhookController.squadWebhook);
 
 router.post('/youverify', express.json({ type: '*/*' }), webhookController.youverifyWebhook);
 
