@@ -39,6 +39,7 @@ app.use('/api/disputes', disputeRoutes);
 app.use('/api/disputes', require('./routes/dispute.routes'));
 app.use('/api/contacts', userContactRoutes);
 app.use('/api/contributions', contributionRoutes);
+app.use('/api/contributions', require('./routes/contribution.routes'));
 app.use('/api/missed-contributions', require('./routes/missed_contribution.routes'));
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/tickets', ticketRoutes);
