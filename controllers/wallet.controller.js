@@ -39,7 +39,7 @@ async function createSquadVirtualAccount(payload) {
   }
 
   const squadRes = await axios.post(
-    'https://sandbox-api-d.squadco.com/virtual-account',
+    'https://api-d.squadco.com/virtual-account',
     payload,
     {
       headers: {
