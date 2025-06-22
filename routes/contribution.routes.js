@@ -34,8 +34,7 @@ router.post('/groups/:groupId/join', auth, controller.joinGroup);
 router.get('/groups', auth, controller.getUserGroups);
 
 // ✅ Get group details
-//router.get('/groups/:id', auth, controller.getGroupDetails);
-router.get('/groups/:id', auth, contributionController.getGroupDetails);
+router.get('/groups/:id', auth, controller.getGroupDetails);
 router.post('/groups/:groupId/invite', auth, controller.inviteToGroup);
 router.post('/groups/:groupId/leave', auth, controller.leaveGroup);
 router.put('/groups/:groupId', auth, controller.updateGroup);
