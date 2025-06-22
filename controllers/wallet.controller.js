@@ -24,34 +24,23 @@ const maskAccount = (acc) => acc ? acc.slice(0, 3) + '**' + acc.slice(-3) : '***
 const formatNaira = (num) => 'NGN' + Number(num).toLocaleString('en-NG', { minimumFractionDigits: 2 });
 
 // --- SQUAD VIRTUAL ACCOUNT CREATION ---
-async function createSquadVirtualAccount({
-  customer_identifier,
-  first_name,
-  last_name,
-  middle_name,
-  mobile_num,
-  dob,
-  address,
-  gender,
-  bvn,
-  beneficiary_account,
-  email
-}) {
+async function createSquadVirtualAccount(payload) {
+  // Remove empty/undefined/null fields (especially middle_name)
+  Object.keys(payload).forEach(key => {
+    if (payload[key] === '' || payload[key] === undefined || payload[key] === null) {
+      delete payload[key];
+    }
+  });
+
+  // Format dob to mm/dd/yyyy if needed
+  if (payload.dob && /^\d{4}-\d{2}-\d{2}$/.test(payload.dob)) {
+    const [year, month, day] = payload.dob.split('-');
+    payload.dob = `${month}/${day}/${year}`;
+  }
+
   const squadRes = await axios.post(
     'https://sandbox-api-d.squadco.com/virtual-account',
-    {
-      customer_identifier,
-      first_name,
-      last_name,
-      middle_name,
-      mobile_num,
-      dob,
-      address,
-      gender,
-      bvn,
-      beneficiary_account,
-      email
-    },
+    payload,
     {
       headers: {
         Authorization: `Bearer ${SQUAD_SECRET_KEY}`,
@@ -431,7 +420,7 @@ exports.createVirtualAccount = async (req, res) => {
             first_name: firstName,
             last_name: lastName,
             phone,
-            bvn, // <-- add this if available
+            bvn,
           },
           {
             headers: {
@@ -490,19 +479,17 @@ exports.createVirtualAccount = async (req, res) => {
         { where: { userId: user.id } }
       );
     } else if (provider === 'squad') {
-      // --- SQUAD LOGIC ---
-      // Validate required Squad fields
       if (
         !firstName || !lastName || !phone || !dob || !address ||
         !gender || !bvn || !beneficiary_account
       ) {
         return res.status(400).json({ message: 'Missing required fields for Squad virtual account.' });
       }
-      const squadData = await createSquadVirtualAccount({
+      // Build Squad payload, OMIT middle_name if empty
+      const squadPayload = {
         customer_identifier: user.id.toString(),
         first_name: firstName,
         last_name: lastName,
-        middle_name: middleName,
         mobile_num: phone,
         dob,
         address,
@@ -510,20 +497,24 @@ exports.createVirtualAccount = async (req, res) => {
         bvn,
         beneficiary_account,
         email
-      });
+      };
+      if (middleName && middleName.trim() !== '') {
+        squadPayload.middle_name = middleName;
+      }
+
+      const squadData = await createSquadVirtualAccount(squadPayload);
       if (!squadData || !squadData.data) {
         return res.status(500).json({ message: 'Failed to create Squad virtual account', error: squadData });
       }
       savedAccount = await db.VirtualAccount.create({
         userId: user.id,
         accountNumber: squadData.data.virtual_account_number,
-        bankName: squadData.data.bank_code, // You may want to map code to name
+        bankName: squadData.data.bank_code,
         bankId: squadData.data.bank_code,
         accountName: `${squadData.data.first_name} ${squadData.data.last_name}`,
         raw: squadData,
         provider: 'squad'
       });
-      // Optionally update wallet/account info as with Paystack
       await db.Wallet.update(
         {
           accountNumber: savedAccount.accountNumber,
