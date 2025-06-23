@@ -6,6 +6,9 @@ const sendSms = require('../utils/sendSms');
 const sendPush = require('../utils/sendPush');
 const { renderTemplate } = require('../utils/notificationTemplates');
 
+// For logging (replace with your logger if you have one)
+const logger = console;
+
 // Helper to calculate endDate based on frequency (default 30 days)
 function calculateEndDate(startDate, frequency) {
   const date = new Date(startDate);
@@ -64,6 +67,7 @@ exports.createGroup = async (req, res) => {
 
     return res.status(201).json({ group });
   } catch (err) {
+    logger.error(err);
     return res.status(500).json({ error: err.message });
   }
 };
@@ -111,21 +115,33 @@ exports.joinGroup = async (req, res) => {
 
     return res.status(200).json({ message: 'Successfully joined the group' });
   } catch (err) {
+    logger.error(err);
     return res.status(500).json({ error: err.message });
   }
 };
 
-// Get all groups user belongs to
+// Get all groups user belongs to (with pagination)
 exports.getUserGroups = async (req, res) => {
   try {
     const userId = req.user.id;
+    const { page = 1, limit = 20 } = req.query;
     const memberships = await db.ContributionMember.findAll({ where: { userId } });
 
     const groupIds = memberships.map(m => m.groupId);
-    const groups = await db.ContributionGroup.findAll({ where: { id: groupIds } });
+    const groups = await db.ContributionGroup.findAndCountAll({
+      where: { id: groupIds },
+      offset: (page - 1) * limit,
+      limit: parseInt(limit)
+    });
 
-    return res.status(200).json({ groups });
+    return res.status(200).json({
+      groups: groups.rows,
+      total: groups.count,
+      page: parseInt(page),
+      limit: parseInt(limit)
+    });
   } catch (err) {
+    logger.error(err);
     return res.status(500).json({ error: err.message });
   }
 };
@@ -144,6 +160,7 @@ exports.getGroupDetails = async (req, res) => {
 
     return res.status(200).json({ group, members });
   } catch (err) {
+    logger.error(err);
     return res.status(500).json({ error: err.message });
   }
 };
@@ -205,7 +222,7 @@ exports.inviteToGroup = async (req, res) => {
 
     return res.json({ success: true, message: 'Invite sent' });
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     return res.status(500).json({ error: err.message });
   }
 };
@@ -225,6 +242,7 @@ exports.leaveGroup = async (req, res) => {
 
     return res.json({ success: true, message: 'You have left the group' });
   } catch (err) {
+    logger.error(err);
     return res.status(500).json({ error: err.message });
   }
 };
@@ -244,6 +262,7 @@ exports.updateGroup = async (req, res) => {
 
     return res.json({ success: true, message: 'Group updated', group });
   } catch (err) {
+    logger.error(err);
     return res.status(500).json({ error: err.message });
   }
 };
@@ -261,27 +280,96 @@ exports.payoutHistory = async (req, res) => {
     });
     return res.json({ success: true, payouts });
   } catch (err) {
+    logger.error(err);
     return res.status(500).json({ error: err.message });
   }
 };
 
-// Advanced Scheduler with templates and bulk user fetch
-exports.runScheduler = async (req, res) => {
+// GET /api/contributions/activity-feed (with pagination)
+exports.getActivityFeed = async (req, res) => {
   try {
-    const groups = await db.ContributionGroup.findAll({ where: { status: 'active' } });
+    const { page = 1, limit = 20 } = req.query;
+    const activities = [];
+
+    // Recent joins
+    const joins = await db.ContributionMember.findAll({
+      order: [['joinedAt', 'DESC']],
+      limit: parseInt(limit),
+      offset: (page - 1) * limit,
+      include: [
+        { model: db.User, attributes: ['fullName'] },
+        { model: db.ContributionGroup, attributes: ['name'] }
+      ]
+    });
+    joins.forEach(j => activities.push({
+      type: 'join',
+      title: `${j.User?.fullName ?? 'Someone'} joined ${j.ContributionGroup?.name ?? 'a group'}`,
+      description: '',
+      createdAt: j.joinedAt
+    }));
+
+    // Recent contributions
+    const payments = await db.ContributionPayment.findAll({
+      where: { status: 'success' },
+      order: [['paidAt', 'DESC']],
+      limit: parseInt(limit),
+      offset: (page - 1) * limit,
+      include: [
+        { model: db.User, attributes: ['fullName'] },
+        { model: db.ContributionCycle, include: [{ model: db.ContributionGroup, attributes: ['name'] }] }
+      ]
+    });
+    payments.forEach(p => activities.push({
+      type: 'contribution',
+      title: `${p.User?.fullName ?? 'Someone'} made a contribution`,
+      description: `To ${p.ContributionCycle?.ContributionGroup?.name ?? 'a group'}`,
+      createdAt: p.paidAt
+    }));
+
+    // Recent cycle completions
+    const cycles = await db.ContributionCycle.findAll({
+      where: { status: 'completed' },
+      order: [['updatedAt', 'DESC']],
+      limit: parseInt(limit),
+      offset: (page - 1) * limit,
+      include: [{ model: db.ContributionGroup, attributes: ['name'] }]
+    });
+    cycles.forEach(c => activities.push({
+      type: 'cycle_complete',
+      title: `Cycle completed for ${c.ContributionGroup?.name ?? 'a group'}`,
+      description: '',
+      createdAt: c.updatedAt
+    }));
+
+    // Sort all activities by date descending
+    activities.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.json({ activities, page: parseInt(page), limit: parseInt(limit) });
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Advanced Scheduler with transaction, templates and bulk user fetch
+exports.runScheduler = async (req, res) => {
+  const t = await db.sequelize.transaction();
+  try {
+    const groups = await db.ContributionGroup.findAll({ where: { status: 'active' }, transaction: t });
     let processed = 0, newCycles = 0, missedPayments = 0;
     let adminSummary = [];
 
     for (const group of groups) {
       const cycle = await db.ContributionCycle.findOne({
-        where: { groupId: group.id, status: 'open' }
+        where: { groupId: group.id, status: 'open' },
+        transaction: t
       });
       if (!cycle) continue;
 
-      const members = await db.ContributionMember.findAll({ where: { groupId: group.id } });
+      const members = await db.ContributionMember.findAll({ where: { groupId: group.id }, transaction: t });
       const memberIds = members.map(m => m.id);
       const userIds = members.map(m => m.userId);
-      const users = await db.User.findAll({ where: { id: userIds } });
+      const users = await db.User.findAll({ where: { id: userIds }, transaction: t });
 
       // 3. Check for missed payments (deadline passed and not paid)
       const now = new Date();
@@ -292,7 +380,8 @@ exports.runScheduler = async (req, res) => {
             cycleId: cycle.id,
             memberId: memberIds,
             status: { [Op.notIn]: ['paid', 'missed'] }
-          }
+          },
+          transaction: t
         });
         const unpaidMemberIds = payments.map(p => p.memberId);
 
@@ -309,7 +398,7 @@ exports.runScheduler = async (req, res) => {
             missedPayments++;
             const payment = payments.find(p => p.memberId === member.id);
             if (payment) {
-              await payment.update({ status: 'missed', penalty: group.penaltyAmount || 0 });
+              await payment.update({ status: 'missed', penalty: group.penaltyAmount || 0 }, { transaction: t });
             }
             // Notify member (all channels, template)
             const user = users.find(u => u.id === member.userId);
@@ -326,7 +415,7 @@ exports.runScheduler = async (req, res) => {
           }
         }
         if (missedContributions.length) {
-          await db.MissedContribution.bulkCreate(missedContributions);
+          await db.MissedContribution.bulkCreate(missedContributions, { transaction: t });
         }
       }
 
@@ -336,18 +425,20 @@ exports.runScheduler = async (req, res) => {
           cycleId: cycle.id,
           memberId: memberIds,
           status: { [Op.in]: ['paid', 'missed'] }
-        }
+        },
+        transaction: t
       });
 
       if (payments.length === members.length) {
-        await cycle.update({ status: 'closed', closedAt: now });
+        await cycle.update({ status: 'closed', closedAt: now }, { transaction: t });
         adminSummary.push(`Closed cycle ${cycle.cycleNumber} for group "${group.name}"`);
 
         const payoutOrder = await db.PayoutOrder.findOne({
-          where: { cycleId: cycle.id, paid: false }
+          where: { cycleId: cycle.id, paid: false },
+          transaction: t
         });
         if (payoutOrder) {
-          await payoutOrder.update({ paid: true, paidAt: now });
+          await payoutOrder.update({ paid: true, paidAt: now }, { transaction: t });
           const user = users.find(u => u.id === payoutOrder.userId);
           if (user) {
             await sendNotification(
@@ -368,7 +459,8 @@ exports.runScheduler = async (req, res) => {
           let nextPayoutUserId;
           if (group.payoutOrderType === 'custom') {
             const nextOrder = await db.PayoutOrder.findOne({
-              where: { groupId: group.id, cycleNumber: nextCycleNumber }
+              where: { groupId: group.id, cycleNumber: nextCycleNumber },
+              transaction: t
             });
             nextPayoutUserId = nextOrder ? nextOrder.userId : null;
           } else {
@@ -382,7 +474,7 @@ exports.runScheduler = async (req, res) => {
             endDate: calculateEndDate(now, group.frequency),
             amount: group.amountPerMember,
             status: 'open'
-          });
+          }, { transaction: t });
 
           await db.PayoutOrder.create({
             groupId: group.id,
@@ -390,7 +482,7 @@ exports.runScheduler = async (req, res) => {
             userId: nextPayoutUserId,
             cycleNumber: nextCycleNumber,
             paid: false
-          });
+          }, { transaction: t });
 
           const newPayments = members.map(member => ({
             memberId: member.id,
@@ -398,7 +490,7 @@ exports.runScheduler = async (req, res) => {
             amount: group.amountPerMember,
             status: 'pending'
           }));
-          await db.ContributionPayment.bulkCreate(newPayments);
+          await db.ContributionPayment.bulkCreate(newPayments, { transaction: t });
 
           // Notify all members about new cycle (template)
           await sendNotification.sendBatchNotification(
@@ -431,12 +523,15 @@ exports.runScheduler = async (req, res) => {
       text: summaryMsg.replace(/<br>/g, '\n')
     });
 
+    await t.commit();
+    logger.info('Scheduler ran', { processed, newCycles, missedPayments });
     return res.json({
       success: true,
       message: `Scheduler ran. Closed ${processed} cycle(s), started ${newCycles} new cycle(s), marked ${missedPayments} missed payment(s).`
     });
   } catch (err) {
-    console.error(err);
+    await t.rollback();
+    logger.error(err);
     return res.status(500).json({ error: err.message });
   }
 };
@@ -459,7 +554,56 @@ exports.addContributionContact = async (req, res) => {
 
     return res.json({ success: true, contact });
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     return res.status(500).json({ error: err.message });
+  }
+};
+exports.getAnalytics = async (req, res) => {
+  try {
+    // Example analytics logic
+    const totalContributions = await db.ContributionPayment.sum('amount', { where: { status: 'success' } });
+    const topContributor = await db.User.findOne({
+      include: [{
+        model: db.ContributionPayment,
+        where: { status: 'success' }
+      }],
+      order: [[db.Sequelize.literal('(SELECT SUM(amount) FROM ContributionPayments WHERE ContributionPayments.userId = User.id)'), 'DESC']]
+    });
+    const cycles = await db.ContributionCycle.count({ where: { status: 'completed' } });
+    // You can add more analytics as needed
+
+    res.json({
+      totalContributions: totalContributions || 0,
+      topContributor: topContributor ? topContributor.fullName : '-',
+      trend: '-', // Add your trend logic if needed
+      cycles
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+exports.getSettings = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const settings = await db.ContributionSetting.findOne({ where: { userId } });
+    res.json(settings || { notifications: true, autoPay: false, reminderFrequency: 'Weekly' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.saveSettings = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { notifications, autoPay, reminderFrequency } = req.body;
+    let settings = await db.ContributionSetting.findOne({ where: { userId } });
+    if (settings) {
+      await settings.update({ notifications, autoPay, reminderFrequency });
+    } else {
+      settings = await db.ContributionSetting.create({ userId, notifications, autoPay, reminderFrequency });
+    }
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };

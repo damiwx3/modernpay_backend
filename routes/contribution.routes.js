@@ -41,5 +41,9 @@ router.put('/groups/:groupId', auth, controller.updateGroup);
 router.get('/payout-history', auth, controller.payoutHistory);
 router.post('/scheduler/trigger', auth, controller.runScheduler);
 router.post('/contacts', auth, controller.addContributionContact);
+router.get('/activity-feed', auth, controller.getActivityFeed);
+router.get('/analytics', auth, controller.getAnalytics);
+router.get('/settings', auth, controller.getSettings);
+router.put('/settings', auth, controller.saveSettings);
 
 module.exports = router;
