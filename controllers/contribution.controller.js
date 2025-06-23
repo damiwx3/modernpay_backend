@@ -284,7 +284,6 @@ exports.payoutHistory = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
-
 // GET /api/contributions/activity-feed (with pagination)
 exports.getActivityFeed = async (req, res) => {
   try {
@@ -297,13 +296,13 @@ exports.getActivityFeed = async (req, res) => {
       limit: parseInt(limit),
       offset: (page - 1) * limit,
       include: [
-        { model: db.User, as: 'User', attributes: ['fullName'] }, // FIX: add 'as'
-        { model: db.ContributionGroup, as: 'ContributionGroup', attributes: ['name'] } // FIX: add 'as'
+        { model: db.User, as: 'user', attributes: ['fullName'] },
+        { model: db.ContributionGroup, as: 'contributionGroup', attributes: ['name'] }
       ]
     });
     joins.forEach(j => activities.push({
       type: 'join',
-      title: `${j.User?.fullName ?? 'Someone'} joined ${j.ContributionGroup?.name ?? 'a group'}`,
+      title: `${j.user?.fullName ?? 'Someone'} joined ${j.contributionGroup?.name ?? 'a group'}`,
       description: '',
       createdAt: j.joinedAt
     }));
@@ -314,17 +313,17 @@ exports.getActivityFeed = async (req, res) => {
       order: [['paidAt', 'DESC']],
       limit: 10,
       include: [
-        { model: db.User, as: 'User', attributes: ['fullName'] }, // FIX: add 'as'
-        { model: db.ContributionCycle, as: 'ContributionCycle', include: [
-            { model: db.ContributionGroup, as: 'ContributionGroup', attributes: ['name'] }
+        { model: db.User, as: 'user', attributes: ['fullName'] },
+        { model: db.ContributionCycle, as: 'contributionCycle', include: [
+            { model: db.ContributionGroup, as: 'contributionGroup', attributes: ['name'] }
           ]
         }
       ]
     });
     payments.forEach(p => activities.push({
       type: 'contribution',
-      title: `${p.User?.fullName ?? 'Someone'} made a contribution`,
-      description: `To ${p.ContributionCycle?.ContributionGroup?.name ?? 'a group'}`,
+      title: `${p.user?.fullName ?? 'Someone'} made a contribution`,
+      description: `To ${p.contributionCycle?.contributionGroup?.name ?? 'a group'}`,
       createdAt: p.paidAt
     }));
 
@@ -335,12 +334,12 @@ exports.getActivityFeed = async (req, res) => {
       limit: parseInt(limit),
       offset: (page - 1) * limit,
       include: [
-        { model: db.ContributionGroup, as: 'ContributionGroup', attributes: ['name'] } // FIX: add 'as'
+        { model: db.ContributionGroup, as: 'contributionGroup', attributes: ['name'] }
       ]
     });
     cycles.forEach(c => activities.push({
       type: 'cycle_complete',
-      title: `Cycle completed for ${c.ContributionGroup?.name ?? 'a group'}`,
+      title: `Cycle completed for ${c.contributionGroup?.name ?? 'a group'}`,
       description: '',
       createdAt: c.updatedAt
     }));
