@@ -4,6 +4,7 @@ const controller = require('../controllers/member.controller');
 const auth = require('../middleware/auth.middleware');
 
 
-router.get('/members/:id/profile', auth, controller.getMemberProfile);
+// Should be:
+router.get('/:id/profile', auth, controller.getMemberProfile);
 
 module.exports = router;
