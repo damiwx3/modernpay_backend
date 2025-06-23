@@ -8,7 +8,7 @@ module.exports = (sequelize, DataTypes) => {
 
   ContributionMember.associate = function(models) {
     ContributionMember.belongsTo(models.ContributionGroup, { foreignKey: 'groupId' });
-    ContributionMember.belongsTo(models.User, { foreignKey: 'userId' });
+    ContributionMember.belongsTo(models.User, { foreignKey: 'userId', as: 'user' });
   };
 
   return ContributionMember;
