@@ -353,6 +353,7 @@ exports.payoutHistory = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
+
 // GET /api/contributions/activity-feed (with pagination)
 exports.getActivityFeed = async (req, res) => {
   try {
@@ -366,12 +367,12 @@ exports.getActivityFeed = async (req, res) => {
       offset: (page - 1) * limit,
       include: [
         { model: db.User, as: 'User', attributes: ['fullName'] },
-        { model: db.ContributionGroup, as: 'contributionGroup', attributes: ['name'] }
+        { model: db.ContributionGroup, as: 'ContributionGroup', attributes: ['name'] }
       ]
     });
     joins.forEach(j => activities.push({
       type: 'join',
-      title: `${j.user?.fullName ?? 'Someone'} joined ${j.contributionGroup?.name ?? 'a group'}`,
+      title: `${j.User?.fullName ?? 'Someone'} joined ${j.ContributionGroup?.name ?? 'a group'}`,
       description: '',
       createdAt: j.joinedAt
     }));
@@ -384,7 +385,7 @@ exports.getActivityFeed = async (req, res) => {
       include: [
         { model: db.User, as: 'user', attributes: ['fullName'] },
         { model: db.ContributionCycle, as: 'contributionCycle', include: [
-            { model: db.ContributionGroup, as: 'contributionGroup', attributes: ['name'] }
+            { model: db.ContributionGroup, as: 'ContributionGroup', attributes: ['name'] }
           ]
         }
       ]
@@ -392,7 +393,7 @@ exports.getActivityFeed = async (req, res) => {
     payments.forEach(p => activities.push({
       type: 'contribution',
       title: `${p.user?.fullName ?? 'Someone'} made a contribution`,
-      description: `To ${p.contributionCycle?.contributionGroup?.name ?? 'a group'}`,
+      description: `To ${p.contributionCycle?.ContributionGroup?.name ?? 'a group'}`,
       createdAt: p.paidAt
     }));
 
@@ -403,12 +404,12 @@ exports.getActivityFeed = async (req, res) => {
       limit: parseInt(limit),
       offset: (page - 1) * limit,
       include: [
-        { model: db.ContributionGroup, as: 'contributionGroup', attributes: ['name'] }
+        { model: db.ContributionGroup, as: 'ContributionGroup', attributes: ['name'] }
       ]
     });
     cycles.forEach(c => activities.push({
       type: 'cycle_complete',
-      title: `Cycle completed for ${c.contributionGroup?.name ?? 'a group'}`,
+      title: `Cycle completed for ${c.ContributionGroup?.name ?? 'a group'}`,
       description: '',
       createdAt: c.updatedAt
     }));
@@ -630,6 +631,7 @@ exports.addContributionContact = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
+
 exports.getAnalytics = async (req, res) => {
   try {
     // Example analytics logic
@@ -654,6 +656,7 @@ exports.getAnalytics = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
 exports.getSettings = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -676,6 +679,76 @@ exports.saveSettings = async (req, res) => {
     }
     res.json(settings);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ===== FIXED: ACTIVITY FEED ALIAS USAGE =====
+exports.getActivityFeed = async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const activities = [];
+
+    // Recent joins (NO alias for User/ContributionGroup)
+    const joins = await db.ContributionMember.findAll({
+      order: [['joinedAt', 'DESC']],
+      limit: parseInt(limit),
+      offset: (page - 1) * limit,
+      include: [
+        { model: db.User, attributes: ['fullName'] },
+        { model: db.ContributionGroup, attributes: ['name'] }
+      ]
+    });
+    joins.forEach(j => activities.push({
+      type: 'join',
+      title: `${j.User?.fullName ?? 'Someone'} joined ${j.ContributionGroup?.name ?? 'a group'}`,
+      description: '',
+      createdAt: j.joinedAt
+    }));
+
+    // Recent contributions (alias for user, NO alias for ContributionGroup)
+    const payments = await db.ContributionPayment.findAll({
+      where: { status: 'success' },
+      order: [['paidAt', 'DESC']],
+      limit: 10,
+      include: [
+        { model: db.User, as: 'user', attributes: ['fullName'] },
+        { model: db.ContributionCycle, include: [
+            { model: db.ContributionGroup, attributes: ['name'] }
+          ]
+        }
+      ]
+    });
+    payments.forEach(p => activities.push({
+      type: 'contribution',
+      title: `${p.user?.fullName ?? 'Someone'} made a contribution`,
+      description: `To ${p.ContributionCycle?.ContributionGroup?.name ?? 'a group'}`,
+      createdAt: p.paidAt
+    }));
+
+    // Recent cycle completions (NO alias for ContributionGroup)
+    const cycles = await db.ContributionCycle.findAll({
+      where: { status: 'completed' },
+      order: [['updatedAt', 'DESC']],
+      limit: parseInt(limit),
+      offset: (page - 1) * limit,
+      include: [
+        { model: db.ContributionGroup, attributes: ['name'] }
+      ]
+    });
+    cycles.forEach(c => activities.push({
+      type: 'cycle_complete',
+      title: `Cycle completed for ${c.ContributionGroup?.name ?? 'a group'}`,
+      description: '',
+      createdAt: c.updatedAt
+    }));
+
+    // Sort all activities by date descending
+    activities.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.json({ activities, page: parseInt(page), limit: parseInt(limit) });
+  } catch (err) {
+    logger.error(err);
     res.status(500).json({ error: err.message });
   }
 };
