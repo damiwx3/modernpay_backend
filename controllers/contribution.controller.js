@@ -21,6 +21,7 @@ function calculateEndDate(startDate, frequency) {
 
 // Create a new contribution group
 exports.createGroup = async (req, res) => {
+  const t = await db.sequelize.transaction();
   try {
     const {
       name,
@@ -34,8 +35,16 @@ exports.createGroup = async (req, res) => {
       penaltyAmount
     } = req.body;
 
-    if (!name || !amountPerMember) {
-      return res.status(400).json({ message: 'Name and amountPerMember are required' });
+    // Input validation
+    if (!name || typeof name !== 'string' || name.trim().length < 3) {
+      logger.warn('Invalid group name');
+      await t.rollback();
+      return res.status(400).json({ message: 'Valid group name is required' });
+    }
+    if (!amountPerMember || isNaN(amountPerMember) || Number(amountPerMember) <= 0) {
+      logger.warn('Invalid amountPerMember');
+      await t.rollback();
+      return res.status(400).json({ message: 'Valid amountPerMember is required' });
     }
 
     let imageUrl = null;
@@ -56,24 +65,28 @@ exports.createGroup = async (req, res) => {
       isPublic: isPublic === 'true' || isPublic === true,
       payoutOrderType: payoutOrderType || 'random',
       penaltyAmount: penaltyAmount ? parseFloat(penaltyAmount) : 0
-    });
+    }, { transaction: t });
 
     await db.ContributionMember.create({
       groupId: group.id,
       userId: req.user.id,
       isAdmin: true,
       joinedAt: new Date()
-    });
+    }, { transaction: t });
 
+    await t.commit();
+    logger.info(`Group created: ${group.name} by user ${req.user.id}`);
     return res.status(201).json({ group });
   } catch (err) {
-    logger.error(err);
+    await t.rollback();
+    logger.error('Error creating group:', err);
     return res.status(500).json({ error: err.message });
   }
 };
 
 // Join a group by ID (via URL param)
 exports.joinGroup = async (req, res) => {
+  const t = await db.sequelize.transaction();
   try {
     const groupId = req.params.groupId;
     const userId = req.user.id;
@@ -83,14 +96,22 @@ exports.joinGroup = async (req, res) => {
     });
 
     if (existing) {
+      logger.warn(`User ${userId} already a member of group ${groupId}`);
+      await t.rollback();
       return res.status(409).json({ message: 'Already a member of this group' });
     }
 
     const group = await db.ContributionGroup.findByPk(groupId);
-    if (!group) return res.status(404).json({ message: 'Sorry, this group does not exist.' });
+    if (!group) {
+      logger.warn(`Group ${groupId} does not exist`);
+      await t.rollback();
+      return res.status(404).json({ message: 'Sorry, this group does not exist.' });
+    }
 
     const memberCount = await db.ContributionMember.count({ where: { groupId } });
     if (group.maxMembers && memberCount >= group.maxMembers) {
+      logger.warn(`Group ${groupId} at max capacity`);
+      await t.rollback();
       return res.status(403).json({ message: 'Group has reached max capacity' });
     }
 
@@ -99,7 +120,7 @@ exports.joinGroup = async (req, res) => {
       userId,
       isAdmin: false,
       joinedAt: new Date()
-    });
+    }, { transaction: t });
 
     // Notify group admin(s) using template
     const admins = await db.ContributionMember.findAll({ where: { groupId, isAdmin: true } });
@@ -113,9 +134,12 @@ exports.joinGroup = async (req, res) => {
       { groupName: group.name, memberName: req.user.fullName }
     );
 
+    await t.commit();
+    logger.info(`User ${userId} joined group ${groupId}`);
     return res.status(200).json({ message: 'Successfully joined the group' });
   } catch (err) {
-    logger.error(err);
+    await t.rollback();
+    logger.error('Error joining group:', err);
     return res.status(500).json({ error: err.message });
   }
 };
@@ -134,6 +158,7 @@ exports.getUserGroups = async (req, res) => {
       limit: parseInt(limit)
     });
 
+    logger.info(`Fetched groups for user ${userId}`);
     return res.status(200).json({
       groups: groups.rows,
       total: groups.count,
@@ -141,7 +166,7 @@ exports.getUserGroups = async (req, res) => {
       limit: parseInt(limit)
     });
   } catch (err) {
-    logger.error(err);
+    logger.error('Error fetching user groups:', err);
     return res.status(500).json({ error: err.message });
   }
 };
@@ -151,33 +176,50 @@ exports.getGroupDetails = async (req, res) => {
   try {
     const { id } = req.params;
     const group = await db.ContributionGroup.findByPk(id);
-    if (!group) return res.status(404).json({ message: 'Sorry, this group does not exist.' });
+    if (!group) {
+      logger.warn(`Group ${id} not found`);
+      return res.status(404).json({ message: 'Sorry, this group does not exist.' });
+    }
 
     const members = await db.ContributionMember.findAll({
       where: { groupId: id },
       include: [{ model: db.User, attributes: ['id', 'fullName', 'email'] }]
     });
 
+    logger.info(`Fetched details for group ${id}`);
     return res.status(200).json({ group, members });
   } catch (err) {
-    logger.error(err);
+    logger.error('Error fetching group details:', err);
     return res.status(500).json({ error: err.message });
   }
 };
 
 // Invite to group (by email or userId), using template
 exports.inviteToGroup = async (req, res) => {
+  const t = await db.sequelize.transaction();
   try {
     const { groupId } = req.params;
     const { email, invitedUserId } = req.body;
-    if (!email && !invitedUserId) return res.status(400).json({ message: 'Email or invitedUserId is required' });
+    if (!email && !invitedUserId) {
+      logger.warn('Invite missing email or invitedUserId');
+      await t.rollback();
+      return res.status(400).json({ message: 'Email or invitedUserId is required' });
+    }
 
     const group = await db.ContributionGroup.findByPk(groupId);
-    if (!group) return res.status(404).json({ message: 'Sorry, this group does not exist.' });
+    if (!group) {
+      logger.warn(`Group ${groupId} not found for invite`);
+      await t.rollback();
+      return res.status(404).json({ message: 'Sorry, this group does not exist.' });
+    }
 
     const where = invitedUserId ? { groupId, invitedUserId } : { groupId, email };
     const existing = await db.ContributionInvite.findOne({ where });
-    if (existing) return res.status(409).json({ message: 'User already invited' });
+    if (existing) {
+      logger.warn(`User already invited to group ${groupId}`);
+      await t.rollback();
+      return res.status(409).json({ message: 'User already invited' });
+    }
 
     await db.ContributionInvite.create({
       groupId,
@@ -186,7 +228,7 @@ exports.inviteToGroup = async (req, res) => {
       email: email || null,
       status: 'pending',
       invitedAt: new Date()
-    });
+    }, { transaction: t });
 
     // Send notification if email is provided (template)
     if (email) {
@@ -220,49 +262,76 @@ exports.inviteToGroup = async (req, res) => {
       }
     }
 
+    await t.commit();
+    logger.info(`Invite sent for group ${groupId}`);
     return res.json({ success: true, message: 'Invite sent' });
   } catch (err) {
-    logger.error(err);
+    await t.rollback();
+    logger.error('Error sending invite:', err);
     return res.status(500).json({ error: err.message });
   }
 };
 
 // Leave group
 exports.leaveGroup = async (req, res) => {
+  const t = await db.sequelize.transaction();
   try {
     const { groupId } = req.params;
     const userId = req.user.id;
 
     const member = await db.ContributionMember.findOne({ where: { groupId, userId } });
-    if (!member) return res.status(404).json({ message: 'You are not a member of this group' });
+    if (!member) {
+      logger.warn(`User ${userId} not a member of group ${groupId}`);
+      await t.rollback();
+      return res.status(404).json({ message: 'You are not a member of this group' });
+    }
 
-    if (member.isAdmin) return res.status(403).json({ message: 'Admins cannot leave the group. Please assign another admin before leaving.' });
+    if (member.isAdmin) {
+      logger.warn(`Admin ${userId} tried to leave group ${groupId}`);
+      await t.rollback();
+      return res.status(403).json({ message: 'Admins cannot leave the group. Please assign another admin before leaving.' });
+    }
 
-    await member.destroy();
+    await member.destroy({ transaction: t });
 
+    await t.commit();
+    logger.info(`User ${userId} left group ${groupId}`);
     return res.json({ success: true, message: 'You have left the group' });
   } catch (err) {
-    logger.error(err);
+    await t.rollback();
+    logger.error('Error leaving group:', err);
     return res.status(500).json({ error: err.message });
   }
 };
 
 // Update group
 exports.updateGroup = async (req, res) => {
+  const t = await db.sequelize.transaction();
   try {
     const { groupId } = req.params;
     const updates = req.body;
 
     const group = await db.ContributionGroup.findByPk(groupId);
-    if (!group) return res.status(404).json({ message: 'Sorry, this group does not exist.' });
+    if (!group) {
+      logger.warn(`Group ${groupId} not found for update`);
+      await t.rollback();
+      return res.status(404).json({ message: 'Sorry, this group does not exist.' });
+    }
 
-    if (group.createdBy !== req.user.id) return res.status(403).json({ message: 'Only the group creator can perform this action.' });
+    if (group.createdBy !== req.user.id) {
+      logger.warn(`User ${req.user.id} not authorized to update group ${groupId}`);
+      await t.rollback();
+      return res.status(403).json({ message: 'Only the group creator can perform this action.' });
+    }
 
-    await group.update(updates);
+    await group.update(updates, { transaction: t });
 
+    await t.commit();
+    logger.info(`Group ${groupId} updated by user ${req.user.id}`);
     return res.json({ success: true, message: 'Group updated', group });
   } catch (err) {
-    logger.error(err);
+    await t.rollback();
+    logger.error('Error updating group:', err);
     return res.status(500).json({ error: err.message });
   }
 };
@@ -296,7 +365,7 @@ exports.getActivityFeed = async (req, res) => {
       limit: parseInt(limit),
       offset: (page - 1) * limit,
       include: [
-        { model: db.User, as: 'user', attributes: ['fullName'] },
+        { model: db.User, as: 'User', attributes: ['fullName'] },
         { model: db.ContributionGroup, as: 'contributionGroup', attributes: ['name'] }
       ]
     });
