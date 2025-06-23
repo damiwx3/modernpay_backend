@@ -297,8 +297,8 @@ exports.getActivityFeed = async (req, res) => {
       limit: parseInt(limit),
       offset: (page - 1) * limit,
       include: [
-        { model: db.User, attributes: ['fullName'] },
-        { model: db.ContributionGroup, attributes: ['name'] }
+        { model: db.User, as: 'User', attributes: ['fullName'] }, // FIX: add 'as'
+        { model: db.ContributionGroup, as: 'ContributionGroup', attributes: ['name'] } // FIX: add 'as'
       ]
     });
     joins.forEach(j => activities.push({
@@ -310,14 +310,17 @@ exports.getActivityFeed = async (req, res) => {
 
     // Recent contributions
     const payments = await db.ContributionPayment.findAll({
-  where: { status: 'success' },
-  order: [['paidAt', 'DESC']],
-  limit: 10,
-  include: [
-    { model: db.User, as: 'User', attributes: ['fullName'] }, // <-- add 'as'
-    { model: db.ContributionCycle, include: [{ model: db.ContributionGroup, attributes: ['name'] }] }
-  ]
-});
+      where: { status: 'success' },
+      order: [['paidAt', 'DESC']],
+      limit: 10,
+      include: [
+        { model: db.User, as: 'User', attributes: ['fullName'] }, // FIX: add 'as'
+        { model: db.ContributionCycle, as: 'ContributionCycle', include: [
+            { model: db.ContributionGroup, as: 'ContributionGroup', attributes: ['name'] }
+          ]
+        }
+      ]
+    });
     payments.forEach(p => activities.push({
       type: 'contribution',
       title: `${p.User?.fullName ?? 'Someone'} made a contribution`,
@@ -331,7 +334,9 @@ exports.getActivityFeed = async (req, res) => {
       order: [['updatedAt', 'DESC']],
       limit: parseInt(limit),
       offset: (page - 1) * limit,
-      include: [{ model: db.ContributionGroup, attributes: ['name'] }]
+      include: [
+        { model: db.ContributionGroup, as: 'ContributionGroup', attributes: ['name'] } // FIX: add 'as'
+      ]
     });
     cycles.forEach(c => activities.push({
       type: 'cycle_complete',
