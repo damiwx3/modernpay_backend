@@ -633,29 +633,29 @@ exports.addContributionContact = async (req, res) => {
 
 exports.getAnalytics = async (req, res) => {
   try {
-    // Example analytics logic
     const totalContributions = await db.ContributionPayment.sum('amount', { where: { status: 'success' } });
     const topContributor = await db.User.findOne({
       include: [{
         model: db.ContributionPayment,
+        as: 'contributionPayments', // <-- use the alias from your User.hasMany association
         where: { status: 'success' }
       }],
-      order: [[db.Sequelize.literal('(SELECT SUM(amount) FROM ContributionPayments WHERE ContributionPayments.userId = User.id)'), 'DESC']]
+      order: [
+        [db.Sequelize.literal('(SELECT SUM(amount) FROM "ContributionPayments" WHERE "ContributionPayments"."userId" = "User"."id")'), 'DESC']
+      ]
     });
     const cycles = await db.ContributionCycle.count({ where: { status: 'completed' } });
-    // You can add more analytics as needed
 
     res.json({
       totalContributions: totalContributions || 0,
       topContributor: topContributor ? topContributor.fullName : '-',
-      trend: '-', // Add your trend logic if needed
+      trend: '-',
       cycles
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
-
 exports.getSettings = async (req, res) => {
   try {
     const userId = req.user.id;
