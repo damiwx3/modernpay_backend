@@ -360,14 +360,14 @@ exports.getActivityFeed = async (req, res) => {
     const { page = 1, limit = 20 } = req.query;
     const activities = [];
 
-    // Recent joins
+    // Recent joins (NO alias for User/ContributionGroup)
     const joins = await db.ContributionMember.findAll({
       order: [['joinedAt', 'DESC']],
       limit: parseInt(limit),
       offset: (page - 1) * limit,
       include: [
-        { model: db.User, as: 'User', attributes: ['fullName'] },
-        { model: db.ContributionGroup, as: 'ContributionGroup', attributes: ['name'] }
+        { model: db.User, attributes: ['fullName'] }, // no 'as'
+        { model: db.ContributionGroup, attributes: ['name'] } // no 'as'
       ]
     });
     joins.forEach(j => activities.push({
@@ -377,15 +377,15 @@ exports.getActivityFeed = async (req, res) => {
       createdAt: j.joinedAt
     }));
 
-    // Recent contributions
+    // Recent contributions (alias for user, NO alias for ContributionGroup)
     const payments = await db.ContributionPayment.findAll({
       where: { status: 'success' },
       order: [['paidAt', 'DESC']],
       limit: 10,
       include: [
-        { model: db.User, as: 'user', attributes: ['fullName'] },
-        { model: db.ContributionCycle, as: 'contributionCycle', include: [
-            { model: db.ContributionGroup, as: 'ContributionGroup', attributes: ['name'] }
+        { model: db.User, as: 'user', attributes: ['fullName'] }, // must use 'as' here
+        { model: db.ContributionCycle, include: [
+            { model: db.ContributionGroup, attributes: ['name'] } // no 'as'
           ]
         }
       ]
@@ -393,18 +393,18 @@ exports.getActivityFeed = async (req, res) => {
     payments.forEach(p => activities.push({
       type: 'contribution',
       title: `${p.user?.fullName ?? 'Someone'} made a contribution`,
-      description: `To ${p.contributionCycle?.ContributionGroup?.name ?? 'a group'}`,
+      description: `To ${p.ContributionCycle?.ContributionGroup?.name ?? 'a group'}`,
       createdAt: p.paidAt
     }));
 
-    // Recent cycle completions
+    // Recent cycle completions (NO alias for ContributionGroup)
     const cycles = await db.ContributionCycle.findAll({
       where: { status: 'completed' },
       order: [['updatedAt', 'DESC']],
       limit: parseInt(limit),
       offset: (page - 1) * limit,
       include: [
-        { model: db.ContributionGroup, as: 'ContributionGroup', attributes: ['name'] }
+        { model: db.ContributionGroup, attributes: ['name'] } // no 'as'
       ]
     });
     cycles.forEach(c => activities.push({
@@ -423,7 +423,6 @@ exports.getActivityFeed = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-
 // Advanced Scheduler with transaction, templates and bulk user fetch
 exports.runScheduler = async (req, res) => {
   const t = await db.sequelize.transaction();
