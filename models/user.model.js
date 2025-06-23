@@ -31,6 +31,7 @@ module.exports = (sequelize, DataTypes) => {
     bvn: { type: DataTypes.STRING },
     address: { type: DataTypes.STRING },
     selfieUrl: { type: DataTypes.STRING },
+    profileImage: { type: DataTypes.STRING, allowNull: true }, // <-- Add this line
     isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
     transactionPin: { type: DataTypes.STRING, allowNull: true },
     twoFactorEnabled: { type: DataTypes.BOOLEAN, defaultValue: false },
@@ -44,7 +45,7 @@ module.exports = (sequelize, DataTypes) => {
 
     // Add other associations as needed, for example:
     //User.hasMany(models.ContributionMember, { foreignKey: 'userId' });
-     //User.hasMany(models.ContributionInvite, { foreignKey: 'invitedUserId' });
+    //User.hasMany(models.ContributionInvite, { foreignKey: 'invitedUserId' });
   };
 
   return User;
