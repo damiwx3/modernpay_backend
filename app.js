@@ -56,7 +56,7 @@ app.use('/api/virtual-cards', require('./routes/virtual_card.routes'));
 app.use('/api/system', require('./routes/system.routes'));
 app.use('/api/wallets', require('./routes/transaction.routes'));
 app.use('/api/security', securityRoutes);
-app.use('/api/notifications', notificationRoutes);
+//app.use('/api/notifications', notificationRoutes);
 app.use('/api/notifications', require('./routes/notification.routes'));
 app.use('/api/members', require('./routes/member.routes'));
 //app.use('/api/transactions', require('./routes/transaction.routes'));

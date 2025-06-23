@@ -183,7 +183,7 @@ exports.getGroupDetails = async (req, res) => {
 
     const members = await db.ContributionMember.findAll({
       where: { groupId: id },
-      include: [{ model: db.User, attributes: ['id', 'fullName', 'email'] }]
+      include: [{ model: db.User, as: 'user', attributes: ['fullName'] }]
     });
 
     logger.info(`Fetched details for group ${id}`);
