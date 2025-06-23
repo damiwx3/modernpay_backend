@@ -61,7 +61,9 @@ db.VirtualAccount = require('./virtualaccount.model')(sequelize, DataTypes); // 
 db.NotificationLog = require('./notification_log.model')(sequelize, DataTypes);
 db.NotificationLog.belongsTo(db.User, { foreignKey: 'userId' });
 db.WebhookLog = require('./webhook_log.model')(sequelize, DataTypes);
+const ContributionSetting = require('./contribution_setting.model.js')(sequelize, DataTypes);
 
+db.ContributionSetting = ContributionSetting;
 
 // ==========================
 // ✅ Define Relationships Here
