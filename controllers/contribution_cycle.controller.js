@@ -79,9 +79,16 @@ exports.makeContribution = async (req, res) => {
     const existing = await ContributionPayment.findOne({ where: { cycleId, userId } });
     if (existing) return res.status(409).json({ message: 'You have already paid for this cycle' });
 
+    // Find the memberId for this user in this group
+    const member = await ContributionMember.findOne({
+      where: { userId, groupId: cycle.groupId }
+    });
+    if (!member) return res.status(400).json({ message: 'Member not found in group' });
+
     await ContributionPayment.create({
       cycleId,
       userId,
+      memberId: member.id, // <-- set memberId here
       amount,
       status: 'success',
       paidAt: new Date(),
