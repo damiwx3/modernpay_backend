@@ -4,6 +4,16 @@ const router = express.Router();
 const controller = require('../controllers/contribution_cycle.controller');
 const auth = require('../middleware/auth.middleware');
 
+router.get('/group/:groupId', auth, async (req, res) => {
+  try {
+    const groupId = req.params.groupId;
+    const cycles = await require('../models').ContributionCycle.findAll({ where: { groupId } });
+    res.json({ cycles });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Get all cycles
 router.get('/', auth, controller.getAllCycles);
 

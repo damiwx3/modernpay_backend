@@ -45,5 +45,16 @@ router.get('/activity-feed', auth, controller.getActivityFeed);
 router.get('/analytics', auth, controller.getAnalytics);
 router.get('/settings', auth, controller.getSettings);
 router.put('/settings', auth, controller.saveSettings);
+// ...existing code...
+router.get('/groups/:groupId/cycles', auth, async (req, res) => {
+  try {
+    const groupId = req.params.groupId;
+    const cycles = await require('../models').ContributionCycle.findAll({ where: { groupId } });
+    res.json({ cycles });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+// ...existing code...
 
 module.exports = router;
