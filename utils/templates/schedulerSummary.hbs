@@ -1,0 +1,35 @@
+Scheduler Run Summary
+
+Date: {{date}}
+Admin: {{adminName}}
+
+----------------------------------------
+Cycles Closed: {{closedCycles}}
+New Cycles Started: {{newCycles}}
+Missed Payments Marked: {{missedPayments}}
+----------------------------------------
+
+{{#if details}}
+Details:
+{{#each details}}
+- {{this}}
+{{/each}}
+{{/if}}
+
+{{#if groups}}
+Groups Processed:
+{{#each groups}}
+• {{this.name}} (ID: {{this.id}}) - Status: {{this.status}}
+{{/each}}
+{{/if}}
+
+{{#if errors}}
+Errors Encountered:
+{{#each errors}}
+- {{this}}
+{{/each}}
+{{/if}}
+
+----------------------------------------
+Thank you,
+The Contribution Platform Team
