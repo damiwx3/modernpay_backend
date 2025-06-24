@@ -18,7 +18,7 @@ exports.getCycleById = async (req, res) => {
   try {
     const cycle = await ContributionCycle.findByPk(req.params.id);
     if (!cycle) return res.status(404).json({ message: 'Cycle not found' });
-    res.status(200).json(cycle);
+    res.status(200).json({ cycle }); // <-- wrap in { cycle }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
