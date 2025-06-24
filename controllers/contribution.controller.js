@@ -423,7 +423,7 @@ exports.getActivityFeed = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-// Advanced Scheduler with transaction, templates and bulk user fetch
+// Advanced Scheduler with force withdrawal for missed payments
 exports.runScheduler = async (req, res) => {
   const t = await db.sequelize.transaction();
   try {
@@ -451,7 +451,7 @@ exports.runScheduler = async (req, res) => {
           where: {
             cycleId: cycle.id,
             memberId: memberIds,
-            status: { [Op.notIn]: ['paid', 'missed'] }
+            status: { [Op.notIn]: ['paid', 'missed', 'success'] }
           },
           transaction: t
         });
@@ -459,30 +459,84 @@ exports.runScheduler = async (req, res) => {
 
         const missedContributions = [];
         for (const member of members) {
-          if (unpaidMemberIds.includes(member.id)) {
-            missedContributions.push({
-              memberId: member.id,
-              userId: member.userId,
-              cycleId: cycle.id,
-              reason: 'Missed payment deadline',
-              missedAt: now
-            });
-            missedPayments++;
-            const payment = payments.find(p => p.memberId === member.id);
-            if (payment) {
-              await payment.update({ status: 'missed', penalty: group.penaltyAmount || 0 }, { transaction: t });
-            }
-            // Notify member (all channels, template)
-            const user = users.find(u => u.id === member.userId);
-            if (user) {
-              await sendNotification(
-                user,
-                '',
-                'Missed Contribution',
-                { groupId: group.id, cycleId: cycle.id },
-                'missedPayment',
-                { groupName: group.name, cycleNumber: cycle.cycleNumber }
-              );
+          // If payment is missing or not paid/success
+          const payment = await db.ContributionPayment.findOne({
+            where: { cycleId: cycle.id, memberId: member.id },
+            transaction: t
+          });
+
+          if (!payment || (payment.status !== 'success' && payment.status !== 'paid')) {
+            // Try to auto-deduct from wallet
+            const wallet = await db.Wallet.findOne({ where: { userId: member.userId }, transaction: t });
+            if (wallet && wallet.balance >= group.amountPerMember) {
+              wallet.balance -= group.amountPerMember;
+              await wallet.save({ transaction: t });
+
+              if (payment) {
+                await payment.update({
+                  status: 'success',
+                  paidAt: now,
+                  isAutoPaid: true
+                }, { transaction: t });
+              } else {
+                await db.ContributionPayment.create({
+                  memberId: member.id,
+                  userId: member.userId,
+                  cycleId: cycle.id,
+                  amount: group.amountPerMember,
+                  status: 'success',
+                  paidAt: now,
+                  isAutoPaid: true
+                }, { transaction: t });
+              }
+
+              // Optionally, notify the user about auto-deduction
+              const user = users.find(u => u.id === member.userId);
+              if (user) {
+                await sendNotification(
+                  user,
+                  '',
+                  'Auto-Deduction for Missed Contribution',
+                  { groupId: group.id, cycleId: cycle.id },
+                  'autoDeducted',
+                  { groupName: group.name, cycleNumber: cycle.cycleNumber }
+                );
+              }
+            } else {
+              // If still unpaid and cannot auto-deduct, mark as missed (if not already)
+              if (payment && payment.status !== 'missed') {
+                await payment.update({ status: 'missed', penalty: group.penaltyAmount || 0 }, { transaction: t });
+              } else if (!payment) {
+                await db.ContributionPayment.create({
+                  memberId: member.id,
+                  userId: member.userId,
+                  cycleId: cycle.id,
+                  amount: group.amountPerMember,
+                  status: 'missed',
+                  missedAt: now,
+                  penalty: group.penaltyAmount || 0
+                }, { transaction: t });
+              }
+              missedContributions.push({
+                memberId: member.id,
+                userId: member.userId,
+                cycleId: cycle.id,
+                reason: 'Missed payment deadline',
+                missedAt: now
+              });
+              missedPayments++;
+              // Notify member (all channels, template)
+              const user = users.find(u => u.id === member.userId);
+              if (user) {
+                await sendNotification(
+                  user,
+                  '',
+                  'Missed Contribution',
+                  { groupId: group.id, cycleId: cycle.id },
+                  'missedPayment',
+                  { groupName: group.name, cycleNumber: cycle.cycleNumber }
+                );
+              }
             }
           }
         }
@@ -496,7 +550,7 @@ exports.runScheduler = async (req, res) => {
         where: {
           cycleId: cycle.id,
           memberId: memberIds,
-          status: { [Op.in]: ['paid', 'missed'] }
+          status: { [Op.in]: ['paid', 'missed', 'success'] }
         },
         transaction: t
       });
@@ -607,7 +661,6 @@ exports.runScheduler = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
-
 // Add contribution contact
 exports.addContributionContact = async (req, res) => {
   try {

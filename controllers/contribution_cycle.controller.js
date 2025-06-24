@@ -64,6 +64,9 @@ exports.createCycle = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+// const db = require('../models');
+const Wallet = db.Wallet; // Make sure your Wallet model is loaded
+
 exports.makeContribution = async (req, res) => {
   try {
     const { cycleId, amount, txRef } = req.body;
@@ -85,18 +88,72 @@ exports.makeContribution = async (req, res) => {
     });
     if (!member) return res.status(400).json({ message: 'Member not found in group' });
 
+    // 1. Check for late payment (after 24h from cycle start)
+    const cycleStart = new Date(cycle.startDate);
+    let penalty = 0;
+    let penaltyToPlatform = 0;
+    let penaltyToGroup = 0;
+    let totalAmount = amount;
+
+    if (now - cycleStart > 24 * 60 * 60 * 1000) {
+      penalty = amount * 0.05;
+      penaltyToPlatform = penalty / 2;
+      penaltyToGroup = penalty / 2;
+      totalAmount = amount + penalty;
+    }
+
+    // 2. Check wallet balance
+    const wallet = await db.Wallet.findOne({ where: { userId } });
+    if (!wallet || wallet.balance < totalAmount) {
+      return res.status(400).json({ message: 'Insufficient wallet balance' });
+    }
+
+    // 3. Deduct from wallet
+    wallet.balance -= totalAmount;
+    await wallet.save();
+
+    // 4. Record payment
     await ContributionPayment.create({
       cycleId,
       userId,
-      memberId: member.id, // <-- set memberId here
-      amount,
+      memberId: member.id,
+      amount: amount,
+      penalty: penalty,
       status: 'success',
-      paidAt: new Date(),
+      paidAt: now,
       txRef,
       isAutoPaid: false
     });
 
-    res.status(200).json({ message: 'Payment recorded' });
+    // 5. Record penalty splits (pseudo-code, implement PlatformFee/GroupIncome models as needed)
+    if (penalty > 0) {
+      // Save platform fee
+      if (db.PlatformFee) {
+        await db.PlatformFee.create({
+          cycleId,
+          userId,
+          amount: penaltyToPlatform,
+          type: 'late',
+          collectedAt: now
+        });
+      }
+      // Save group fee (optionally, to a group wallet or income table)
+      if (db.GroupIncome) {
+        await db.GroupIncome.create({
+          groupId: cycle.groupId,
+          cycleId,
+          amount: penaltyToGroup,
+          type: 'late',
+          collectedAt: now
+        });
+      }
+    }
+
+    res.status(200).json({
+      message: penalty > 0
+        ? `Payment recorded with late penalty. Wallet debited ${totalAmount} (${amount} + ${penalty} penalty)`
+        : 'Payment recorded and wallet debited'
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -141,10 +198,29 @@ exports.closeCycle = async (req, res) => {
     });
     if (!payout) return res.status(400).json({ message: 'All payouts already completed' });
 
-    const alreadyPaid = await PayoutOrder.findOne({
-      where: { cycleId: id, userId: payout.userId, paid: true }
-    });
-    if (alreadyPaid) return res.status(409).json({ message: 'Duplicate payout attempt' });
+    // --- 2% PLATFORM FEE LOGIC START ---
+    const totalPool = cycle.amount * members.length;
+    const platformFee = totalPool * 0.02;
+    const payoutAmount = totalPool - platformFee;
+
+    // Save platform fee (optional: create PlatformFee model/table)
+    if (db.PlatformFee) {
+      await db.PlatformFee.create({
+        cycleId: cycle.id,
+        amount: platformFee,
+        type: 'cycle',
+        collectedAt: new Date()
+      });
+    }
+    // --- 2% PLATFORM FEE LOGIC END ---
+
+    // Find the payout member's wallet
+    const payoutWallet = await db.Wallet.findOne({ where: { userId: payout.userId } });
+    if (!payoutWallet) return res.status(404).json({ message: 'Payout wallet not found for user' });
+
+    // Add the payout amount (after fee) to the payout member's wallet
+    payoutWallet.balance += payoutAmount;
+    await payoutWallet.save();
 
     payout.paid = true;
     payout.paidAt = new Date();
@@ -153,7 +229,12 @@ exports.closeCycle = async (req, res) => {
     cycle.status = 'completed';
     await cycle.save();
 
-    res.json({ message: 'Cycle closed and payout released' });
+    res.json({
+      message: 'Cycle closed and payout released (2% platform fee deducted)',
+      payoutUserId: payout.userId,
+      payoutAmount,
+      platformFee
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
