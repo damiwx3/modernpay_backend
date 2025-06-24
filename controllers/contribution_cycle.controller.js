@@ -103,7 +103,7 @@ exports.getCyclePayments = async (req, res) => {
       include: [
         {
           model: db.User,
-          as: 'User',
+          as: 'user',
           attributes: ['id', 'fullName', 'email', 'profileImage']
         }
       ],
