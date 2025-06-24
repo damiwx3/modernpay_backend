@@ -41,6 +41,7 @@ router.post('/groups/:groupId/leave', auth, controller.leaveGroup);
 router.put('/groups/:groupId', auth, controller.updateGroup);
 router.get('/payout-history', auth, controller.payoutHistory);
 router.post('/scheduler/trigger', auth, controller.runScheduler);
+router.post('/run-scheduler', auth, controller.runScheduler);
 router.post('/contacts', auth, controller.addContributionContact);
 router.get('/activity-feed', auth, controller.getActivityFeed);
 router.get('/summary', auth, controller.getContributionSummary);
