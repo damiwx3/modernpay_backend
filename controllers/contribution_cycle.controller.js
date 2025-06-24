@@ -178,7 +178,6 @@ exports.getCyclePayments = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-
 exports.closeCycle = async (req, res) => {
   try {
     const { id } = req.params;
@@ -192,8 +191,9 @@ exports.closeCycle = async (req, res) => {
       return res.status(400).json({ message: 'Not all members have paid yet' });
     }
 
+    // FIX: Use status instead of paid
     const payout = await PayoutOrder.findOne({
-      where: { cycleId: id, paid: false },
+      where: { cycleId: id, status: { [db.Sequelize.Op.ne]: 'paid' } }, // <-- FIXED
       order: [['order', 'ASC']]
     });
     if (!payout) return res.status(400).json({ message: 'All payouts already completed' });
@@ -222,7 +222,8 @@ exports.closeCycle = async (req, res) => {
     payoutWallet.balance += payoutAmount;
     await payoutWallet.save();
 
-    payout.paid = true;
+    // FIX: Use status instead of paid
+    payout.status = 'paid'; // <-- FIXED
     payout.paidAt = new Date();
     await payout.save();
 

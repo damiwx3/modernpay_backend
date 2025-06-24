@@ -341,7 +341,7 @@ exports.payoutHistory = async (req, res) => {
   try {
     const userId = req.user.id;
     const payouts = await db.PayoutOrder.findAll({
-      where: { userId, paid: true },
+      where: { userId, status: 'paid' }, // <-- FIXED
       include: [
         { model: db.ContributionCycle, include: [{ model: db.ContributionGroup }] }
       ],
@@ -559,12 +559,13 @@ exports.runScheduler = async (req, res) => {
         await cycle.update({ status: 'closed', closedAt: now }, { transaction: t });
         adminSummary.push(`Closed cycle ${cycle.cycleNumber} for group "${group.name}"`);
 
+        // FIX: Use status instead of paid
         const payoutOrder = await db.PayoutOrder.findOne({
-          where: { cycleId: cycle.id, paid: false },
+          where: { cycleId: cycle.id, status: { [Op.ne]: 'paid' } }, // <-- FIXED
           transaction: t
         });
         if (payoutOrder) {
-          await payoutOrder.update({ paid: true, paidAt: now }, { transaction: t });
+          await payoutOrder.update({ status: 'paid', paidAt: now }, { transaction: t }); // <-- FIXED
           const user = users.find(u => u.id === payoutOrder.userId);
           if (user) {
             await sendNotification(
@@ -607,7 +608,7 @@ exports.runScheduler = async (req, res) => {
             cycleId: newCycle.id,
             userId: nextPayoutUserId,
             cycleNumber: nextCycleNumber,
-            paid: false
+            status: 'pending' // <-- FIXED
           }, { transaction: t });
 
           const newPayments = members.map(member => ({
@@ -617,7 +618,6 @@ exports.runScheduler = async (req, res) => {
             status: 'pending'
           }));
           await db.ContributionPayment.bulkCreate(newPayments, { transaction: t });
-
           // Notify all members about new cycle (template)
           await sendNotification.sendBatchNotification(
             users,
@@ -821,7 +821,7 @@ exports.getContributionSummary = async (req, res) => {
     const totalReceived = await db.PayoutOrder.sum('amount', {
       where: {
         userId,
-        paid: true,
+        status: 'paid', // <-- FIXED
         ...(groupId ? { groupId } : {})
       }
     });
