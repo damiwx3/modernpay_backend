@@ -43,7 +43,7 @@ exports.createCycle = async (req, res) => {
       startDate,
       endDate,
       amount,
-      status: 'active',
+      status: 'open',
       cycleNumber: nextCycleNumber // <-- set cycleNumber here
     });
 
