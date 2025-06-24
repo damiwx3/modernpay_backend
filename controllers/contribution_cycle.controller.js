@@ -30,13 +30,23 @@ exports.createCycle = async (req, res) => {
     if (!groupId || !startDate || !amount) {
       return res.status(400).json({ message: 'Missing fields' });
     }
+
+    // Find the latest cycleNumber for this group
+    const lastCycle = await ContributionCycle.findOne({
+      where: { groupId },
+      order: [['cycleNumber', 'DESC']]
+    });
+    const nextCycleNumber = lastCycle ? lastCycle.cycleNumber + 1 : 1;
+
     const cycle = await ContributionCycle.create({
       groupId,
       startDate,
       endDate,
       amount,
-      status: 'active'
+      status: 'active',
+      cycleNumber: nextCycleNumber // <-- set cycleNumber here
     });
+
     if (payoutOrderType === 'rotational') {
       const members = await ContributionMember.findAll({ where: { groupId } });
       const shuffled = members.sort(() => 0.5 - Math.random());
@@ -54,7 +64,6 @@ exports.createCycle = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-
 exports.makeContribution = async (req, res) => {
   try {
     const { cycleId, amount, txRef } = req.body;
