@@ -62,7 +62,9 @@ app.use('/api/members', require('./routes/member.routes'));
 //app.use('/api/transactions', require('./routes/transaction.routes'));
 app.use('/api/bills', require('./routes/bill.routes'));
 app.use('/uploads', express.static('uploads'));
-
+app.use('/api/group-wallet', require('./routes/group_wallet.routes'));
+app.use('/api/platform-fees', require('./routes/platform_fee.routes'));
+app.use('/api/group-income', require('./routes/group_income.routes'));
 // Swagger
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
