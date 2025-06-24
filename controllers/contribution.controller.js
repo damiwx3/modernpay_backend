@@ -804,3 +804,48 @@ exports.getActivityFeed = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+exports.getContributionSummary = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const groupId = req.query.groupId || req.params.groupId;
+
+    // Total contributed by user (optionally filter by group)
+    const totalContributed = await db.ContributionPayment.sum('amount', {
+      where: {
+        userId,
+        ...(groupId ? { groupId } : {})
+      }
+    });
+
+    // Total received by user (from payouts)
+    const totalReceived = await db.PayoutOrder.sum('amount', {
+      where: {
+        userId,
+        paid: true,
+        ...(groupId ? { groupId } : {})
+      }
+    });
+
+    // Groups joined
+    const groupsJoined = await db.ContributionMember.count({
+      where: { userId }
+    });
+
+    // Recent cycles (last 5)
+    const recentCycles = await db.ContributionCycle.findAll({
+      where: groupId ? { groupId } : {},
+      order: [['createdAt', 'DESC']],
+      limit: 5,
+      attributes: ['cycleNumber']
+    });
+
+    res.json({
+      totalContributed: totalContributed || 0,
+      totalReceived: totalReceived || 0,
+      groupsJoined: groupsJoined || 0,
+      recentCycles: recentCycles.map(c => ({ cycleNumber: c.cycleNumber }))
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};

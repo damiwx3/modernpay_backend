@@ -5,6 +5,7 @@ const controller = require('../controllers/contribution.controller');
 const auth = require('../middleware/auth.middleware');
 const multer = require('multer');
 
+
 // Setup Multer for image upload
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -42,6 +43,7 @@ router.get('/payout-history', auth, controller.payoutHistory);
 router.post('/scheduler/trigger', auth, controller.runScheduler);
 router.post('/contacts', auth, controller.addContributionContact);
 router.get('/activity-feed', auth, controller.getActivityFeed);
+router.get('/summary', auth, controller.getContributionSummary);
 router.get('/analytics', auth, controller.getAnalytics);
 router.get('/settings', auth, controller.getSettings);
 router.put('/settings', auth, controller.saveSettings);
