@@ -30,3 +30,14 @@ exports.getMemberProfile = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+// GET /api/members
+exports.listMembers = async (req, res) => {
+  try {
+    const members = await db.User.findAll({
+      attributes: ['id', 'fullName', 'email', 'profileImage']
+    });
+    res.json({ members });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};

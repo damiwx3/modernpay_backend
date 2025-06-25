@@ -6,5 +6,6 @@ const auth = require('../middleware/auth.middleware');
 
 // Should be:
 router.get('/:id/profile', auth, controller.getMemberProfile);
+router.get('/', controller.listMembers);
 
 module.exports = router;
