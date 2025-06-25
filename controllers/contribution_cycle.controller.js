@@ -7,7 +7,9 @@ const PayoutOrder = db.PayoutOrder;
 
 exports.getAllCycles = async (req, res) => {
   try {
-    const cycles = await ContributionCycle.findAll();
+    const { groupId } = req.query;
+    const where = groupId ? { groupId: Number(groupId) } : {};
+    const cycles = await ContributionCycle.findAll({ where });
     res.status(200).json({ cycles });
   } catch (err) {
     res.status(500).json({ error: err.message });
