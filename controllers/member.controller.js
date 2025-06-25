@@ -30,13 +30,38 @@ exports.getMemberProfile = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-// GET /api/members
+
+// GET /api/members?groupId=123
 exports.listMembers = async (req, res) => {
   try {
-    const members = await db.User.findAll({
-      attributes: ['id', 'fullName', 'email', 'profileImage']
-    });
-    res.json({ members });
+    const { groupId } = req.query;
+    if (groupId) {
+      // Find all ContributionMembers for the group, include user info
+      const members = await db.ContributionMember.findAll({
+        where: { groupId },
+        include: [{
+          model: db.User,
+          as: 'user',
+          attributes: ['id', 'fullName', 'email', 'profileImage']
+        }]
+      });
+
+      // Flatten user info for frontend
+      const result = members.map(m => ({
+        id: m.user.id,
+        fullName: m.user.fullName,
+        email: m.user.email,
+        profileImage: m.user.profileImage,
+      }));
+
+      return res.json({ members: result });
+    } else {
+      // Return all users if no groupId is provided (original behavior)
+      const members = await db.User.findAll({
+        attributes: ['id', 'fullName', 'email', 'profileImage']
+      });
+      return res.json({ members });
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
