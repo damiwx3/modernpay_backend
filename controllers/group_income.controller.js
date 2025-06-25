@@ -4,7 +4,11 @@ exports.getGroupIncome = async (req, res) => {
   try {
     const { groupId } = req.params;
     const income = await db.GroupIncome.findAll({
-      where: { groupId },
+      where: { groupId: Number(groupId) },
+      include: [
+        { model: db.User, as: 'user', attributes: ['id', 'fullName', 'email'] },
+        { model: db.ContributionCycle, as: 'cycle', attributes: ['id', 'cycleNumber'] }
+      ],
       order: [['collectedAt', 'DESC']]
     });
     res.json({ income });
