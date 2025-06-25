@@ -36,9 +36,9 @@ exports.listMembers = async (req, res) => {
   try {
     const { groupId } = req.query;
     if (groupId) {
-      // Find all ContributionMembers for the group, include user info
+      // Ensure groupId is a number for the query
       const members = await db.ContributionMember.findAll({
-        where: { groupId },
+        where: { groupId: Number(groupId) },
         include: [{
           model: db.User,
           as: 'user',
