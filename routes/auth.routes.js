@@ -162,5 +162,6 @@ router.post('/forgot-password', authController.forgotPassword);
  *         description: Invalid OTP or input
  */
 router.post('/reset-password', authController.resetPassword);
+router.post('/google', authController.googleLogin);
 
 module.exports = router;

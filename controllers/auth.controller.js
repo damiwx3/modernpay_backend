@@ -4,6 +4,8 @@ const jwt = require('jsonwebtoken');
 const generateOTP = require('../utils/generateOTP');
 const sendEmail = require('../utils/sendEmail');
 const sendSms = require('../utils/sendSms');
+const { OAuth2Client } = require('google-auth-library');
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Helper to convert local phone numbers to international format (Nigeria)
 function toInternational(phone) {
@@ -323,5 +325,63 @@ exports.resetPassword = async (req, res) => {
   } catch (err) {
     console.error('Reset Password error:', err.message);
     res.status(500).json({ message: 'Failed to reset password' });
+  }
+};
+// Google Login
+exports.googleLogin = async (req, res) => {
+  try {
+    const { idToken } = req.body;
+    if (!idToken) return res.status(400).json({ message: 'No idToken provided' });
+
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    const email = payload.email;
+    const fullName = payload.name;
+    const photoURL = payload.picture;
+
+    // Find or create user
+    let user = await db.User.findOne({ where: { email } });
+    if (!user) {
+      user = await db.User.create({
+        email,
+        fullName,
+        profileImage: photoURL,
+        isGoogle: true,
+        emailVerified: true,
+      });
+    }
+
+    // Generate JWT
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // Audit log
+    await db.AuditLog.create({
+      userId: user.id,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      action: 'google_login',
+      status: 'success'
+    });
+
+    res.json({
+      statusCode: 200,
+      user: {
+        id: user.id,
+        fullName: user.fullName,
+        email: user.email,
+        profileImage: user.profileImage,
+      },
+      token,
+    });
+  } catch (err) {
+    console.error('Google Login error:', err.message);
+    res.status(500).json({ message: 'Google login failed', error: err.message });
   }
 };
