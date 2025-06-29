@@ -1,10 +1,11 @@
-
 const db = require('../models');
 const ContributionCycle = db.ContributionCycle;
 const ContributionPayment = db.ContributionPayment;
 const ContributionMember = db.ContributionMember;
 const PayoutOrder = db.PayoutOrder;
+const Wallet = db.Wallet;
 
+// Get all cycles (optionally by group)
 exports.getAllCycles = async (req, res) => {
   try {
     const { groupId } = req.query;
@@ -16,13 +17,14 @@ exports.getAllCycles = async (req, res) => {
   }
 };
 
+// Get cycle by ID, including next payout recipient and payout amount
 exports.getCycleById = async (req, res) => {
   try {
-    const cycle = await db.ContributionCycle.findByPk(req.params.id, {
+    const cycle = await ContributionCycle.findByPk(req.params.id, {
       include: [
         {
           model: db.ContributionMember,
-          as: 'recipient', // Make sure this alias matches your association
+          as: 'recipient',
           include: [{ model: db.User, as: 'user', attributes: ['id', 'fullName'] }]
         }
       ]
@@ -36,14 +38,25 @@ exports.getCycleById = async (req, res) => {
       totalAmount = payments || 0;
     }
 
+    // Find the next unpaid payout order for this cycle
+    const nextPayout = await db.PayoutOrder.findOne({
+      where: { cycleId: cycle.id, status: { [db.Sequelize.Op.ne]: 'paid' } },
+      order: [['order', 'ASC']],
+      include: [{ model: db.User, as: 'user', attributes: ['id', 'fullName'] }]
+    });
+
     res.status(200).json({
       cycle: {
         ...cycle.toJSON(),
         totalAmount,
-        recipient: cycle.recipient ? {
-          id: cycle.recipient.user?.id,
-          fullName: cycle.recipient.user?.fullName
-        } : null
+        nextPayoutRecipient: nextPayout
+          ? {
+              id: nextPayout.user?.id,
+              fullName: nextPayout.user?.fullName,
+              order: nextPayout.order
+            }
+          : null,
+        payoutAmount: totalAmount // or use your payout calculation logic
       }
     });
   } catch (err) {
@@ -51,6 +64,22 @@ exports.getCycleById = async (req, res) => {
   }
 };
 
+// Get the full payout order for a cycle
+exports.getPayoutOrder = async (req, res) => {
+  try {
+    const { id } = req.params; // cycleId
+    const orders = await db.PayoutOrder.findAll({
+      where: { cycleId: id },
+      order: [['order', 'ASC']],
+      include: [{ model: db.User, attributes: ['id', 'fullName', 'email', 'profileImage'] }]
+    });
+    res.json({ payoutOrder: orders });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Create a new contribution cycle and payout order (rotational/random)
 exports.createCycle = async (req, res) => {
   try {
     const { groupId, startDate, endDate, amount, payoutOrderType } = req.body;
@@ -71,29 +100,35 @@ exports.createCycle = async (req, res) => {
       endDate,
       amount,
       status: 'open',
-      cycleNumber: nextCycleNumber // <-- set cycleNumber here
+      cycleNumber: nextCycleNumber
     });
 
-    if (payoutOrderType === 'rotational') {
-      const members = await ContributionMember.findAll({ where: { groupId } });
-      const shuffled = members.sort(() => 0.5 - Math.random());
-      for (let i = 0; i < shuffled.length; i++) {
-        await PayoutOrder.create({
-          cycleId: cycle.id,
-          userId: shuffled[i].userId,
-          order: i + 1,
-          paid: false
-        });
-      }
+    // Always create payout order for all members
+    const members = await ContributionMember.findAll({ where: { groupId } });
+    let payoutOrderList = members;
+
+    // Shuffle if rotational/random
+    if (payoutOrderType === 'rotational' || payoutOrderType === 'random' || payoutOrderType === 'spin') {
+      payoutOrderList = members.sort(() => Math.random() - 0.5);
     }
+
+    for (let i = 0; i < payoutOrderList.length; i++) {
+      await PayoutOrder.create({
+        cycleId: cycle.id,
+        userId: payoutOrderList[i].userId,
+        groupId,
+        order: i + 1,
+        status: 'pending'
+      });
+    }
+
     res.status(201).json({ cycle });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
-// const db = require('../models');
-const Wallet = db.Wallet; // Make sure your Wallet model is loaded
 
+// Make a contribution payment
 exports.makeContribution = async (req, res) => {
   try {
     const { cycleId, amount, txRef } = req.body;
@@ -185,10 +220,11 @@ exports.makeContribution = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+// Get all payments for a cycle
 exports.getCyclePayments = async (req, res) => {
   try {
     const { id } = req.params;
-    // Fetch all payments for this cycle, including user info if available
     const payments = await db.ContributionPayment.findAll({
       where: { cycleId: id },
       include: [
@@ -205,6 +241,8 @@ exports.getCyclePayments = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+// Close a cycle and trigger payout (release to next in order)
 exports.closeCycle = async (req, res) => {
   try {
     const { id } = req.params;
@@ -218,9 +256,9 @@ exports.closeCycle = async (req, res) => {
       return res.status(400).json({ message: 'Not all members have paid yet' });
     }
 
-    // FIX: Use status instead of paid
+    // Find the next unpaid payout order
     const payout = await PayoutOrder.findOne({
-      where: { cycleId: id, status: { [db.Sequelize.Op.ne]: 'paid' } }, // <-- FIXED
+      where: { cycleId: id, status: { [db.Sequelize.Op.ne]: 'paid' } },
       order: [['order', 'ASC']]
     });
     if (!payout) return res.status(400).json({ message: 'All payouts already completed' });
@@ -230,7 +268,7 @@ exports.closeCycle = async (req, res) => {
     const platformFee = totalPool * 0.02;
     const payoutAmount = totalPool - platformFee;
 
-    // Save platform fee (optional: create PlatformFee model/table)
+    // Save platform fee
     if (db.PlatformFee) {
       await db.PlatformFee.create({
         cycleId: cycle.id,
@@ -249,22 +287,77 @@ exports.closeCycle = async (req, res) => {
     payoutWallet.balance += payoutAmount;
     await payoutWallet.save();
 
-    // FIX: Use status instead of paid
-    payout.status = 'paid'; // <-- FIXED
+    payout.status = 'paid';
     payout.paidAt = new Date();
     await payout.save();
 
-    cycle.status = 'completed';
-    await cycle.save();
+    // Only complete cycle if all payouts are done
+    const unpaid = await PayoutOrder.count({ where: { cycleId: id, status: { [db.Sequelize.Op.ne]: 'paid' } } });
+    if (unpaid === 0) {
+      cycle.status = 'completed';
+      await cycle.save();
+    }
 
     res.json({
-      message: 'Cycle closed and payout released (2% platform fee deducted)',
+      message: 'Payout released (2% platform fee deducted)',
       payoutUserId: payout.userId,
       payoutAmount,
       platformFee
     });
   } catch (err) {
     console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};
+// User spins for their payout order in a cycle
+exports.spinForOrder = async (req, res) => {
+  try {
+    const { id } = req.params; // cycleId
+    const userId = req.user.id;
+
+    // Check if user already has a payout order for this cycle
+    const existing = await db.PayoutOrder.findOne({ where: { cycleId: id, userId } });
+    if (existing) {
+      return res.status(400).json({ message: 'You have already spun for your position.' });
+    }
+
+    // Get all assigned orders for this cycle
+    const assignedOrders = await db.PayoutOrder.findAll({
+      where: { cycleId: id },
+      attributes: ['order']
+    });
+    const assignedNumbers = assignedOrders.map(o => o.order);
+
+    // Get total number of members in the group
+    const cycle = await db.ContributionCycle.findByPk(id);
+    if (!cycle) return res.status(404).json({ message: 'Cycle not found' });
+    const members = await db.ContributionMember.findAll({ where: { groupId: cycle.groupId } });
+    const totalMembers = members.length;
+
+    // Find available numbers (1...N)
+    const availableNumbers = [];
+    for (let i = 1; i <= totalMembers; i++) {
+      if (!assignedNumbers.includes(i)) availableNumbers.push(i);
+    }
+    if (availableNumbers.length === 0) {
+      return res.status(400).json({ message: 'All positions have been assigned.' });
+    }
+
+    // Randomly assign a number from availableNumbers
+    const randomIndex = Math.floor(Math.random() * availableNumbers.length);
+    const assignedOrder = availableNumbers[randomIndex];
+
+    // Create the payout order for this user
+    await db.PayoutOrder.create({
+      cycleId: id,
+      userId,
+      groupId: cycle.groupId,
+      order: assignedOrder,
+      status: 'pending'
+    });
+
+    res.json({ message: 'Spin successful!', order: assignedOrder });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
