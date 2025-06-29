@@ -18,34 +18,9 @@ exports.getAllCycles = async (req, res) => {
 
 exports.getCycleById = async (req, res) => {
   try {
-    const cycle = await db.ContributionCycle.findByPk(req.params.id, {
-      include: [
-        {
-          model: db.ContributionMember,
-          as: 'recipient', // Make sure this alias matches your association
-          include: [{ model: db.User, as: 'user', attributes: ['id', 'fullName'] }]
-        }
-      ]
-    });
+    const cycle = await ContributionCycle.findByPk(req.params.id);
     if (!cycle) return res.status(404).json({ message: 'Cycle not found' });
-
-    // Calculate total amount (if not stored in the cycle)
-    let totalAmount = cycle.totalAmount;
-    if (!totalAmount) {
-      const payments = await db.ContributionPayment.sum('amount', { where: { cycleId: cycle.id } });
-      totalAmount = payments || 0;
-    }
-
-    res.status(200).json({
-      cycle: {
-        ...cycle.toJSON(),
-        totalAmount,
-        recipient: cycle.recipient ? {
-          id: cycle.recipient.user?.id,
-          fullName: cycle.recipient.user?.fullName
-        } : null
-      }
-    });
+    res.status(200).json({ cycle }); // <-- wrap in { cycle }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
