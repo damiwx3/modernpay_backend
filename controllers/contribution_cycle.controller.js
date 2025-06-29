@@ -71,7 +71,11 @@ exports.getPayoutOrder = async (req, res) => {
     const orders = await db.PayoutOrder.findAll({
       where: { cycleId: id },
       order: [['order', 'ASC']],
-      include: [{ model: db.User, attributes: ['id', 'fullName', 'email', 'profileImage'] }]
+      include: [{
+        model: db.User,
+        as: 'user', // <-- Use the alias defined in your model
+        attributes: ['id', 'fullName', 'email', 'profileImage']
+      }]
     });
     res.json({ payoutOrder: orders });
   } catch (err) {
@@ -309,6 +313,7 @@ exports.closeCycle = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
 // User spins for their payout order in a cycle
 exports.spinForOrder = async (req, res) => {
   try {
