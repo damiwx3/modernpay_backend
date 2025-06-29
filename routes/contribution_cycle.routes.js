@@ -1,9 +1,9 @@
-
 const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/contribution_cycle.controller');
 const auth = require('../middleware/auth.middleware');
 
+// Get all cycles for a group
 router.get('/group/:groupId', auth, async (req, res) => {
   try {
     const groupId = req.params.groupId;
@@ -14,7 +14,7 @@ router.get('/group/:groupId', auth, async (req, res) => {
   }
 });
 
-// Get all cycles
+// Get all cycles (optionally filtered)
 router.get('/', auth, controller.getAllCycles);
 
 // Get cycle by ID
@@ -26,12 +26,16 @@ router.post('/', auth, controller.createCycle);
 // Make a contribution payment
 router.post('/:id/contribute', auth, controller.makeContribution);
 
-// Close a cycle and trigger payout
+// Get the full payout order for a cycle
 router.get('/:id/payout-order', auth, controller.getPayoutOrder);
+
+// User spins for their payout order in a cycle
 router.post('/:id/spin', auth, controller.spinForOrder);
+
+// Close a cycle and trigger payout
 router.post('/:id/close', auth, controller.closeCycle);
+
+// Get all payments for a cycle
 router.get('/:id/payments', auth, controller.getCyclePayments);
-
-
 
 module.exports = router;
