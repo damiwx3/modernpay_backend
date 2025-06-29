@@ -10,7 +10,11 @@ module.exports = (sequelize, DataTypes) => {
     },
     userId: {
       type: DataTypes.INTEGER,
-      allowNull: true, // Optional, for direct user reference
+      allowNull: true,
+    },
+    groupId: { // <-- Add this field
+      type: DataTypes.INTEGER,
+      allowNull: false,
     },
     amount: {
       type: DataTypes.FLOAT,
@@ -32,8 +36,9 @@ module.exports = (sequelize, DataTypes) => {
 
   ContributionPayment.associate = models => {
     ContributionPayment.belongsTo(models.User, { foreignKey: 'userId', as: 'user' });
-ContributionPayment.belongsTo(models.ContributionMember, { foreignKey: 'memberId' });
-ContributionPayment.belongsTo(models.ContributionCycle, { foreignKey: 'cycleId' });
+    ContributionPayment.belongsTo(models.ContributionMember, { foreignKey: 'memberId' });
+    ContributionPayment.belongsTo(models.ContributionCycle, { foreignKey: 'cycleId' });
+    ContributionPayment.belongsTo(models.ContributionGroup, { foreignKey: 'groupId' });
   };
 
   return ContributionPayment;

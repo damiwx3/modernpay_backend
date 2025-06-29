@@ -8,6 +8,11 @@ module.exports = (sequelize, DataTypes) => {
       unique: true,
       validate: { isEmail: true }
     },
+     referralCode: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true
+    },
     password: { type: DataTypes.STRING, allowNull: false },
     phoneNumber: { type: DataTypes.STRING, allowNull: true },
     deviceToken: { type: DataTypes.STRING, allowNull: true },
@@ -31,7 +36,7 @@ module.exports = (sequelize, DataTypes) => {
     bvn: { type: DataTypes.STRING },
     address: { type: DataTypes.STRING },
     selfieUrl: { type: DataTypes.STRING },
-    profileImage: { type: DataTypes.STRING, allowNull: true }, // <-- Add this line
+    profileImage: { type: DataTypes.STRING, allowNull: true }, 
     isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
     transactionPin: { type: DataTypes.STRING, allowNull: true },
     twoFactorEnabled: { type: DataTypes.BOOLEAN, defaultValue: false },
