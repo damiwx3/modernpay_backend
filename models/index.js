@@ -68,7 +68,7 @@ db.ContributionSetting = ContributionSetting;
 // ==========================
 // ✅ Define Relationships Here
 // ==========================
-
+db.User = require('./user.model')(sequelize, DataTypes);
 db.User.hasOne(db.Wallet, { foreignKey: 'userId' });
 db.Wallet.belongsTo(db.User, { foreignKey: 'userId' });
 
