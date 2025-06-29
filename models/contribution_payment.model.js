@@ -14,7 +14,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     groupId: { // <-- Add this field
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true,
     },
     amount: {
       type: DataTypes.FLOAT,
