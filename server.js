@@ -13,6 +13,7 @@ const startServer = async () => {
     console.log('✅ Database connected successfully.');
 
     await db.sequelize.sync({ alter: true });
+   // await db.sequelize.sync({ alter: true, logging: console.log });
     console.log('🔁 Models synchronized.');
 
     app.listen(PORT, () => {

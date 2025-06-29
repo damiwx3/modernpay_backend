@@ -49,8 +49,8 @@ module.exports = (sequelize, DataTypes) => {
     User.hasMany(models.ContributionPayment, { foreignKey: 'userId', as: 'contributionPayments' });
 
     // Add other associations as needed, for example:
-    //User.hasMany(models.ContributionMember, { foreignKey: 'userId' });
-    //User.hasMany(models.ContributionInvite, { foreignKey: 'invitedUserId' });
+    User.hasMany(models.ContributionMember, { foreignKey: 'userId' });
+    User.hasMany(models.ContributionInvite, { foreignKey: 'invitedUserId' });
   };
 
   return User;
