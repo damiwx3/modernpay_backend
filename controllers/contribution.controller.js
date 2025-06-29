@@ -51,32 +51,43 @@ exports.createGroup = async (req, res) => {
     if (req.file) {
       imageUrl = req.file.path;
     }
+const group = await db.ContributionGroup.create({
+  name,
+  description: description || null,
+  amountPerMember: parseFloat(amountPerMember),
+  frequency,
+  payoutSchedule,
+  imageUrl,
+  createdBy: req.user.id,
+  maxMembers: maxMembers ? parseInt(maxMembers) : 10,
+  status: 'active',
+  isPublic: isPublic === 'true' || isPublic === true,
+  payoutOrderType: payoutOrderType || 'random',
+  penaltyAmount: penaltyAmount ? parseFloat(penaltyAmount) : 0
+}, { transaction: t });
 
-    const group = await db.ContributionGroup.create({
-      name,
-      description: description || null,
-      amountPerMember: parseFloat(amountPerMember),
-      frequency,
-      payoutSchedule,
-      imageUrl,
-      createdBy: req.user.id,
-      maxMembers: maxMembers ? parseInt(maxMembers) : 10,
-      status: 'active',
-      isPublic: isPublic === 'true' || isPublic === true,
-      payoutOrderType: payoutOrderType || 'random',
-      penaltyAmount: penaltyAmount ? parseFloat(penaltyAmount) : 0
-    }, { transaction: t });
+await db.ContributionMember.create({
+  groupId: group.id,
+  userId: req.user.id,
+  isAdmin: true,
+  joinedAt: new Date()
+}, { transaction: t });
 
-    await db.ContributionMember.create({
-      groupId: group.id,
-      userId: req.user.id,
-      isAdmin: true,
-      joinedAt: new Date()
-    }, { transaction: t });
+// ✅ Create the first cycle for the group
+const now = new Date();
+const endDate = calculateEndDate(now, frequency);
+await db.ContributionCycle.create({
+  groupId: group.id,
+  startDate: now,
+  endDate,
+  amount: parseFloat(amountPerMember),
+  status: 'open',
+  cycleNumber: 1
+}, { transaction: t });
 
-    await t.commit();
-    logger.info(`Group created: ${group.name} by user ${req.user.id}`);
-    return res.status(201).json({ group });
+await t.commit();
+logger.info(`Group created: ${group.name} by user ${req.user.id}`);
+return res.status(201).json({ group });
   } catch (err) {
     await t.rollback();
     logger.error('Error creating group:', err);
