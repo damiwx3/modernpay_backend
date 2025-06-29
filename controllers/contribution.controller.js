@@ -181,13 +181,25 @@ exports.getGroupDetails = async (req, res) => {
       return res.status(404).json({ message: 'Sorry, this group does not exist.' });
     }
 
+    // Find the current/active cycle for this group
+    const currentCycle = await db.ContributionCycle.findOne({
+      where: { groupId: id, status: 'open' }, // or 'active' if that's your status
+      order: [['cycleNumber', 'DESC']]
+    });
+
     const members = await db.ContributionMember.findAll({
       where: { groupId: id },
       include: [{ model: db.User, as: 'user', attributes: ['fullName'] }]
     });
 
     logger.info(`Fetched details for group ${id}`);
-    return res.status(200).json({ group, members });
+    return res.status(200).json({
+      group: {
+        ...group.toJSON(),
+        currentCycleId: currentCycle ? currentCycle.id : null // <-- Add this field
+      },
+      members
+    });
   } catch (err) {
     logger.error('Error fetching group details:', err);
     return res.status(500).json({ error: err.message });
@@ -237,7 +249,7 @@ exports.inviteToGroup = async (req, res) => {
         groupName: group.name,
         description: group.description || 'No description',
         amountPerMember: group.amountPerMember,
-        inviteLink: `https://modernpayfinance.com/join-group?groupId=${groupId}`
+        inviteLink: `https://modernpay9ja.com/join-group?groupId=${groupId}`
       });
       await sendEmail({
         to: email,
