@@ -18,8 +18,10 @@ exports.getAllCycles = async (req, res) => {
 };
 
 // Get cycle by ID, including next payout recipient and payout amount
+
 exports.getCycleById = async (req, res) => {
   try {
+    console.log('Fetching cycle with id:', req.params.id);
     const cycle = await ContributionCycle.findByPk(req.params.id, {
       include: [
         {
@@ -246,45 +248,45 @@ exports.getCyclePayments = async (req, res) => {
 exports.closeCycle = async (req, res) => {
   try {
     const { id } = req.params;
-    const cycle = await ContributionCycle.findByPk(id);
+    const cycle = await db.ContributionCycle.findByPk(id);
     if (!cycle) return res.status(404).json({ message: 'Cycle not found' });
 
-    const payments = await ContributionPayment.findAll({ where: { cycleId: id, status: 'success' } });
-    const members = await ContributionMember.findAll({ where: { groupId: cycle.groupId } });
+    const payments = await db.ContributionPayment.findAll({ where: { cycleId: id, status: 'success' } });
+    const members = await db.ContributionMember.findAll({ where: { groupId: cycle.groupId } });
 
     if (payments.length < members.length) {
       return res.status(400).json({ message: 'Not all members have paid yet' });
     }
 
     // Find the next unpaid payout order
-    const payout = await PayoutOrder.findOne({
+    const payout = await db.PayoutOrder.findOne({
       where: { cycleId: id, status: { [db.Sequelize.Op.ne]: 'paid' } },
       order: [['order', 'ASC']]
     });
     if (!payout) return res.status(400).json({ message: 'All payouts already completed' });
 
-    // --- 2% PLATFORM FEE LOGIC START ---
-    const totalPool = cycle.amount * members.length;
-    const platformFee = totalPool * 0.02;
-    const payoutAmount = totalPool - platformFee;
+    // --- 2% PLATFORM FEE LOGIC: Deduct for THIS payout ---
+    const payoutAmount = cycle.amount * members.length;
+    const platformFee = payoutAmount * 0.02;
+    const netPayout = payoutAmount - platformFee;
 
-    // Save platform fee
+    // Save platform fee for this payout
     if (db.PlatformFee) {
       await db.PlatformFee.create({
         cycleId: cycle.id,
+        userId: payout.userId,
         amount: platformFee,
         type: 'cycle',
         collectedAt: new Date()
       });
     }
-    // --- 2% PLATFORM FEE LOGIC END ---
 
     // Find the payout member's wallet
     const payoutWallet = await db.Wallet.findOne({ where: { userId: payout.userId } });
     if (!payoutWallet) return res.status(404).json({ message: 'Payout wallet not found for user' });
 
     // Add the payout amount (after fee) to the payout member's wallet
-    payoutWallet.balance += payoutAmount;
+    payoutWallet.balance += netPayout;
     await payoutWallet.save();
 
     payout.status = 'paid';
@@ -292,7 +294,7 @@ exports.closeCycle = async (req, res) => {
     await payout.save();
 
     // Only complete cycle if all payouts are done
-    const unpaid = await PayoutOrder.count({ where: { cycleId: id, status: { [db.Sequelize.Op.ne]: 'paid' } } });
+    const unpaid = await db.PayoutOrder.count({ where: { cycleId: id, status: { [db.Sequelize.Op.ne]: 'paid' } } });
     if (unpaid === 0) {
       cycle.status = 'completed';
       await cycle.save();
@@ -301,7 +303,7 @@ exports.closeCycle = async (req, res) => {
     res.json({
       message: 'Payout released (2% platform fee deducted)',
       payoutUserId: payout.userId,
-      payoutAmount,
+      payoutAmount: netPayout,
       platformFee
     });
   } catch (err) {
@@ -309,6 +311,7 @@ exports.closeCycle = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+   
 // User spins for their payout order in a cycle
 exports.spinForOrder = async (req, res) => {
   try {
