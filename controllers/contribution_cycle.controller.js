@@ -71,11 +71,7 @@ exports.getPayoutOrder = async (req, res) => {
     const orders = await db.PayoutOrder.findAll({
       where: { cycleId: id },
       order: [['order', 'ASC']],
-      include: [{
-        model: db.User,
-        as: 'user', // <-- Use the alias defined in your model
-        attributes: ['id', 'fullName', 'email', 'profileImage']
-      }]
+      include: [{ model: db.User, attributes: ['id', 'fullName', 'email', 'profileImage'] }]
     });
     res.json({ payoutOrder: orders });
   } catch (err) {
@@ -107,24 +103,24 @@ exports.createCycle = async (req, res) => {
       cycleNumber: nextCycleNumber
     });
 
-    // Always create payout order for all members
-    const members = await ContributionMember.findAll({ where: { groupId } });
-    let payoutOrderList = members;
-
-    // Shuffle if rotational/random
-    if (payoutOrderType === 'rotational' || payoutOrderType === 'random' || payoutOrderType === 'spin') {
-      payoutOrderList = members.sort(() => Math.random() - 0.5);
+    // Only pre-create payout orders for rotational/random
+    if (payoutOrderType === 'rotational' || payoutOrderType === 'random') {
+      const members = await ContributionMember.findAll({ where: { groupId } });
+      let payoutOrderList = members;
+      if (payoutOrderType === 'random') {
+        payoutOrderList = members.sort(() => Math.random() - 0.5);
+      }
+      for (let i = 0; i < payoutOrderList.length; i++) {
+        await PayoutOrder.create({
+          cycleId: cycle.id,
+          userId: payoutOrderList[i].userId,
+          groupId,
+          order: i + 1,
+          status: 'pending'
+        });
+      }
     }
-
-    for (let i = 0; i < payoutOrderList.length; i++) {
-      await PayoutOrder.create({
-        cycleId: cycle.id,
-        userId: payoutOrderList[i].userId,
-        groupId,
-        order: i + 1,
-        status: 'pending'
-      });
-    }
+    // For 'spin', do NOT pre-create payout orders
 
     res.status(201).json({ cycle });
   } catch (err) {
@@ -313,7 +309,6 @@ exports.closeCycle = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-
 // User spins for their payout order in a cycle
 exports.spinForOrder = async (req, res) => {
   try {
