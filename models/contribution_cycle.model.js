@@ -33,6 +33,8 @@ module.exports = (sequelize, DataTypes) => {
     ContributionCycle.belongsTo(models.ContributionGroup, { foreignKey: 'groupId' });
     ContributionCycle.hasMany(models.ContributionPayment, { foreignKey: 'cycleId' });
     ContributionCycle.hasMany(models.MissedContribution, { foreignKey: 'cycleId' });
+    ContributionCycle.hasMany(models.ContributionMember, { foreignKey: 'cycleId', as: 'members' });
+
   };
 
   return ContributionCycle;

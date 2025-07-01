@@ -26,7 +26,7 @@ exports.getCycleById = async (req, res) => {
       include: [
         {
           model: db.ContributionMember,
-          as: 'recipient',
+          as: 'members',
           include: [{ model: db.User, as: 'user', attributes: ['id', 'fullName'] }]
         }
       ]
@@ -58,11 +58,11 @@ exports.getCycleById = async (req, res) => {
               order: nextPayout.order
             }
           : null,
-        payoutAmount: totalAmount // or use your payout calculation logic
+        payoutAmount: totalAmount 
       }
     });
   } catch (err) {
-    console.error('getCycleById error:', err); // <-- Add this line for error logging
+    console.error('getCycleById error:', err); 
     res.status(500).json({ error: err.message });
   }
 };
