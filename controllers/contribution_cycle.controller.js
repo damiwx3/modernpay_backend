@@ -62,10 +62,10 @@ exports.getCycleById = async (req, res) => {
       }
     });
   } catch (err) {
+    console.error('getCycleById error:', err); // <-- Add this line for error logging
     res.status(500).json({ error: err.message });
   }
 };
-
 // Get the full payout order for a cycle
 exports.getPayoutOrder = async (req, res) => {
   try {
