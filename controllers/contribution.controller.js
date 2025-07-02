@@ -169,9 +169,16 @@ exports.getUserGroups = async (req, res) => {
       limit: parseInt(limit)
     });
 
+    // Add membersCount to each group
+    const groupsWithCounts = await Promise.all(groups.rows.map(async (g) => {
+      const groupObj = g.toJSON();
+      groupObj.membersCount = await db.ContributionMember.count({ where: { groupId: g.id } });
+      return groupObj;
+    }));
+
     logger.info(`Fetched groups for user ${userId}`);
     return res.status(200).json({
-      groups: groups.rows,
+      groups: groupsWithCounts,
       total: groups.count,
       page: parseInt(page),
       limit: parseInt(limit)
