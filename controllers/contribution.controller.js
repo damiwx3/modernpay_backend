@@ -192,23 +192,24 @@ exports.getGroupDetails = async (req, res) => {
       return res.status(404).json({ message: 'Sorry, this group does not exist.' });
     }
 
-    // Find the current/active cycle for this group
     const currentCycle = await db.ContributionCycle.findOne({
-      where: { groupId: id, status: 'open' }, // or 'active' if that's your status
+      where: { groupId: id, status: 'open' },
       order: [['cycleNumber', 'DESC']]
     });
 
     const members = await db.ContributionMember.findAll({
       where: { groupId: id },
-      include: [{ model: db.User, as: 'user', attributes: ['fullName'] }]
+      include: [{ model: db.User, as: 'user', attributes: ['fullName', 'id'] }]
     });
+
+    // Add membersCount to group object
+    const groupObj = group.toJSON();
+    groupObj.currentCycleId = currentCycle ? currentCycle.id : null;
+    groupObj.membersCount = members.length;
 
     logger.info(`Fetched details for group ${id}`);
     return res.status(200).json({
-      group: {
-        ...group.toJSON(),
-        currentCycleId: currentCycle ? currentCycle.id : null // <-- Add this field
-      },
+      group: groupObj,
       members
     });
   } catch (err) {
@@ -709,23 +710,58 @@ exports.addContributionContact = async (req, res) => {
 
 exports.getAnalytics = async (req, res) => {
   try {
-    const totalContributions = await db.ContributionPayment.sum('amount', { where: { status: 'success' } });
+    const groupId = req.query.groupId;
+    const where = groupId ? { groupId } : {};
+
+    const totalContributions = await db.ContributionPayment.sum('amount', { where: { ...where, status: 'success' } });
+
     const topContributor = await db.User.findOne({
       include: [{
         model: db.ContributionPayment,
-        as: 'contributionPayments', // <-- use the alias from your User.hasMany association
-        where: { status: 'success' }
+        as: 'contributionPayments',
+        where: { ...where, status: 'success' }
       }],
       order: [
-        [db.Sequelize.literal('(SELECT SUM(amount) FROM "ContributionPayments" WHERE "ContributionPayments"."userId" = "User"."id")'), 'DESC']
+        [db.Sequelize.literal('(SELECT SUM(amount) FROM "ContributionPayments" WHERE "ContributionPayments"."userId" = "User"."id"' + (groupId ? ` AND "ContributionPayments"."groupId" = ${groupId}` : '') + ')'), 'DESC']
       ]
     });
-    const cycles = await db.ContributionCycle.count({ where: { status: 'completed' } });
+
+    const cycles = await db.ContributionCycle.count({ where: { ...where, status: 'completed' } });
+
+    // Trend calculation
+    const now = new Date();
+    const lastMonth = new Date(now);
+    lastMonth.setDate(now.getDate() - 30);
+    const prevMonth = new Date(now);
+    prevMonth.setDate(now.getDate() - 60);
+
+    const lastMonthSum = await db.ContributionPayment.sum('amount', {
+      where: {
+        ...where,
+        status: 'success',
+        paidAt: { [db.Sequelize.Op.gte]: lastMonth }
+      }
+    });
+    const prevMonthSum = await db.ContributionPayment.sum('amount', {
+      where: {
+        ...where,
+        status: 'success',
+        paidAt: {
+          [db.Sequelize.Op.gte]: prevMonth,
+          [db.Sequelize.Op.lt]: lastMonth
+        }
+      }
+    });
+
+    let trend = '-';
+    if (lastMonthSum > prevMonthSum) trend = 'Upward';
+    else if (lastMonthSum < prevMonthSum) trend = 'Downward';
+    else if (lastMonthSum === prevMonthSum && lastMonthSum !== 0) trend = 'Stable';
 
     res.json({
       totalContributions: totalContributions || 0,
       topContributor: topContributor ? topContributor.fullName : '-',
-      trend: '-',
+      trend,
       cycles
     });
   } catch (err) {
@@ -832,10 +868,11 @@ exports.getContributionSummary = async (req, res) => {
     const userId = req.user.id;
     const groupId = req.query.groupId || req.params.groupId;
 
-    // Total contributed by user (optionally filter by group)
+    // Total contributed by user (successful only)
     const totalContributed = await db.ContributionPayment.sum('amount', {
       where: {
         userId,
+        status: 'success',
         ...(groupId ? { groupId } : {})
       }
     });
@@ -844,7 +881,7 @@ exports.getContributionSummary = async (req, res) => {
     const totalReceived = await db.PayoutOrder.sum('amount', {
       where: {
         userId,
-        status: 'paid', // <-- FIXED
+        status: 'paid',
         ...(groupId ? { groupId } : {})
       }
     });
@@ -854,19 +891,28 @@ exports.getContributionSummary = async (req, res) => {
       where: { userId }
     });
 
-    // Recent cycles (last 5)
-    const recentCycles = await db.ContributionCycle.findAll({
-      where: groupId ? { groupId } : {},
-      order: [['createdAt', 'DESC']],
-      limit: 5,
-      attributes: ['cycleNumber']
+    // Recent cycles the user contributed to
+    const recentPayments = await db.ContributionPayment.findAll({
+      where: {
+        userId,
+        status: 'success',
+        ...(groupId ? { groupId } : {})
+      },
+      include: [{ model: db.ContributionCycle, attributes: ['cycleNumber'] }],
+      order: [['paidAt', 'DESC']],
+      limit: 5
     });
+
+    const recentCycles = recentPayments
+      .map(p => p.ContributionCycle)
+      .filter(c => !!c)
+      .map(c => ({ cycleNumber: c.cycleNumber }));
 
     res.json({
       totalContributed: totalContributed || 0,
       totalReceived: totalReceived || 0,
       groupsJoined: groupsJoined || 0,
-      recentCycles: recentCycles.map(c => ({ cycleNumber: c.cycleNumber }))
+      recentCycles
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
