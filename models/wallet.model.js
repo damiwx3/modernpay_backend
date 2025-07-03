@@ -43,7 +43,7 @@ module.exports = (sequelize, DataTypes) => {
   });
 
   Wallet.associate = (models) => {
-    Wallet.belongsTo(models.User, { foreignKey: 'userId' });
+    //Wallet.belongsTo(models.User, { foreignKey: 'userId' });
     Wallet.belongsTo(models.User, { foreignKey: 'userId', as: 'user' });
   };
 
