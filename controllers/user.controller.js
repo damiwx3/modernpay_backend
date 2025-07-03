@@ -5,10 +5,21 @@ const { v4: uuidv4 } = require('uuid');
 exports.getProfile = async (req, res) => {
   try {
     const user = await db.User.findByPk(req.user.id, {
-      attributes: { exclude: ['password'] }
+      attributes: { exclude: ['password'] },
+      include: [{
+        model: db.Wallet,
+        as: 'wallet',
+        attributes: ['accountNumber']
+      }]
     });
     if (!user) return res.status(404).json({ message: 'User not found' });
-    res.status(200).json({ user });
+
+    // Flatten wallet.accountNumber to accountNumber
+    const userObj = user.toJSON();
+    userObj.accountNumber = userObj.wallet?.accountNumber || 'N/A';
+    delete userObj.wallet; // Optional: remove wallet object if not needed
+
+    res.status(200).json({ user: userObj });
   } catch (err) {
     res.status(500).json({ message: 'Unable to retrieve profile' });
   }
