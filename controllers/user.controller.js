@@ -122,7 +122,6 @@ exports.verifyAccount = async (req, res) => {
     res.status(500).json({ message: 'Failed to verify account' });
   }
 };
-
 // Update current user's profile
 exports.updateProfile = async (req, res) => {
   try {
@@ -150,13 +149,16 @@ exports.updateProfile = async (req, res) => {
     const userData = user.toJSON();
     delete userData.password;
 
+    // Add accountNumber to the response (like getProfile)
+    const wallet = await db.Wallet.findOne({ where: { userId: user.id } });
+    userData.accountNumber = wallet ? wallet.accountNumber : 'N/A';
+
     res.status(200).json({ message: 'Profile updated successfully', user: userData });
   } catch (err) {
-    console.log('Update profile error:', err); // <-- Add this line
+    console.log('Update profile error:', err);
     res.status(500).json({ message: 'Failed to update profile' });
   }
 };
-
 // Get any user by ID (admin or internal use)
 exports.getUserById = async (req, res) => {
   try {
